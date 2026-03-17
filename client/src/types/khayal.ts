@@ -21,6 +21,9 @@ export interface GenerationResult {
   scenarioType: string;
   scenes: GeneratedScene[];
   title?: string;
+  titleEn?: string;
+  synopsis?: string;
+  synopsisEn?: string;
   culturalContext?: string;
   atmosphere?: string;
   cinematicStyle?: string;
@@ -28,6 +31,13 @@ export interface GenerationResult {
   detectedLanguage?: string;
   unifiedConcept?: string;
   filmRequirements?: FilmRequirements;
+  // المحركات الجديدة
+  domain?: string;
+  filmTone?: string;
+  audienceLevel?: string;
+  musicMood?: string;
+  script?: any;    // FilmScript
+  analysis?: any;  // DomainAnalysis
   // Film batch fields
   batchIndex?: number;
   totalScenes?: number;

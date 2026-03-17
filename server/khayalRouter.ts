@@ -18,6 +18,9 @@ import { eq, desc } from "drizzle-orm";
 import { analyzeDocument } from "./documentAnalyzer";
 import type { DocumentAnalysisResult } from "./documentAnalyzer";
 import { checkContent, SAFE_CONTENT_DIRECTIVE } from "./contentFilter";
+import { analyzeDomain, buildDomainPrompt, quickDetectDomain } from "./domainEngine";
+import type { DomainAnalysis } from "./domainEngine";
+import { generateScript } from "./scriptEngine";
 
 // ═══════════════════════════════════════════════════════════════
 // CAMERA ANGLES — زوايا الكاميرا المحددة لكتلة واحدة
@@ -702,5 +705,139 @@ export const khayalRouter = router({
       return db.select().from(khayalScenes)
         .where(eq(khayalScenes.projectId, input.projectId))
         .orderBy(khayalScenes.order);
+    }),
+
+  // ══════════════════════════════════════════════════════════════
+  // المقوم 1: تحليل المحتوى وخطة الفيلم
+  // ══════════════════════════════════════════════════════════════
+  analyzeDomain: publicProcedure
+    .input(z.object({
+      description: z.string().min(2),
+    }))
+    .mutation(async ({ input }) => {
+      // كشف سريع بدون AI أولاً
+      const quickDomain = quickDetectDomain(input.description);
+
+      // تحليل عميق بالـ AI
+      const analysis = await analyzeDomain(input.description);
+
+      return {
+        ...analysis,
+        quickDomain, // للمقارنة
+      };
+    }),
+
+  // ══════════════════════════════════════════════════════════════
+  // المقوم 2: توليد السيناريو الكامل
+  // ══════════════════════════════════════════════════════════════
+  generateScript: publicProcedure
+    .input(z.object({
+      description: z.string().min(2),
+      domainAnalysis: z.any().optional(), // إذا تم التحليل مسبقاً
+    }))
+    .mutation(async ({ input }) => {
+      // إذا لم يكن هناك تحليل مسبق، نحلل الآن
+      const analysis: DomainAnalysis = input.domainAnalysis ||
+        await analyzeDomain(input.description);
+
+      const script = await generateScript(input.description, analysis);
+
+      return {
+        script,
+        analysis,
+      };
+    }),
+
+  // ══════════════════════════════════════════════════════════════
+  // المقوم 1+2+3: توليد كامل بالمحركات الجديدة
+  // ══════════════════════════════════════════════════════════════
+  generateWithDomainEngine: publicProcedure
+    .input(z.object({
+      description: z.string().min(2),
+      referenceImageUrl: z.string().url().optional(),
+      visualMode: z.enum(["free", "cinematic", "realistic", "precise"]).default("cinematic"),
+    }))
+    .mutation(async ({ input }) => {
+      // المقوم 1: تحليل المحتوى
+      const analysis = await analyzeDomain(input.description);
+
+      // المقوم 2: كتابة السيناريو
+      const script = await generateScript(input.description, analysis);
+
+      // المقوم 3: بناء prompts الصور المخصصة
+      const unifiedConcept = input.description;
+
+      // توليد الصور بشكل متوازٍ
+      const generatedScenes = await Promise.allSettled(
+        analysis.sceneOutline.map(async (sceneOutline, index) => {
+          const originalImages = input.referenceImageUrl
+            ? [{ url: input.referenceImageUrl, mimeType: "image/jpeg" as const }]
+            : undefined;
+
+          // بناء prompt مخصص للمجال
+          const domainPrompt = buildDomainPrompt(sceneOutline, analysis, unifiedConcept);
+
+          // إضافة قيود الوضع البصري
+          const modeConstraint = {
+            free: "",
+            cinematic: "cinematic color grading, dramatic lighting, film quality,",
+            realistic: "photorealistic, true-to-life, accurate proportions,",
+            precise: "architectural precision, exact proportions, technical accuracy,",
+          }[input.visualMode];
+
+          const finalPrompt = `${domainPrompt} ${modeConstraint}`.trim();
+
+          const { url } = await generateImage({
+            prompt: finalPrompt,
+            originalImages,
+          });
+
+          // الحصول على النص من السيناريو
+          const scriptScene = script.scenes[index];
+
+          return {
+            type: `scene_${index}`,
+            label: sceneOutline.title.ar,
+            labelEn: sceneOutline.title.en,
+            imageUrl: url,
+            prompt: finalPrompt,
+            arabicCaption: sceneOutline.educationalFact?.ar || sceneOutline.narrativeText?.ar || "",
+            englishCaption: sceneOutline.educationalFact?.en || sceneOutline.narrativeText?.en || "",
+            narration: scriptScene?.narration,
+            educationalFact: scriptScene?.educationalFact,
+            storyText: scriptScene?.storyText,
+            displayText: scriptScene?.displayText,
+            duration: sceneOutline.duration,
+            order: index,
+          };
+        })
+      );
+
+      const successfulScenes = generatedScenes
+        .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+        .map(r => r.value);
+
+      return {
+        scenes: successfulScenes,
+        description: input.description,
+        title: analysis.filmTitle.ar,
+        titleEn: analysis.filmTitle.en,
+        synopsis: analysis.filmSynopsis.ar,
+        synopsisEn: analysis.filmSynopsis.en,
+        domain: analysis.primaryDomain,
+        filmTone: analysis.filmTone,
+        audienceLevel: analysis.audienceLevel,
+        detectedLanguage: analysis.detectedLanguage,
+        musicMood: analysis.musicMood,
+        script,
+        analysis,
+        // للتوافق مع الواجهة القديمة
+        scenarioType: "imagine",
+        culturalContext: analysis.keyThemes.join(", "),
+        atmosphere: analysis.emotionalArc,
+        cinematicStyle: analysis.visualStyle,
+        mainElements: analysis.keyThemes,
+        unifiedConcept: input.description,
+      };
     }),
 });

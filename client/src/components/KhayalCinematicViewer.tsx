@@ -830,23 +830,52 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
       <div className="absolute bottom-28 right-0 left-0 px-8 z-20"
         style={{ opacity: showCaption ? 1 : 0, transform: showCaption ? "translateY(0)" : "translateY(24px)", transition: "opacity 1.2s ease-out, transform 1.2s ease-out" }}>
         <div className="max-w-3xl">
-          {result.culturalContext && (
+          {/* مؤشر نوع المحتوى */}
+          {(result.domain || result.culturalContext) && (
             <div className="flex items-center gap-2 mb-2">
               <div className="w-6 h-px" style={{ background: accentColor }} />
-              <span className="text-xs tracking-widest uppercase" style={{ color: accentColor }}>{result.culturalContext}</span>
+              <span className="text-xs tracking-widest uppercase" style={{ color: accentColor }}>
+                {result.domain || result.culturalContext}
+              </span>
             </div>
           )}
+
+          {/* عنوان المشهد */}
           <h2 className="text-4xl md:text-5xl font-black text-white mb-2 leading-tight" style={{ textShadow: "0 2px 20px rgba(0,0,0,0.8)" }}>
             {currentScene?.label}
           </h2>
-          {currentScene?.arabicCaption && (
-            <p className="text-lg font-light mb-1" style={{ color: "rgba(255,255,255,0.72)", textShadow: "0 1px 10px rgba(0,0,0,0.9)", fontStyle: "italic" }}>
-              {currentScene.arabicCaption}
-            </p>
-          )}
-          <p className="text-sm text-white/35 max-w-xl leading-relaxed line-clamp-2" style={{ textShadow: "0 1px 8px rgba(0,0,0,0.9)" }}>
-            {result.description}
-          </p>
+
+          {/* النص التعليمي/القصصي من السيناريو */}
+          {(() => {
+            const scriptScene = result.script?.scenes?.[currentIndex];
+            const educFact = scriptScene?.educationalFact?.ar;
+            const storyText = scriptScene?.storyText?.ar;
+            const caption = currentScene?.arabicCaption;
+            const displayText = educFact || storyText || caption;
+            return displayText ? (
+              <p className="text-base font-medium mb-1 max-w-2xl leading-relaxed"
+                style={{ color: "rgba(255,255,255,0.85)", textShadow: "0 1px 10px rgba(0,0,0,0.9)" }}>
+                {displayText}
+              </p>
+            ) : null;
+          })()}
+
+          {/* التعليق السردي */}
+          {(() => {
+            const scriptScene = result.script?.scenes?.[currentIndex];
+            const narration = scriptScene?.narration?.ar;
+            return narration ? (
+              <p className="text-sm text-white/40 max-w-xl leading-relaxed line-clamp-2"
+                style={{ textShadow: "0 1px 8px rgba(0,0,0,0.9)", fontStyle: "italic" }}>
+                {narration}
+              </p>
+            ) : (
+              <p className="text-sm text-white/35 max-w-xl leading-relaxed line-clamp-2"
+                style={{ textShadow: "0 1px 8px rgba(0,0,0,0.9)" }}>
+                {result.description}
+              </p>
+            );
+          })()}
         </div>
       </div>
 
@@ -1027,16 +1056,38 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
 
       {/* ── Info panel ── */}
       {showInfo && (
-        <div className="absolute top-16 left-6 z-30 rounded-2xl p-5 w-72"
-          style={{ background: "rgba(8,9,15,0.96)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(24px)" }}>
+        <div className="absolute top-16 left-6 z-30 rounded-2xl p-5 w-80 overflow-y-auto"
+          style={{ background: "rgba(8,9,15,0.96)", border: "1px solid rgba(255,255,255,0.08)", backdropFilter: "blur(24px)", maxHeight: "80vh" }}>
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-white font-bold text-sm">معلومات المشروع</h3>
+            <h3 className="text-white font-bold text-sm">معلومات الفيلم</h3>
             <button onClick={() => setShowInfo(false)} className="text-white/30 hover:text-white text-xs">✕</button>
           </div>
+
+          {/* المحركات الجديدة */}
+          {result.domain && (
+            <div className="mb-3 p-2 rounded-lg" style={{ background: `${accentColor}10`, border: `1px solid ${accentColor}25` }}>
+              <p className="text-white/30 text-xs mb-1">نوع المحتوى</p>
+              <div className="flex items-center gap-2">
+                <span className="text-sm" style={{ color: accentColor }}>●</span>
+                <p className="text-white text-sm font-semibold">{result.domain}</p>
+              </div>
+              {result.filmTone && <p className="text-white/50 text-xs mt-1">أسلوب: {result.filmTone} · جمهور: {result.audienceLevel}</p>}
+            </div>
+          )}
+
+          {/* السينوبسيس */}
+          {result.synopsis && (
+            <div className="mb-3">
+              <p className="text-white/30 text-xs mb-1">ملخص الفيلم</p>
+              <p className="text-white/70 text-xs leading-relaxed">{result.synopsis}</p>
+            </div>
+          )}
+
           {result.title && <div className="mb-2"><p className="text-white/30 text-xs">العنوان</p><p className="text-white text-sm font-medium">{result.title}</p></div>}
-          {result.culturalContext && <div className="mb-2"><p className="text-white/30 text-xs">السياق الثقافي</p><p style={{ color: accentColor }} className="text-sm">{result.culturalContext}</p></div>}
+          {result.titleEn && <div className="mb-2"><p className="text-white/30 text-xs">English Title</p><p className="text-white/70 text-sm" dir="ltr">{result.titleEn}</p></div>}
+          {result.culturalContext && <div className="mb-2"><p className="text-white/30 text-xs">السياق</p><p style={{ color: accentColor }} className="text-sm">{result.culturalContext}</p></div>}
           {result.atmosphere && <div className="mb-2"><p className="text-white/30 text-xs">الأجواء</p><p className="text-white/70 text-sm">{result.atmosphere}</p></div>}
-          {result.cinematicStyle && <div className="mb-2"><p className="text-white/30 text-xs">الأسلوب السينمائي</p><p className="text-white/70 text-sm">{result.cinematicStyle}</p></div>}
+
           {/* Music mood indicator */}
           <div className="mb-2">
             <p className="text-white/30 text-xs">الموسيقى التصويرية</p>
@@ -1048,6 +1099,22 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
                activeMood === "epic" ? "⚡ ملحمية" : "🎵 درامية"}
             </p>
           </div>
+
+          {/* السيناريو الكامل */}
+          {result.script?.educationalSummary?.keyFacts?.length > 0 && (
+            <div className="mb-3">
+              <p className="text-white/30 text-xs mb-2">حقائق تعليمية</p>
+              <div className="flex flex-col gap-1.5">
+                {result.script.educationalSummary.keyFacts.slice(0, 3).map((fact: any, i: number) => (
+                  <div key={i} className="flex gap-2 text-xs">
+                    <span style={{ color: accentColor }}>▸</span>
+                    <span className="text-white/60">{fact.ar}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {result.mainElements && result.mainElements.length > 0 && (
             <div>
               <p className="text-white/30 text-xs mb-1">العناصر الرئيسية</p>
