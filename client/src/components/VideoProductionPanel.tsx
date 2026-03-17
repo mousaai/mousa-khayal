@@ -243,10 +243,17 @@ export default function VideoProductionPanel() {
       {/* ── حالة الخطأ ── */}
       {error && (
         <div className="bg-red-900/30 border border-red-500/40 rounded-lg p-4 text-red-300 text-sm">
-          <span className="font-bold">خطأ: </span>{error}
-          <Button variant="ghost" size="sm" className="mr-2 text-red-400 hover:text-red-200" onClick={handleReset}>
-            إعادة المحاولة
-          </Button>
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <span className="font-bold">خطأ: </span>
+              {error.includes("TTS") || error.includes("audio") || error.includes("speech")
+                ? "خدمة توليد الصوت غير متاحة حالياً. سيتم إنتاج الفيديو بدون صوت تلقائي."
+                : error}
+            </div>
+            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-200 shrink-0" onClick={handleReset}>
+              إعادة المحاولة
+            </Button>
+          </div>
         </div>
       )}
 

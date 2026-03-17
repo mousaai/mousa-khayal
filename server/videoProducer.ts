@@ -209,7 +209,9 @@ export class VideoProducer {
       const mergedPath = await this.mergeScenes(scenePaths);
 
       report("إضافة الصوت...", 88);
-      let finalPath = await this.assembleVideo(mergedPath, audioPath);
+      let finalPath = audioPath
+        ? await this.assembleVideo(mergedPath, audioPath)
+        : mergedPath;
 
       // الخطوة 6: الموسيقى الخلفية (اختياري)
       if (musicPath) {
@@ -294,7 +296,7 @@ export class VideoProducer {
   private async generateAudio(
     script: VideoScript,
     mode: ProductionMode = "production"
-  ): Promise<string> {
+  ): Promise<string | null> {
     const audioPath = path.join(this.workDir, "narration.mp3");
     const voice = VOICE_MAP[script.voice] ?? "onyx";
     const ttsModel = PRODUCTION_MODELS[mode].tts;
@@ -302,29 +304,35 @@ export class VideoProducer {
     const { ENV } = await import("./_core/env");
     const apiUrl = ENV.forgeApiUrl || "";
 
-    const response = await fetch(`${apiUrl}/v1/audio/speech`, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${ENV.forgeApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: ttsModel,
-        voice,
-        input: script.narration,
-        speed: 0.95,
-      }),
-    });
+    try {
+      const response = await fetch(`${apiUrl}/v1/audio/speech`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${ENV.forgeApiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: ttsModel,
+          voice,
+          input: script.narration,
+          speed: 0.95,
+        }),
+      });
 
-    if (!response.ok) {
-      const err = await response.text();
-      throw new Error(`TTS failed: ${err}`);
+      if (!response.ok) {
+        const err = await response.text();
+        console.warn(`[VideoProducer] TTS unavailable (${response.status}): ${err} — سيتم إنتاج الفيديو بدون صوت`);
+        return null;
+      }
+
+      const buffer = Buffer.from(await response.arrayBuffer());
+      await fs.writeFile(audioPath, buffer);
+      console.log(`  ✓ صوت جاهز: ${audioPath}`);
+      return audioPath;
+    } catch (e) {
+      console.warn(`[VideoProducer] TTS error: ${e} — سيتم إنتاج الفيديو بدون صوت`);
+      return null;
     }
-
-    const buffer = Buffer.from(await response.arrayBuffer());
-    await fs.writeFile(audioPath, buffer);
-    console.log(`  ✓ صوت جاهز: ${audioPath}`);
-    return audioPath;
   }
 
   // ─────────────────────────────────────────────────────────
@@ -498,8 +506,9 @@ export class VideoProducer {
 
   private assembleVideo(
     mergedPath: string,
-    audioPath: string
+    audioPath: string | null
   ): Promise<string> {
+    if (!audioPath) return Promise.resolve(mergedPath);
     return new Promise((resolve, reject) => {
       const finalPath = path.join(this.workDir, "with_audio.mp4");
 
