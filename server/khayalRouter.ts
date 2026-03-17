@@ -841,3 +841,8 @@ export const khayalRouter = router({
       };
     }),
 });
+
+// ══════════════════════════════════════════════════════════════
+// NOTE: The router export above closes with }); — we need to
+// add video procedures. We'll create a separate videoRouter.
+// ══════════════════════════════════════════════════════════════

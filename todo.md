@@ -73,3 +73,14 @@
 - [ ] دمج cinematicEngine في downloadVideoMP4 فعلياً (الحالي يستخدم حلقة بسيطة)
 - [ ] تراكب النصوص التعليمية على الفيديو المُصدَّر
 - [ ] زر تحميل السيناريو الكامل (PDF)
+
+---
+
+## 🎬 محرك الفيديو الاحترافي (منهج الإخراج)
+
+- [x] VideoProducer.ts: Pipeline 6 خطوات (صور → صوت TTS → Ken Burns → ترجمة عربية → دمج → S3)
+- [x] generateVideoScript: كتابة السيناريو تلقائياً بالعربي/الإنجليزي
+- [x] videoRouter.ts: 4 endpoints (generateScript / startProduction / getJobStatus / quickProduce)
+- [x] VideoProductionPanel.tsx: واجهة إنتاج الفيديو مع مؤشر التقدم الحي
+- [x] زر "فيديو" في الصفحة الرئيسية يفتح واجهة الإنتاج
+- [x] الاختبارات: 71/71 اجتازت

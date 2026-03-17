@@ -8,6 +8,7 @@ import KhayalCinematicViewer from "@/components/KhayalCinematicViewer";
 import DocumentUploader from "@/components/DocumentUploader";
 import FilmDirectorModal from "@/components/FilmDirectorModal";
 import type { GenerationResult, DocumentAnalysis } from "@/types/khayal";
+import VideoProductionPanel from "@/components/VideoProductionPanel";
 import { musicEngine, selectMusicMood, type MusicMood } from "@/lib/musicEngine";
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
@@ -174,6 +175,7 @@ export default function Home() {
 
   // Film director
   const [showFilmModal, setShowFilmModal] = useState(false);
+  const [showVideoProducer, setShowVideoProducer] = useState(false);
   // ── حالة تصدير الفيديو ──
   const [videoExportProgress, setVideoExportProgress] = useState<{
     isActive: boolean;
@@ -560,6 +562,28 @@ export default function Home() {
       handleGenerate();
     }
   };
+
+  // ── Show Video Producer ──
+  if (showVideoProducer) {
+    return (
+      <div className="min-h-screen bg-[#020408] overflow-y-auto" dir="rtl">
+        <div className="relative z-10 flex flex-col items-center px-4 py-8">
+          <div className="w-full max-w-4xl">
+            <button
+              onClick={() => setShowVideoProducer(false)}
+              className="flex items-center gap-2 text-blue-400 hover:text-blue-200 text-sm mb-6 transition-colors"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M19 12H5M12 19l-7-7 7-7"/>
+              </svg>
+              <span>العودة إلى خيال</span>
+            </button>
+            <VideoProductionPanel />
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── Show result viewer ──
   if (result) {
@@ -1002,6 +1026,21 @@ export default function Home() {
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
                   </svg>
+                </button>
+
+                {/* Video Producer button */}
+                <button
+                  onClick={() => setShowVideoProducer(true)}
+                  className="flex items-center gap-1.5 px-3 h-[34px] rounded-xl text-xs font-bold transition-all hover:scale-105"
+                  style={{
+                    background: "rgba(59,130,246,0.12)",
+                    border: "1px solid rgba(59,130,246,0.35)",
+                    color: "#60a5fa",
+                  }}
+                  title="إنتاج فيديو احترافي"
+                >
+                  <span>🎥</span>
+                  <span className="hidden sm:inline">فيديو</span>
                 </button>
 
                 {/* Film director button */}
