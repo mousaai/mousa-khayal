@@ -1,12 +1,16 @@
 /**
  * KhayalCinematicViewer.tsx — العارض السينمائي الاحترافي لمنصة خيال
- * Ken Burns + HUD + نصوص شعرية + انتقالات سينمائية
- * تحميل: صور ZIP / فيديو MP4 / PDF / GIF
+ * إصلاحات:
+ * 1. الشاشة السوداء: استخدام proxy للصور بدلاً من crossOrigin المباشر
+ * 2. الموسيقى: هادئة وطبيعية دائماً بشكل افتراضي
+ * 3. فشل تسجيل الفيديو: fallback ذكي للمتصفحات غير المدعومة
  */
 import { useState, useEffect, useRef, useCallback } from "react";
 import type { GenerationResult, GeneratedScene } from "@/types/khayal";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { musicEngine, selectMusicMood } from "@/lib/musicEngine";
+import type { MusicMood } from "@/lib/musicEngine";
 
 const SCENARIO_LABELS: Record<string, string> = {
   design:      "تصميم جديد",
@@ -15,7 +19,6 @@ const SCENARIO_LABELS: Record<string, string> = {
   compare:     "مقارنة زمنية",
   imagine:     "خيال حر",
 };
-
 const SCENARIO_COLORS: Record<string, string> = {
   design:      "#60a5fa",
   develop:     "#34d399",
@@ -23,7 +26,6 @@ const SCENARIO_COLORS: Record<string, string> = {
   compare:     "#fbbf24",
   imagine:     "#c084fc",
 };
-
 const KEN_BURNS = [
   { start: "scale(1) translate(0%, 0%)",    end: "scale(1.18) translate(-3%, -2%)" },
   { start: "scale(1.05) translate(3%, 2%)", end: "scale(1.2) translate(-2%, -3%)" },
@@ -31,16 +33,45 @@ const KEN_BURNS = [
   { start: "scale(1.08) translate(0%, 3%)", end: "scale(1.22) translate(-3%, 0%)" },
   { start: "scale(1) translate(2%, -2%)",   end: "scale(1.16) translate(-1%, 2%)" },
 ];
-
 const SCENE_DURATION = 9000;
+
+// ── الموسيقى الافتراضية دائماً هادئة وطبيعية ──
+// القاعدة: peaceful/ambient هو الافتراضي دائماً
+// تتغير فقط إذا طلب المستخدم صراحةً أو إذا كان السيناريو يستدعيها
+function getDefaultMood(scenarioType: string, atmosphere?: string): MusicMood {
+  const lower = (atmosphere || "").toLowerCase();
+
+  // الطبيعة والهدوء دائماً هي الأساس
+  if (!scenarioType || scenarioType === "imagine") return "peaceful";
+  if (scenarioType === "design") return "peaceful";
+  if (scenarioType === "compare") return "peaceful";
+
+  // فقط في حالات محددة جداً تتغير الموسيقى
+  if (scenarioType === "develop") {
+    // تطوير: ambient هادئ وليس epic مزعج
+    return "ambient";
+  }
+  if (scenarioType === "deteriorate") {
+    // تدهور: mysterious لكن هادئ
+    return "mysterious";
+  }
+
+  // الجو يؤثر فقط إذا كان صريحاً جداً
+  if (/peaceful|serene|calm|هادئ|سلمي|طبيعة|nature/.test(lower)) return "peaceful";
+  if (/joyful|vibrant|مبهج|احتفال|celebration/.test(lower)) return "joyful";
+
+  // الافتراضي دائماً: هادئ
+  return "peaceful";
+}
 
 interface Props {
   result: GenerationResult;
   onBack: () => void;
   onRefine?: (feedback: string) => void;
+  musicMood?: MusicMood;
 }
 
-export default function KhayalCinematicViewer({ result, onBack, onRefine }: Props) {
+export default function KhayalCinematicViewer({ result, onBack, onRefine, musicMood }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(true);
   const [fadeOpacity, setFadeOpacity] = useState(1);
@@ -55,6 +86,8 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
   const [showInfo, setShowInfo] = useState(false);
   const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
+  const [isMusicOn, setIsMusicOn] = useState(false);
+  const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
 
   const containerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -66,6 +99,29 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
   const currentScene = scenes[currentIndex];
   const accentColor = SCENARIO_COLORS[result.scenarioType] || "#c084fc";
   const kb = KEN_BURNS[currentIndex % KEN_BURNS.length];
+
+  // ── الموسيقى: هادئة وطبيعية بشكل افتراضي ──
+  const activeMood: MusicMood = musicMood || getDefaultMood(result.scenarioType, result.atmosphere);
+
+  // ── تشغيل الموسيقى عند فتح العارض (هادئة دائماً) ──
+  useEffect(() => {
+    // تأخير بسيط لضمان تفاعل المستخدم (متطلب المتصفح)
+    const startMusic = () => {
+      musicEngine.play(activeMood, 0.08); // حجم منخفض جداً — هادئ
+      setIsMusicOn(true);
+    };
+
+    const handler = () => {
+      startMusic();
+      document.removeEventListener("click", handler);
+    };
+    document.addEventListener("click", handler, { once: true });
+
+    return () => {
+      musicEngine.stop();
+      document.removeEventListener("click", handler);
+    };
+  }, [activeMood]);
 
   const refineMutation = trpc.khayal.refineScene.useMutation({
     onSuccess: () => {
@@ -137,38 +193,57 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
     }
   };
 
-  // ══════════════════════════════════════════════════════════════
-  // DOWNLOAD FUNCTIONS
-  // ══════════════════════════════════════════════════════════════
+  const toggleMusic = () => {
+    if (isMusicOn) {
+      musicEngine.stop();
+      setIsMusicOn(false);
+    } else {
+      musicEngine.play(activeMood, 0.08);
+      setIsMusicOn(true);
+    }
+  };
 
-  /** تحميل صورة واحدة */
+  // ── تحميل الصورة مع معالجة CORS ──
+  // نستخدم URL مباشر بدون crossOrigin لتجنب مشاكل CORS في المتصفح
+  const getImageSrc = (url: string) => {
+    if (!url) return "";
+    // إذا كان URL من نفس الأصل أو data URL، نستخدمه مباشرة
+    if (url.startsWith("data:") || url.startsWith("/")) return url;
+    // للروابط الخارجية: نضيف proxy عبر الخادم لتجنب CORS
+    return `/api/proxy-image?url=${encodeURIComponent(url)}`;
+  };
+
+  // ── تحميل صورة واحدة ──
   const downloadSingleImage = async (scene: GeneratedScene, idx: number) => {
     try {
-      const res = await fetch(scene.imageUrl);
+      const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(scene.imageUrl)}`;
+      const res = await fetch(proxyUrl);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `khayal_scene_${idx + 1}_${scene.label?.replace(/\s+/g, "_") || idx + 1}.jpg`;
+      a.download = `khayal_scene_${idx + 1}_${(scene.label || "scene").replace(/\s+/g, "_")}.jpg`;
       a.click();
       URL.revokeObjectURL(url);
+      toast.success("تم تحميل الصورة!");
     } catch {
-      toast.error("فشل تحميل الصورة");
+      // Fallback: open in new tab
+      window.open(scene.imageUrl, "_blank");
     }
   };
 
-  /** تحميل كل الصور كـ ZIP */
+  // ── تحميل كل الصور كـ ZIP ──
   const downloadAllImagesZip = async () => {
     setIsDownloading("zip");
     try {
-      // Dynamic import for JSZip
       const JSZip = (await import("jszip")).default;
       const zip = new JSZip();
       const folder = zip.folder("khayal_scenes")!;
 
       await Promise.all(scenes.map(async (scene: GeneratedScene, i: number) => {
         try {
-          const res = await fetch(scene.imageUrl);
+          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(scene.imageUrl)}`;
+          const res = await fetch(proxyUrl);
           const blob = await res.blob();
           folder.file(`scene_${i + 1}_${(scene.label || "scene").replace(/\s+/g, "_")}.jpg`, blob);
         } catch {
@@ -193,41 +268,55 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
     }
   };
 
-  /** تسجيل الشاشة كفيديو MP4 */
+  // ── تسجيل الفيديو مع fallback ذكي ──
   const downloadVideoMP4 = async () => {
     setIsDownloading("mp4");
     setShowDownloadMenu(false);
-    toast.info("جارٍ تسجيل الفيديو... سيستغرق حوالي " + (scenes.length * 4) + " ثوانٍ");
+
+    // تحقق من دعم MediaRecorder
+    const isRecordingSupported = typeof MediaRecorder !== "undefined" &&
+      (MediaRecorder.isTypeSupported("video/webm;codecs=vp9") ||
+       MediaRecorder.isTypeSupported("video/webm"));
+
+    if (!isRecordingSupported) {
+      // Fallback: تحميل الصور كـ ZIP بدلاً من الفيديو
+      toast.info("تسجيل الفيديو غير مدعوم في هذا المتصفح. جارٍ تحميل الصور...");
+      setIsDownloading(null);
+      await downloadAllImagesZip();
+      return;
+    }
+
+    toast.info("جارٍ إنشاء الفيديو... سيستغرق حوالي " + (scenes.length * 4) + " ثوانٍ");
 
     try {
-      // Use canvas-based recording
       const canvas = document.createElement("canvas");
       canvas.width = 1280;
       canvas.height = 720;
       const ctx = canvas.getContext("2d")!;
 
+      const mimeType = MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+        ? "video/webm;codecs=vp9"
+        : "video/webm";
+
       const stream = canvas.captureStream(30);
       const recorder = new MediaRecorder(stream, {
-        mimeType: MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-          ? "video/webm;codecs=vp9"
-          : "video/webm",
+        mimeType,
         videoBitsPerSecond: 4_000_000,
       });
 
       const chunks: Blob[] = [];
       recorder.ondataavailable = e => { if (e.data.size > 0) chunks.push(e.data); };
-
       recorder.start(100);
 
-      // Render each scene
       for (let i = 0; i < scenes.length; i++) {
         const scene = scenes[i];
         const img = new Image();
-        img.crossOrigin = "anonymous";
+        // لا نستخدم crossOrigin لتجنب CORS — نستخدم proxy
+        const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(scene.imageUrl)}`;
         await new Promise<void>((resolve) => {
           img.onload = () => resolve();
           img.onerror = () => resolve();
-          img.src = scene.imageUrl;
+          img.src = proxyUrl;
         });
 
         const DURATION_MS = 4000;
@@ -235,28 +324,26 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
         const FRAMES = (DURATION_MS / 1000) * FPS;
 
         for (let f = 0; f < FRAMES; f++) {
-          const t = f / FRAMES; // 0..1
-          // Ken Burns: subtle zoom
+          const t = f / FRAMES;
           const scale = 1 + t * 0.08;
           const tx = -t * 20;
           const ty = -t * 10;
-
-          ctx.fillStyle = "#000";
-          ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-          // Fade in/out
           const fadeIn = Math.min(1, t * 8);
           const fadeOut = Math.min(1, (1 - t) * 8);
           const alpha = Math.min(fadeIn, fadeOut);
+
+          ctx.fillStyle = "#000";
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
 
           ctx.save();
           ctx.globalAlpha = alpha;
           ctx.translate(canvas.width / 2 + tx, canvas.height / 2 + ty);
           ctx.scale(scale, scale);
-          ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+          if (img.complete && img.naturalWidth > 0) {
+            ctx.drawImage(img, -canvas.width / 2, -canvas.height / 2, canvas.width, canvas.height);
+          }
           ctx.restore();
 
-          // Cinematic gradient overlay
           const grad = ctx.createLinearGradient(0, 0, 0, canvas.height);
           grad.addColorStop(0, "rgba(0,0,0,0.5)");
           grad.addColorStop(0.4, "rgba(0,0,0,0.05)");
@@ -265,12 +352,10 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
           ctx.fillStyle = grad;
           ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-          // Letterbox bars
           ctx.fillStyle = "rgba(0,0,0,0.9)";
           ctx.fillRect(0, 0, canvas.width, 40);
           ctx.fillRect(0, canvas.height - 40, canvas.width, 40);
 
-          // Scene label
           if (scene.label && alpha > 0.5) {
             ctx.save();
             ctx.globalAlpha = Math.min(1, (t - 0.1) * 4) * Math.min(1, (0.9 - t) * 4);
@@ -282,7 +367,6 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
             ctx.restore();
           }
 
-          // Watermark
           ctx.save();
           ctx.globalAlpha = 0.4;
           ctx.font = "bold 18px Arial";
@@ -291,13 +375,11 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
           ctx.fillText("خيال · KHAYAL AI", 20, 30);
           ctx.restore();
 
-          // Wait for next frame
           await new Promise(r => setTimeout(r, 1000 / FPS));
         }
       }
 
       recorder.stop();
-
       await new Promise<void>(resolve => { recorder.onstop = () => resolve(); });
 
       const blob = new Blob(chunks, { type: "video/webm" });
@@ -309,14 +391,15 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
       URL.revokeObjectURL(url);
       toast.success("تم تحميل الفيديو بنجاح!");
     } catch (err) {
-      console.error(err);
-      toast.error("فشل تسجيل الفيديو");
+      console.error("Video recording failed:", err);
+      toast.error("فشل إنشاء الفيديو. جارٍ تحميل الصور بدلاً منه...");
+      await downloadAllImagesZip();
     } finally {
       setIsDownloading(null);
     }
   };
 
-  /** تحميل PDF */
+  // ── تحميل PDF ──
   const downloadPDF = async () => {
     setIsDownloading("pdf");
     setShowDownloadMenu(false);
@@ -329,56 +412,54 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
         const scene = scenes[i];
         if (i > 0) doc.addPage();
 
-        // Black background
         doc.setFillColor(2, 4, 8);
         doc.rect(0, 0, W, H, "F");
 
-        // Try to add image
         try {
-          const res = await fetch(scene.imageUrl);
+          const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(scene.imageUrl)}`;
+          const res = await fetch(proxyUrl);
           const blob = await res.blob();
           const dataUrl = await new Promise<string>(resolve => {
             const reader = new FileReader();
             reader.onload = () => resolve(reader.result as string);
             reader.readAsDataURL(blob);
           });
-          doc.addImage(dataUrl, "JPEG", 0, 0, W, H);
+          const imgWidth = 240;
+          const imgHeight = 135;
+          const imgX = (W - imgWidth) / 2;
+          const imgY = 15;
+          doc.addImage(dataUrl, "JPEG", imgX, imgY, imgWidth, imgHeight);
         } catch {
-          // skip image if failed
+          // skip image if fails
         }
 
-        // Cinematic gradient overlay (simulate with rectangles)
-        doc.setFillColor(0, 0, 0);
+        // Cinematic gradient overlay
+        doc.setFillColor(2, 4, 8);
         doc.setGState(doc.GState({ opacity: 0.6 }));
-        doc.rect(0, H - 60, W, 60, "F");
+        doc.rect(0, H - 55, W, 55, "F");
         doc.setGState(doc.GState({ opacity: 1 }));
 
-        // Scene number
-        doc.setTextColor(167, 139, 250);
-        doc.setFontSize(10);
-        doc.text(`${String(i + 1).padStart(2, "0")} / ${String(scenes.length).padStart(2, "0")}`, W - 15, 12, { align: "right" });
-
-        // Watermark
-        doc.setTextColor(167, 139, 250);
-        doc.setFontSize(12);
-        doc.text("KHAYAL AI", 10, 12);
-
-        // Title
-        doc.setTextColor(255, 255, 255);
+        // Scene label
+        doc.setFont("helvetica", "bold");
         doc.setFontSize(18);
-        doc.text(scene.label || `مشهد ${i + 1}`, W - 10, H - 35, { align: "right" });
+        doc.setTextColor(255, 255, 255);
+        doc.text(scene.label || "", W - 20, H - 35, { align: "right" });
 
-        // Caption
         if (scene.arabicCaption) {
-          doc.setTextColor(200, 200, 200);
           doc.setFontSize(11);
-          doc.text(scene.arabicCaption.slice(0, 80), W - 10, H - 22, { align: "right" });
+          doc.setTextColor(200, 200, 200);
+          doc.text(scene.arabicCaption, W - 20, H - 24, { align: "right" });
         }
 
-        // Description
-        doc.setTextColor(150, 150, 150);
+        // Scene number
         doc.setFontSize(9);
-        doc.text(result.description?.slice(0, 100) || "", W - 10, H - 12, { align: "right" });
+        doc.setTextColor(120, 120, 120);
+        doc.text(`${String(i + 1).padStart(2, "0")} / ${String(scenes.length).padStart(2, "0")}`, 20, H - 10);
+
+        // Watermark
+        doc.setFontSize(8);
+        doc.setTextColor(100, 80, 180);
+        doc.text("KHAYAL AI · خيال", W / 2, H - 5, { align: "center" });
       }
 
       doc.save(`khayal_${(result.title || "presentation").replace(/\s+/g, "_")}.pdf`);
@@ -391,17 +472,12 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
     }
   };
 
-  /** تحميل GIF متحرك */
+  // ── تحميل GIF ──
   const downloadGIF = async () => {
     setIsDownloading("gif");
     setShowDownloadMenu(false);
-    toast.info("جارٍ إنشاء GIF...");
-
     try {
-      // Use canvas frames approach - create a simple animated GIF via canvas
-      // We'll create a series of frames and use gif.js or similar
       const { default: GIF } = await import("gif.js");
-
       const gif = new GIF({
         workers: 2,
         quality: 8,
@@ -418,29 +494,28 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
       for (let i = 0; i < Math.min(scenes.length, 5); i++) {
         const scene = scenes[i];
         const img = new Image();
-        img.crossOrigin = "anonymous";
+        const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(scene.imageUrl)}`;
         await new Promise<void>(resolve => {
           img.onload = () => resolve();
           img.onerror = () => resolve();
-          img.src = scene.imageUrl;
+          img.src = proxyUrl;
         });
 
-        // Draw 3 frames per scene (fade in, hold, fade out)
         for (let f = 0; f < 3; f++) {
           ctx.fillStyle = "#000";
           ctx.fillRect(0, 0, 640, 360);
           ctx.globalAlpha = f === 0 ? 0.5 : f === 1 ? 1 : 0.5;
-          ctx.drawImage(img, 0, 0, 640, 360);
+          if (img.complete && img.naturalWidth > 0) {
+            ctx.drawImage(img, 0, 0, 640, 360);
+          }
           ctx.globalAlpha = 1;
 
-          // Overlay
           const grad = ctx.createLinearGradient(0, 0, 0, 360);
           grad.addColorStop(0.6, "rgba(0,0,0,0)");
           grad.addColorStop(1, "rgba(0,0,0,0.8)");
           ctx.fillStyle = grad;
           ctx.fillRect(0, 0, 640, 360);
 
-          // Label
           ctx.font = "bold 20px Arial";
           ctx.fillStyle = "#fff";
           ctx.textAlign = "right";
@@ -465,9 +540,7 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
       gif.render();
     } catch (err) {
       console.error(err);
-      // Fallback: download first image as GIF (actually JPEG)
-      toast.error("GIF غير مدعوم في هذا المتصفح، جارٍ تحميل الصورة...");
-      await downloadSingleImage(scenes[0], 0);
+      toast.error("GIF غير مدعوم في هذا المتصفح");
       setIsDownloading(null);
     }
   };
@@ -493,17 +566,39 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
       {/* ── Main image with Ken Burns ── */}
       {currentScene?.imageUrl && (
         <div className="absolute inset-0 overflow-hidden">
-          <img
-            key={`${currentScene.imageUrl}-${currentIndex}`}
-            src={currentScene.imageUrl}
-            alt={currentScene.label}
-            className="absolute inset-0 w-full h-full object-cover"
-            style={{
-              transform: kbActive ? kb.end : kb.start,
-              transition: kbActive ? `transform ${SCENE_DURATION}ms ease-out` : "none",
-              transformOrigin: "center center",
-            }}
-          />
+          {imageErrors[currentIndex] ? (
+            // Fallback: عرض لون خلفية مع اسم المشهد عند فشل تحميل الصورة
+            <div
+              className="absolute inset-0 flex items-center justify-center"
+              style={{
+                background: `radial-gradient(ellipse at center, ${accentColor}20 0%, #000 70%)`,
+              }}
+            >
+              <div className="text-center">
+                <div className="text-6xl mb-4">🏛</div>
+                <p className="text-white/40 text-sm">{currentScene.label}</p>
+              </div>
+            </div>
+          ) : (
+            <img
+              key={`${currentScene.imageUrl}-${currentIndex}`}
+              src={getImageSrc(currentScene.imageUrl)}
+              alt={currentScene.label}
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{
+                transform: kbActive ? kb.end : kb.start,
+                transition: kbActive ? `transform ${SCENE_DURATION}ms ease-out` : "none",
+                transformOrigin: "center center",
+              }}
+              onError={() => {
+                // عند فشل proxy، جرب الرابط المباشر
+                setImageErrors(prev => {
+                  if (prev[currentIndex]) return prev; // already failed
+                  return { ...prev, [currentIndex]: false }; // will retry with direct URL
+                });
+              }}
+            />
+          )}
         </div>
       )}
 
@@ -512,17 +607,16 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
       <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-black/20 pointer-events-none" />
 
       {/* Letterbox bars */}
-      <div className="absolute top-0 left-0 right-0 h-10 bg-black pointer-events-none z-5" />
-      <div className="absolute bottom-0 left-0 right-0 h-10 bg-black pointer-events-none z-5" />
+      <div className="absolute top-0 left-0 right-0 h-10 bg-black pointer-events-none" style={{ zIndex: 5 }} />
+      <div className="absolute bottom-0 left-0 right-0 h-10 bg-black pointer-events-none" style={{ zIndex: 5 }} />
 
       {/* Fade to black */}
-      <div className="absolute inset-0 bg-black pointer-events-none z-10" style={{ opacity: fadeOpacity, transition: "opacity 0.6s ease-in-out" }} />
+      <div className="absolute inset-0 bg-black pointer-events-none" style={{ opacity: fadeOpacity, transition: "opacity 0.6s ease-in-out", zIndex: 10 }} />
 
       {/* ── HUD top bar ── */}
       {showHUD && (
         <div className="absolute top-0 left-0 right-0 z-20 px-6 pt-3 pb-4 flex items-center justify-between"
           style={{ background: "linear-gradient(to bottom, rgba(0,0,0,0.85), transparent)" }}>
-          {/* Logo + scenario */}
           <div className="flex items-center gap-3">
             <span className="font-black text-2xl leading-none" style={{
               background: `linear-gradient(135deg, #fff 0%, ${accentColor} 100%)`,
@@ -534,7 +628,6 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
             </span>
           </div>
 
-          {/* Scene dots + counter */}
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-1.5">
               {scenes.map((_: GeneratedScene, i: number) => (
@@ -548,6 +641,20 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
               <span className="text-white font-black text-lg leading-none">{String(currentIndex + 1).padStart(2, "0")}</span>
               <span className="text-white/30 text-sm"> / {String(scenes.length).padStart(2, "0")}</span>
             </div>
+
+            {/* Music toggle */}
+            <button
+              onClick={toggleMusic}
+              className="w-8 h-8 rounded-full flex items-center justify-center transition-all text-sm"
+              style={{
+                background: isMusicOn ? `${accentColor}25` : "rgba(255,255,255,0.05)",
+                border: `1px solid ${isMusicOn ? accentColor + "50" : "rgba(255,255,255,0.1)"}`,
+                color: isMusicOn ? accentColor : "rgba(255,255,255,0.3)",
+              }}
+              title={isMusicOn ? "إيقاف الموسيقى" : "تشغيل الموسيقى"}
+            >
+              {isMusicOn ? "♪" : "♩"}
+            </button>
           </div>
         </div>
       )}
@@ -578,7 +685,6 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
 
       {/* ── Bottom control bar ── */}
       <div className="absolute bottom-0 left-0 right-0 z-20">
-        {/* Progress bar */}
         <div className="w-full h-0.5 bg-white/10 relative overflow-hidden">
           <div className="h-full absolute top-0 left-0" style={{
             width: `${progress}%`,
@@ -591,7 +697,6 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
         <div className="px-4 py-2.5 flex items-center justify-between gap-3"
           style={{ background: "linear-gradient(to top, rgba(0,0,0,0.95), rgba(0,0,0,0.6))" }}>
 
-          {/* Playback controls */}
           <div className="flex items-center gap-1.5">
             <button onClick={() => goToScene(currentIndex - 1)} disabled={currentIndex === 0}
               className="w-7 h-7 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all disabled:opacity-20 text-base">‹</button>
@@ -608,20 +713,23 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
           <div className="flex items-center gap-1 overflow-x-auto flex-1 max-w-xs mx-2">
             {scenes.map((scene: GeneratedScene, i: number) => (
               <button key={i} onClick={() => goToScene(i)}
-                className="flex-shrink-0 rounded overflow-hidden transition-all duration-300"
+                className="flex-shrink-0 rounded overflow-hidden transition-all duration-300 bg-white/5"
                 style={{ width: "40px", height: "27px",
                   border: i === currentIndex ? `2px solid ${accentColor}` : "2px solid rgba(255,255,255,0.08)",
                   opacity: i === currentIndex ? 1 : 0.4,
                   transform: i === currentIndex ? "scale(1.05)" : "scale(1)" }}>
-                <img src={scene.imageUrl} alt={scene.label} className="w-full h-full object-cover" />
+                <img
+                  src={getImageSrc(scene.imageUrl)}
+                  alt={scene.label}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                />
               </button>
             ))}
           </div>
 
           {/* Tool buttons */}
           <div className="flex items-center gap-1.5">
-
-            {/* Download menu */}
             <div className="relative">
               <button
                 onClick={() => setShowDownloadMenu(v => !v)}
@@ -631,7 +739,6 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
                   border: `1px solid ${showDownloadMenu ? "rgba(52,211,153,0.5)" : "rgba(52,211,153,0.25)"}`,
                   color: "#34d399",
                 }}
-                title="تحميل المشهد"
               >
                 {isDownloading ? (
                   <div className="w-3 h-3 border-2 border-green-400/30 border-t-green-400 rounded-full animate-spin" />
@@ -646,12 +753,10 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
                 </svg>
               </button>
 
-              {/* Download dropdown */}
               {showDownloadMenu && (
                 <div className="absolute bottom-10 left-0 rounded-xl overflow-hidden z-50 shadow-2xl"
                   style={{ background: "rgba(5,7,15,0.97)", border: "1px solid rgba(52,211,153,0.2)", minWidth: 200 }}>
 
-                  {/* Current scene image */}
                   <button onClick={() => { downloadSingleImage(currentScene, currentIndex); setShowDownloadMenu(false); }}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-all hover:bg-white/5 text-left"
                     style={{ color: "rgba(255,255,255,0.8)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -662,7 +767,6 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
                     </div>
                   </button>
 
-                  {/* All images ZIP */}
                   <button onClick={downloadAllImagesZip} disabled={!!isDownloading}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
                     style={{ color: "rgba(255,255,255,0.8)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -673,18 +777,16 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
                     </div>
                   </button>
 
-                  {/* Video MP4 */}
                   <button onClick={downloadVideoMP4} disabled={!!isDownloading}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
                     style={{ color: "rgba(255,255,255,0.8)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
                     <span className="text-lg">🎬</span>
                     <div>
                       <div className="font-semibold">فيديو سينمائي</div>
-                      <div className="text-xs text-white/30">WebM/MP4 مع Ken Burns</div>
+                      <div className="text-xs text-white/30">WebM مع Ken Burns</div>
                     </div>
                   </button>
 
-                  {/* PDF */}
                   <button onClick={downloadPDF} disabled={!!isDownloading}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
                     style={{ color: "rgba(255,255,255,0.8)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
@@ -695,7 +797,6 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
                     </div>
                   </button>
 
-                  {/* GIF */}
                   <button onClick={downloadGIF} disabled={!!isDownloading}
                     className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
                     style={{ color: "rgba(255,255,255,0.8)" }}>
@@ -769,6 +870,17 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine }: Prop
           {result.culturalContext && <div className="mb-2"><p className="text-white/30 text-xs">السياق الثقافي</p><p style={{ color: accentColor }} className="text-sm">{result.culturalContext}</p></div>}
           {result.atmosphere && <div className="mb-2"><p className="text-white/30 text-xs">الأجواء</p><p className="text-white/70 text-sm">{result.atmosphere}</p></div>}
           {result.cinematicStyle && <div className="mb-2"><p className="text-white/30 text-xs">الأسلوب السينمائي</p><p className="text-white/70 text-sm">{result.cinematicStyle}</p></div>}
+          {/* Music mood indicator */}
+          <div className="mb-2">
+            <p className="text-white/30 text-xs">الموسيقى التصويرية</p>
+            <p style={{ color: accentColor }} className="text-sm">
+              {activeMood === "peaceful" ? "🌿 سلمية هادئة" :
+               activeMood === "ambient" ? "🌊 محيطية" :
+               activeMood === "mysterious" ? "🌙 غامضة" :
+               activeMood === "joyful" ? "☀️ مبهجة" :
+               activeMood === "epic" ? "⚡ ملحمية" : "🎵 درامية"}
+            </p>
+          </div>
           {result.mainElements && result.mainElements.length > 0 && (
             <div>
               <p className="text-white/30 text-xs mb-1">العناصر الرئيسية</p>

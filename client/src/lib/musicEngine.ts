@@ -68,27 +68,29 @@ const MUSIC_TRACKS: Record<MusicMood, MusicTrack> = {
   },
 };
 
-// ── اختيار المزاج تلقائياً حسب السيناريو ──
+// ── اختيار المزاج تلقائياً ──
+// القاعدة الأساسية: الطبيعة والهدوء هو الافتراضي دائماً
+// تتغير فقط إذا طلب المستخدم صراحةً موسيقى مختلفة
 export function selectMusicMood(
   scenarioType: string,
-  atmosphere?: string
+  atmosphere?: string,
+  userExplicitRequest?: string
 ): MusicMood {
   const lower = (atmosphere || "").toLowerCase();
+  const userReq = (userExplicitRequest || "").toLowerCase();
 
-  // حسب السيناريو
-  if (scenarioType === "deteriorate") return "mysterious";
-  if (scenarioType === "develop") return "epic";
-  if (scenarioType === "design") return "dramatic";
-  if (scenarioType === "compare") return "ambient";
+  // طلب صريح من المستخدم يتجاوز كل شيء
+  if (userReq) {
+    if (/dramatic|intense|درامي|مكثف|قوي/.test(userReq)) return "dramatic";
+    if (/epic|grand|ملحمي|عظيم/.test(userReq)) return "epic";
+    if (/mysterious|غامض|سحري/.test(userReq)) return "mysterious";
+    if (/joyful|vibrant|مبهج|حيوي/.test(userReq)) return "joyful";
+    if (/ambient|محيطي/.test(userReq)) return "ambient";
+  }
 
-  // حسب الجو
-  if (/peaceful|serene|calm|هادئ|سلمي/.test(lower)) return "peaceful";
-  if (/dramatic|intense|قوي|مكثف/.test(lower)) return "dramatic";
-  if (/epic|grand|ملحمي|عظيم/.test(lower)) return "epic";
-  if (/mysterious|mystical|غامض|سحري/.test(lower)) return "mysterious";
-  if (/joyful|vibrant|مبهج|حيوي/.test(lower)) return "joyful";
-
-  return "ambient";
+  // الافتراضي دائماً: سلمي هادئ وطبيعي
+  // كل السيناريوهات تبدأ بالهدوء ولا تتغير إلا بطلب صريح
+  return "peaceful";
 }
 
 // ── محرك الصوت ──
