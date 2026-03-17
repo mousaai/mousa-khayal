@@ -65,3 +65,39 @@ export const khayalScenes = mysqlTable("khayal_scenes", {
 
 export type KhayalScene = typeof khayalScenes.$inferSelect;
 export type InsertKhayalScene = typeof khayalScenes.$inferInsert;
+
+// جدول الذاكرة الجغرافية والثقافية — محرك المعرفة الجغرافية لمنصة خيال
+export const geoKnowledge = mysqlTable("geo_knowledge", {
+  id: int("id").autoincrement().primaryKey(),
+  // المعرفات الجغرافية
+  locationName: varchar("locationName", { length: 255 }).notNull(),
+  locationNameAr: varchar("locationNameAr", { length: 255 }),
+  country: varchar("country", { length: 100 }),
+  countryCode: varchar("countryCode", { length: 10 }),
+  region: varchar("region", { length: 100 }),
+  city: varchar("city", { length: 100 }),
+  latitude: varchar("latitude", { length: 30 }),
+  longitude: varchar("longitude", { length: 30 }),
+  // السياق الثقافي
+  culturalContext: text("culturalContext"),
+  architecturalStyle: text("architecturalStyle"),
+  climate: varchar("climate", { length: 100 }),
+  vegetation: text("vegetation"),
+  historicalPeriod: varchar("historicalPeriod", { length: 100 }),
+  // البيانات البصرية
+  colorPalette: json("colorPalette"),   // ألوان سائدة في المنطقة
+  lightingCharacter: varchar("lightingCharacter", { length: 100 }), // طبيعة الضوء
+  atmosphericMood: varchar("atmosphericMood", { length: 100 }),
+  // معرفة موسعة
+  knowledgeData: json("knowledgeData"),  // بيانات إضافية من AI
+  streetViewAvailable: int("streetViewAvailable").default(0),
+  mapsPlaceId: varchar("mapsPlaceId", { length: 255 }),
+  // معلومات النظام
+  searchCount: int("searchCount").default(0),
+  lastSearched: timestamp("lastSearched"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type GeoKnowledge = typeof geoKnowledge.$inferSelect;
+export type InsertGeoKnowledge = typeof geoKnowledge.$inferInsert;

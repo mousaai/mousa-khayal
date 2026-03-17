@@ -194,7 +194,8 @@ export default function Home() {
   const waveAnimRef = useRef<number>(0);
 
   const lang = UI_LANGS[activeLang] || UI_LANGS.AR;
-  const isRTL = activeLang === "AR";
+  // لغات RTL: عربي + فارسي + أردي + عبري
+  const isRTL = ["AR", "FA", "UR", "HE"].includes(activeLang);
 
   const generateMutation = trpc.khayal.generateScene.useMutation();
   const generateFilmMutation = trpc.khayal.generateFilm.useMutation();
@@ -317,10 +318,29 @@ export default function Home() {
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         const fd = new FormData();
         fd.append("audio", blob, "voice.webm");
+        // لا نُرسل language — الخادم يكشفها تلقائياً
         try {
           const res = await fetch("/api/transcribe", { method: "POST", body: fd });
           const data = await res.json();
-          if (data.text) setPrompt(prev => prev ? prev + " " + data.text : data.text);
+          if (data.text) {
+            setPrompt(prev => prev ? prev + " " + data.text : data.text);
+            // ── كشف اللغة تلقائياً وتحديث الواجهة فوراً ──
+            if (data.language) {
+              const detectedLang = data.language.toUpperCase().slice(0, 2);
+              // خريطة رموز ISO → مفاتيح UI_LANGS
+              const ISO_MAP: Record<string, string> = {
+                AR: "AR", EN: "EN", JA: "JA", FR: "FR",
+                ZH: "ZH", IT: "IT", ES: "ES", HI: "HI",
+                // لغات إضافية تُعيَّن للأقرب
+                DE: "EN", PT: "ES", RU: "EN", KO: "JA",
+                TR: "EN", FA: "AR", UR: "HI", BN: "HI",
+              };
+              const mappedLang = ISO_MAP[detectedLang] || "EN";
+              if (mappedLang in UI_LANGS) {
+                setActiveLang(mappedLang);
+              }
+            }
+          }
         } catch {
           // silently ignore
         } finally {
@@ -807,7 +827,28 @@ export default function Home() {
             <textarea
               ref={textareaRef}
               value={prompt}
-              onChange={e => setPrompt(e.target.value)}
+              onChange={e => {
+                const val = e.target.value;
+                setPrompt(val);
+                // ── كشف اللغة من النص تلقائياً ──
+                if (val.length > 8) {
+                  const arabicRx = /[\u0600-\u06FF]/;
+                  const japaneseRx = /[\u3040-\u30FF\u4E00-\u9FFF]/;
+                  const chineseRx = /[\u4E00-\u9FFF]/;
+                  const hindiRx = /[\u0900-\u097F]/;
+                  const frRx = /[àâçéèêëîïôùûüæœ]/i;
+                  const esRx = /[áéíóúüñ¿¡]/i;
+                  const itRx = /[àèéìíîòóùú]/i;
+                  if (arabicRx.test(val)) setActiveLang("AR");
+                  else if (hindiRx.test(val)) setActiveLang("HI");
+                  else if (japaneseRx.test(val)) setActiveLang("JA");
+                  else if (chineseRx.test(val)) setActiveLang("ZH");
+                  else if (frRx.test(val)) setActiveLang("FR");
+                  else if (esRx.test(val)) setActiveLang("ES");
+                  else if (itRx.test(val)) setActiveLang("IT");
+                  else if (/[a-zA-Z]/.test(val)) setActiveLang("EN");
+                }
+              }}
               onKeyDown={handleKeyDown}
               placeholder={documentAnalysis ? documentAnalysis.mainDescription.slice(0, 80) + "..." : lang.placeholder}
               dir={isRTL ? "rtl" : "ltr"}
