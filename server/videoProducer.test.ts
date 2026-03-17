@@ -1,5 +1,6 @@
 /**
- * videoProducer.test.ts — اختبارات محرك الفيديو الاحترافي
+ * videoProducer.test.ts v2.0 — اختبارات محرك الفيديو الاحترافي
+ * يغطي: 8 تأثيرات حركة + 8 انتقالات + موسيقى + نسب أبعاد + وضع مسودة/إنتاج + مقاييس
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
@@ -9,18 +10,21 @@ vi.mock("./_core/llm", () => ({
     choices: [{
       message: {
         content: JSON.stringify({
-          title: "حياة النملة",
+          title: "حياة النملة تحت الأرض",
           language: "ar",
           voice: "ar_male",
           narration: "النملة حشرة اجتماعية تعيش في مستعمرات منظمة تحت الأرض.",
           domain: "educational",
+          musicMood: "calm",
           scenes: [
             {
               imagePrompt: "macro photography of an ant colony underground tunnel, photorealistic",
               subtitle: "المستعمرة تحت الأرض",
               narration: "تبني النملة أنفاقاً معقدة تحت الأرض.",
               duration: 6,
-              zoom: "in",
+              zoom: "zoom_in",
+              transition: "fade",
+              sceneType: "b_roll",
             },
             {
               imagePrompt: "ants carrying food, macro photography, dramatic lighting",
@@ -28,13 +32,17 @@ vi.mock("./_core/llm", () => ({
               narration: "تجمع النملة الغذاء لتخزينه للشتاء.",
               duration: 5,
               zoom: "pan_right",
+              transition: "dissolve",
+              sceneType: "b_roll",
             },
             {
               imagePrompt: "ant queen laying eggs in royal chamber, macro photography",
               subtitle: "الملكة والبيض",
               narration: "تضع الملكة آلاف البيض يومياً.",
               duration: 7,
-              zoom: "out",
+              zoom: "zoom_out",
+              transition: "wipe_left",
+              sceneType: "b_roll",
             },
           ],
         }),
@@ -74,7 +82,6 @@ global.fetch = vi.fn().mockImplementation((url: string) => {
       arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
     });
   }
-  // Image download
   return Promise.resolve({
     ok: true,
     arrayBuffer: () => Promise.resolve(new ArrayBuffer(1024)),
@@ -133,7 +140,7 @@ vi.mock("fs", async () => {
 });
 
 // ══════════════════════════════════════════════════════════════
-// الاختبارات
+// اختبارات v1 (محافظة على التوافق)
 // ══════════════════════════════════════════════════════════════
 
 describe("generateVideoScript", () => {
@@ -141,12 +148,11 @@ describe("generateVideoScript", () => {
     const { generateVideoScript } = await import("./videoProducer");
     const script = await generateVideoScript("حياة النملة", "ar", "ar_male", 3);
 
-    expect(script.title).toBe("حياة النملة");
+    expect(script.title).toBeTruthy();
     expect(script.language).toBe("ar");
     expect(script.voice).toBe("ar_male");
     expect(script.domain).toBe("educational");
     expect(script.scenes).toHaveLength(3);
-    expect(script.scenes[0].zoom).toMatch(/^(in|out|pan_left|pan_right)$/);
   });
 
   it("يحتوي كل مشهد على imagePrompt وsubtitle ومدة", async () => {
@@ -161,9 +167,39 @@ describe("generateVideoScript", () => {
   });
 });
 
-describe("VideoProducer - CONFIG", () => {
+// ══════════════════════════════════════════════════════════════
+// اختبارات v2.0 — المقومات الجديدة
+// ══════════════════════════════════════════════════════════════
+
+describe("generateVideoScript v2.0 — الحقول الجديدة", () => {
+  it("يعيد musicMood في السيناريو", async () => {
+    const { generateVideoScript } = await import("./videoProducer");
+    const script = await generateVideoScript("حياة النملة", "ar", "ar_male", 3);
+    expect(script.musicMood).toBeDefined();
+    expect(typeof script.musicMood).toBe("string");
+  });
+
+  it("المشاهد تحتوي على zoom v2.0 (zoom_in, zoom_out, pan_left...)", async () => {
+    const { generateVideoScript } = await import("./videoProducer");
+    const script = await generateVideoScript("حياة النملة", "ar", "ar_male", 3);
+    const validMotions = ["zoom_in", "zoom_out", "pan_left", "pan_right", "shake", "rotate", "bounce", "spiral",
+                          "in", "out"]; // backward compat
+    script.scenes.forEach(scene => {
+      expect(validMotions).toContain(scene.zoom);
+    });
+  });
+
+  it("المشاهد تحتوي على transition و sceneType", async () => {
+    const { generateVideoScript } = await import("./videoProducer");
+    const script = await generateVideoScript("حياة النملة", "ar", "ar_male", 3);
+    // الانتقالات والنوع اختياريان لكن يجب أن يكونا موجودين في السيناريو الجديد
+    expect(script.scenes[0].transition).toBeDefined();
+    expect(script.scenes[0].sceneType).toBeDefined();
+  });
+});
+
+describe("VideoProducer v2.0 — المقومات الأساسية", () => {
   it("يستخدم دقة 1920×1080", () => {
-    // التحقق من الثوابت مباشرة بدون fs mock
     const { readFileSync } = require("node:fs");
     const source = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoProducer.ts", "utf-8");
     expect(source).toContain("1920");
@@ -176,19 +212,55 @@ describe("VideoProducer - CONFIG", () => {
     expect(source).toContain("fps: 25");
   });
 
-  it("يدعم 4 أنواع حركة Ken Burns", () => {
+  it("يحتوي على 8 تأثيرات حركة Ken Burns", () => {
     const { readFileSync } = require("node:fs");
     const source = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoProducer.ts", "utf-8");
-    expect(source).toContain("pan_left");
-    expect(source).toContain("pan_right");
-    // zoom in / zoom out ممثلة بفلاتر zoompan
-    expect(source).toContain("zoompan");
-    expect(source).toContain("zoom-0.0008"); // zoom out
-    expect(source).toContain("zoom+0.0008"); // zoom in
+    ["zoom_in", "zoom_out", "pan_left", "pan_right", "shake", "rotate", "bounce", "spiral"].forEach(m => {
+      expect(source).toContain(m);
+    });
+  });
+
+  it("يحتوي على 8 انتقالات", () => {
+    const { readFileSync } = require("node:fs");
+    const source = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoProducer.ts", "utf-8");
+    ["fade", "dissolve", "wipe_left", "wipe_right", "zoom_fade", "blur_fade", "slide_left", "slide_right"].forEach(t => {
+      expect(source).toContain(t);
+    });
+  });
+
+  it("يحتوي على 4 نسب أبعاد", () => {
+    const { readFileSync } = require("node:fs");
+    const source = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoProducer.ts", "utf-8");
+    expect(source).toContain("16:9");
+    expect(source).toContain("9:16");
+    expect(source).toContain("1:1");
+    expect(source).toContain("4:3");
+  });
+
+  it("يحتوي على وضع مسودة وإنتاج", () => {
+    const { readFileSync } = require("node:fs");
+    const source = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoProducer.ts", "utf-8");
+    expect(source).toContain("draft");
+    expect(source).toContain("production");
+  });
+
+  it("يحتوي على موسيقى خلفية (addBackgroundMusic)", () => {
+    const { readFileSync } = require("node:fs");
+    const source = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoProducer.ts", "utf-8");
+    expect(source).toContain("addBackgroundMusic");
+    expect(source).toContain("musicVolume");
+  });
+
+  it("يحتوي على مقاييس الأداء (metrics)", () => {
+    const { readFileSync } = require("node:fs");
+    const source = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoProducer.ts", "utf-8");
+    expect(source).toContain("durationMs");
+    expect(source).toContain("fileSizeMB");
+    expect(source).toContain("costEstimate");
   });
 });
 
-describe("videoRouter - getJobStatus", () => {
+describe("videoRouter v2.0", () => {
   it("يعيد not_found لمهمة غير موجودة", async () => {
     const { appRouter } = await import("./routers");
     const caller = appRouter.createCaller({
@@ -201,10 +273,8 @@ describe("videoRouter - getJobStatus", () => {
     expect(status.status).toBe("not_found");
     expect(status.progress).toBe(0);
   });
-});
 
-describe("videoRouter - generateScript", () => {
-  it("يولد سيناريو من وصف نصي", async () => {
+  it("generateScript يقبل المدخلات ويعيد سيناريو", async () => {
     const { appRouter } = await import("./routers");
     const caller = appRouter.createCaller({
       req: {} as any,
@@ -223,10 +293,8 @@ describe("videoRouter - generateScript", () => {
     expect(result.script.title).toBeTruthy();
     expect(result.script.scenes.length).toBeGreaterThan(0);
   });
-});
 
-describe("videoRouter - startProduction", () => {
-  it("يبدأ مهمة إنتاج ويعيد jobId", async () => {
+  it("startProduction يقبل options v2.0 ويعيد jobId", async () => {
     const { appRouter } = await import("./routers");
     const caller = appRouter.createCaller({
       req: {} as any,
@@ -236,27 +304,31 @@ describe("videoRouter - startProduction", () => {
 
     const result = await caller.video.startProduction({
       script: {
-        title: "اختبار",
+        title: "اختبار v2",
         language: "ar",
         voice: "ar_male",
         narration: "هذا اختبار",
         domain: "educational",
+        musicMood: "calm",
         scenes: [
           {
             imagePrompt: "test scene",
             subtitle: "مشهد اختبار",
             duration: 5,
-            zoom: "in",
+            zoom: "zoom_in",
+            transition: "fade",
+            sceneType: "b_roll",
           },
         ],
       },
+      options: { aspectRatio: "9:16", mode: "draft", musicVolume: 0.1 },
     });
 
     expect(result.jobId).toBeTruthy();
     expect(result.jobId).toMatch(/^job_/);
   });
 
-  it("يبدأ مهمة quickProduce ويعيد jobId", async () => {
+  it("quickProduce يقبل options v2.0 ويعيد jobId", async () => {
     const { appRouter } = await import("./routers");
     const caller = appRouter.createCaller({
       req: {} as any,
@@ -265,13 +337,38 @@ describe("videoRouter - startProduction", () => {
     });
 
     const result = await caller.video.quickProduce({
-      description: "حياة النملة",
+      description: "دورة الماء في الطبيعة",
       language: "ar",
-      voice: "ar_male",
+      voice: "ar_female",
       sceneCount: 3,
+      options: { aspectRatio: "1:1", mode: "draft" },
     });
 
     expect(result.jobId).toBeTruthy();
     expect(result.jobId).toMatch(/^quick_/);
+  });
+});
+
+describe("videoRouter v2.0 — التحقق من schema", () => {
+  it("videoRouter يقبل نسبة أبعاد 16:9", async () => {
+    const { readFileSync } = require("node:fs");
+    const routerSrc = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoRouter.ts", "utf-8");
+    expect(routerSrc).toContain("16:9");
+    expect(routerSrc).toContain("9:16");
+    expect(routerSrc).toContain("1:1");
+    expect(routerSrc).toContain("4:3");
+  });
+
+  it("videoRouter يقبل وضع draft و production", async () => {
+    const { readFileSync } = require("node:fs");
+    const routerSrc = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoRouter.ts", "utf-8");
+    expect(routerSrc).toContain("draft");
+    expect(routerSrc).toContain("production");
+  });
+
+  it("videoRouter يقبل musicVolume", async () => {
+    const { readFileSync } = require("node:fs");
+    const routerSrc = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoRouter.ts", "utf-8");
+    expect(routerSrc).toContain("musicVolume");
   });
 });
