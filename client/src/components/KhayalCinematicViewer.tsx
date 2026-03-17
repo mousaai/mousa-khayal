@@ -88,6 +88,14 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
   const [isMusicOn, setIsMusicOn] = useState(false);
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
+  // ── حالة شاشة تقدم تصدير الفيديو ──
+  const [videoExport, setVideoExport] = useState<{
+    phase: "loading" | "recording" | "encoding" | "done";
+    currentScene: number;
+    totalScenes: number;
+    progressPct: number;
+    totalSeconds: number;
+  } | null>(null);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -295,7 +303,14 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
     const perSceneSeconds = Math.max(3, totalVideoSeconds / scenes.length);
     const estimatedTotalSec = Math.round(perSceneSeconds * scenes.length);
 
-    toast.info(`جارٍ إنشاء فيديو ${estimatedTotalSec} ثانية... سيستغرق حوالي ${Math.ceil(estimatedTotalSec / 3)} ثانية للمعالجة`);
+    // فتح شاشة التقدم الكاملة
+    setVideoExport({
+      phase: "loading",
+      currentScene: 0,
+      totalScenes: scenes.length,
+      progressPct: 0,
+      totalSeconds: estimatedTotalSec,
+    });
 
     try {
       const canvas = document.createElement("canvas");
@@ -333,8 +348,13 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
         const FPS = 30;
         const FRAMES = (DURATION_MS / 1000) * FPS;
 
-        // مؤشر تقدم التسجيل
-        toast.info(`تسجيل المشهد ${i + 1} من ${scenes.length}...`, { id: "video-progress" });
+        // تحديث شاشة التقدم
+        setVideoExport(prev => prev ? {
+          ...prev,
+          phase: "recording",
+          currentScene: i + 1,
+          progressPct: Math.round(((i) / scenes.length) * 85), // 0-85% للتسجيل
+        } : null);
 
         for (let f = 0; f < FRAMES; f++) {
           const t = f / FRAMES;
@@ -392,6 +412,8 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
         }
       }
 
+      // مرحلة الترميز
+      setVideoExport(prev => prev ? { ...prev, phase: "encoding", progressPct: 90 } : null);
       recorder.stop();
       await new Promise<void>(resolve => { recorder.onstop = () => resolve(); });
 
@@ -402,9 +424,14 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
       a.download = `khayal_${(result.title || "cinematic").replace(/\s+/g, "_")}.webm`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success(`✅ تم إنشاء فيديو ${estimatedTotalSec} ثانية بنجاح!`, { id: "video-progress" });
+      // اكتمل — عرض 100% لثانية ثم إغلاق الشاشة
+      setVideoExport(prev => prev ? { ...prev, phase: "done", progressPct: 100 } : null);
+      await new Promise(r => setTimeout(r, 1500));
+      setVideoExport(null);
+      toast.success(`✅ تم إنشاء فيديو ${estimatedTotalSec} ثانية بنجاح!`);
     } catch (err) {
       console.error("Video recording failed:", err);
+      setVideoExport(null);
       toast.error("فشل إنشاء الفيديو. جارٍ تحميل الصور بدلاً منه...");
       await downloadAllImagesZip();
     } finally {
@@ -564,9 +591,136 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
     refineMutation.mutate({ projectId: result.projectId, feedback: refineFeedback });
   };
 
-  // ══════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
   // RENDER
-  // ══════════════════════════════════════════════════════════════
+  // ════════════════════════════════════════════════════════════
+
+  // ── شاشة تقدم تصدير الفيديو ──
+  if (videoExport) {
+    const phaseLabels: Record<string, string> = {
+      loading:   "جارٍ تحميل المشاهد...",
+      recording: `تسجيل المشهد ${videoExport.currentScene} من ${videoExport.totalScenes}`,
+      encoding:  "جارٍ ترميز الفيديو...",
+      done:      `✅ تم إنشاء فيديو ${videoExport.totalSeconds} ثانية!`,
+    };
+    const phaseIcons: Record<string, string> = {
+      loading: "⏳", recording: "🎥", encoding: "⚡", done: "✅",
+    };
+    const steps = [
+      { key: "loading",   label: "تحميل الصور" },
+      { key: "recording", label: "تسجيل الفيديو" },
+      { key: "encoding",  label: "ترميز وحفظ" },
+      { key: "done",      label: "اكتمل" },
+    ];
+    const stepOrder = ["loading", "recording", "encoding", "done"];
+    const currentStepIdx = stepOrder.indexOf(videoExport.phase);
+
+    return (
+      <div
+        dir="rtl"
+        className="fixed inset-0 z-50 flex flex-col items-center justify-center"
+        style={{ background: "#020408", fontFamily: "'Cairo','Tajawal',sans-serif" }}
+      >
+        {/* خلفية تدرجية */}
+        <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 70% 60% at 50% 40%, rgba(124,58,237,0.18) 0%, transparent 70%)" }} />
+
+        {/* أيقونة الفيلم */}
+        <div
+          className="relative z-10 w-24 h-24 rounded-full flex items-center justify-center mb-8"
+          style={{
+            background: videoExport.phase === "done"
+              ? "linear-gradient(135deg, #10b981, #059669)"
+              : "linear-gradient(135deg, #7c3aed, #ec4899)",
+            boxShadow: videoExport.phase === "done"
+              ? "0 0 60px rgba(16,185,129,0.5)"
+              : "0 0 60px rgba(124,58,237,0.5)",
+            animation: videoExport.phase !== "done" ? "pulse 2s infinite" : "none",
+          }}
+        >
+          <span className="text-4xl">{phaseIcons[videoExport.phase]}</span>
+        </div>
+
+        {/* العنوان */}
+        <h2 className="relative z-10 text-2xl font-bold text-white mb-2">
+          {videoExport.phase === "done" ? "تم إنشاء الفيديو" : "جارٍ إنشاء الفيديو"}
+        </h2>
+        <p className="relative z-10 text-purple-300 text-sm mb-8">
+          {phaseLabels[videoExport.phase]}
+        </p>
+
+        {/* شريط التقدم */}
+        <div className="relative z-10 w-full max-w-md px-6 mb-6">
+          <div className="w-full bg-white/10 rounded-full h-4 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-700"
+              style={{
+                width: `${videoExport.progressPct}%`,
+                background: videoExport.phase === "done"
+                  ? "linear-gradient(90deg, #10b981, #059669)"
+                  : "linear-gradient(90deg, #7c3aed, #ec4899, #0ea5e9)",
+                boxShadow: "0 0 12px rgba(124,58,237,0.6)",
+              }}
+            />
+          </div>
+          <div className="flex justify-between mt-2 text-xs text-gray-400">
+            <span>{videoExport.totalSeconds} ثانية</span>
+            <span className="font-bold text-purple-300">{videoExport.progressPct}%</span>
+          </div>
+        </div>
+
+        {/* خطوات التقدم */}
+        <div className="relative z-10 flex gap-4 mb-8">
+          {steps.map((step, idx) => (
+            <div key={step.key} className="flex flex-col items-center gap-1">
+              <div
+                className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold transition-all duration-500"
+                style={{
+                  background: idx < currentStepIdx
+                    ? "rgba(124,58,237,0.8)"
+                    : idx === currentStepIdx
+                    ? "linear-gradient(135deg, #7c3aed, #ec4899)"
+                    : "rgba(255,255,255,0.08)",
+                  border: idx === currentStepIdx ? "2px solid #ec4899" : "2px solid transparent",
+                  boxShadow: idx === currentStepIdx ? "0 0 20px rgba(236,72,153,0.5)" : "none",
+                  transform: idx === currentStepIdx ? "scale(1.2)" : "scale(1)",
+                  color: idx <= currentStepIdx ? "#fff" : "rgba(255,255,255,0.3)",
+                }}
+              >
+                {idx < currentStepIdx ? "✓" : idx + 1}
+              </div>
+              <span
+                className="text-xs"
+                style={{ color: idx <= currentStepIdx ? "#a78bfa" : "rgba(255,255,255,0.3)" }}
+              >
+                {step.label}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        {/* معاينة المشهد الحالي */}
+        {videoExport.currentScene > 0 && videoExport.currentScene <= scenes.length && (
+          <div className="relative z-10 w-full max-w-xs px-6">
+            <div className="rounded-xl overflow-hidden" style={{ border: "1px solid rgba(167,139,250,0.2)" }}>
+              <img
+                src={scenes[videoExport.currentScene - 1]?.imageUrl || ""}
+                alt="المشهد الحالي"
+                className="w-full aspect-video object-cover opacity-70"
+              />
+              <div className="px-3 py-2 text-center" style={{ background: "rgba(0,0,0,0.6)" }}>
+                <p className="text-white/70 text-xs">
+                  {scenes[videoExport.currentScene - 1]?.label || ""}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        <style>{`@keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:0.8;transform:scale(1.05)} }`}</style>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}

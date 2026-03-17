@@ -174,7 +174,27 @@ export default function Home() {
 
   // Film director
   const [showFilmModal, setShowFilmModal] = useState(false);
-  const [filmProgress, setFilmProgress] = useState<FilmProgress | null>(null);
+  // ── حالة تصدير الفيديو ──
+  const [videoExportProgress, setVideoExportProgress] = useState<{
+    isActive: boolean;
+    currentScene: number;
+    totalScenes: number;
+    phase: "loading" | "recording" | "encoding" | "done";
+    durationSeconds: number;
+  } | null>(null);
+
+  const [filmProgress, setFilmProgress] = useState<{
+    isActive: boolean;
+    totalScenes: number;
+    completedScenes: number;
+    currentBatch: number;
+    totalBatches: number;
+    durationSeconds: number;
+    durationLabel: string;
+    accumulatedScenes: GenerationResult["scenes"];
+    projectId: number | null;
+    isComplete: boolean;
+  } | null>(null);
 
   // UI
   const [bgIdx, setBgIdx] = useState(0);
@@ -466,8 +486,8 @@ export default function Home() {
       isComplete: false,
     });
 
-    // تشغيل موسيقى درامية أثناء التوليد
-    musicEngine.play("dramatic", 0.1);
+    // لا موسيقى أثناء التوليد — صمت كامل حتى تكتمل المشاهد
+    musicEngine.stop();
 
     let currentProjectId: number | null = null;
     let allScenes: GenerationResult["scenes"] = [];
