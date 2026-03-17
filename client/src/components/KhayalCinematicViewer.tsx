@@ -286,7 +286,16 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
       return;
     }
 
-    toast.info("جارٍ إنشاء الفيديو... سيستغرق حوالي " + (scenes.length * 4) + " ثوانٍ");
+    // حساب مدة كل مشهد بدقة من المدة الإجمالية المطلوبة
+    // إذا طلب المستخدم 30 ثانية وعندنا 5 مشاهد → كل مشهد = 6 ثوانٍ
+    const requestedDuration = result.filmRequirements?.sceneCount
+      ? result.filmRequirements.sceneCount * result.filmRequirements.sceneDurationSec
+      : null;
+    const totalVideoSeconds = requestedDuration || scenes.length * 6;
+    const perSceneSeconds = Math.max(3, totalVideoSeconds / scenes.length);
+    const estimatedTotalSec = Math.round(perSceneSeconds * scenes.length);
+
+    toast.info(`جارٍ إنشاء فيديو ${estimatedTotalSec} ثانية... سيستغرق حوالي ${Math.ceil(estimatedTotalSec / 3)} ثانية للمعالجة`);
 
     try {
       const canvas = document.createElement("canvas");
@@ -301,7 +310,7 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
       const stream = canvas.captureStream(30);
       const recorder = new MediaRecorder(stream, {
         mimeType,
-        videoBitsPerSecond: 4_000_000,
+        videoBitsPerSecond: 5_000_000, // جودة أعلى
       });
 
       const chunks: Blob[] = [];
@@ -319,9 +328,13 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
           img.src = proxyUrl;
         });
 
-        const DURATION_MS = 4000;
+        // مدة كل مشهد محسوبة بدقة من المدة الإجمالية المطلوبة
+        const DURATION_MS = Math.round(perSceneSeconds * 1000);
         const FPS = 30;
         const FRAMES = (DURATION_MS / 1000) * FPS;
+
+        // مؤشر تقدم التسجيل
+        toast.info(`تسجيل المشهد ${i + 1} من ${scenes.length}...`, { id: "video-progress" });
 
         for (let f = 0; f < FRAMES; f++) {
           const t = f / FRAMES;
@@ -389,7 +402,7 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
       a.download = `khayal_${(result.title || "cinematic").replace(/\s+/g, "_")}.webm`;
       a.click();
       URL.revokeObjectURL(url);
-      toast.success("تم تحميل الفيديو بنجاح!");
+      toast.success(`✅ تم إنشاء فيديو ${estimatedTotalSec} ثانية بنجاح!`, { id: "video-progress" });
     } catch (err) {
       console.error("Video recording failed:", err);
       toast.error("فشل إنشاء الفيديو. جارٍ تحميل الصور بدلاً منه...");
