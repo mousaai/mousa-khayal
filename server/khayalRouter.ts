@@ -1,7 +1,7 @@
 /**
  * khayalRouter.ts — محرك الذكاء المتقدم لمنصة خيال
- * يحلل الوصف بعمق، يولّد مشاهد سينمائية فوتوريالستيك،
- * ويدعم حلقة تحسين ذاتي وذاكرة المستخدم
+ * يحلل الوصف بعمق بأي لغة، يستنتج السيناريو تلقائياً،
+ * يولّد مشاهد سينمائية فوتوريالستيك بمستوى هوليوود
  */
 import { z } from "zod";
 import { publicProcedure, router } from "./_core/trpc";
@@ -11,10 +11,11 @@ import { getDb } from "./db";
 import { khayalProjects, khayalScenes } from "../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
 
-// ===== تحليل الوصف العميق بالذكاء الاصطناعي =====
+// ═══════════════════════════════════════════════════════════════════════════
+// DEEP AI ANALYSIS — متعدد اللغات، استنتاج تلقائي للسيناريو
+// ═══════════════════════════════════════════════════════════════════════════
 async function deepAnalyzeDescription(
   description: string,
-  scenarioType: string,
   referenceImageUrl?: string,
   previousFeedback?: string
 ): Promise<{
@@ -22,53 +23,55 @@ async function deepAnalyzeDescription(
   culturalContext: string;
   mainElements: string[];
   atmosphere: string;
+  scenarioType: string;
   scenes: Array<{ type: string; label: string; prompt: string; arabicCaption: string }>;
   cinematicStyle: string;
+  detectedLanguage: string;
 }> {
 
-  const scenarioInstructions: Record<string, string> = {
-    design: "تصميم جديد ومبتكر، حديث وفاخر، مع إضاءة ذهبية عند الغروب، نظيف وعصري",
-    develop: "تطوير وتحسين المكان، مستقبل مزدهر بعد 20 سنة من التطوير والنمو والازدهار",
-    deteriorate: "تدهور وتقادم وإهمال، تآكل الزمن، أجواء درامية كئيبة، أطلال وذكريات",
-    compare: "مقارنة زمنية واضحة، قبل وبعد، تحول درامي من الماضي إلى المستقبل",
-    imagine: "خيال إبداعي حر بلا حدود، أي شيء ممكن، مبهر وغير متوقع، فريد من نوعه",
-  };
+  const systemPrompt = `You are a world-class cinematic director and architectural visualization expert with deep knowledge of ALL world cultures, architectural styles, and artistic traditions.
 
-  const scenarioDesc = scenarioInstructions[scenarioType] || scenarioInstructions.imagine;
+Your task: Analyze the provided description (in ANY language) and generate 5 photorealistic cinematic scenes at Hollywood level.
 
-  const systemPrompt = `أنت مخرج سينمائي عالمي خبير ومصمم معماري بارع، تفهم كل ثقافات العالم وأساليبها المعمارية والفنية.
-مهمتك: تحليل الوصف المقدم بعمق وتوليد 5 مشاهد سينمائية فوتوريالستيك احترافية بمستوى هوليوود.
+CRITICAL RULES:
+1. Detect the language and cultural context automatically from the description
+2. Infer the scenario type automatically from the description:
+   - "design" → new design, fresh concept, modern, innovative
+   - "develop" → development, prosperity, growth, future flourishing
+   - "deteriorate" → decay, aging, ruins, abandonment, time erosion
+   - "compare" → before/after, time comparison, transformation
+   - "imagine" → free imagination, sci-fi, fantasy, any creative concept
+3. Generate prompts in ENGLISH for maximum image quality
+4. Each prompt MUST start with "Ultra photorealistic cinematic render,"
+5. Include specific cultural/architectural details matching the description
+6. Vary camera angles: wide establishing, aerial drone, eye-level, close-up detail, atmospheric
+7. Add dramatic lighting: golden hour, blue hour, storm light, soft dawn, dramatic shadows
+8. Always include: "8K resolution, ultra-detailed, cinematic color grading, depth of field, volumetric lighting, award-winning photography"
+9. Add people/life to scenes for realism
+10. Arabic captions should be poetic short phrases (even if description is in another language)
 
-السيناريو: ${scenarioDesc}
-${previousFeedback ? `\nملاحظات التحسين من المستخدم: ${previousFeedback}` : ""}
+${previousFeedback ? `User refinement feedback: ${previousFeedback}` : ""}
 
-قواعد توليد الـ prompts:
-1. ابدأ كل prompt بـ "Ultra photorealistic cinematic render,"
-2. أضف السياق الثقافي والمعماري المحدد
-3. أضف تفاصيل الإضاءة الدرامية (golden hour / blue hour / dramatic storm / soft dawn)
-4. أضف أسلوب الكاميرا (wide establishing shot / aerial drone / eye-level / macro detail / tracking shot)
-5. أضف جودة الصورة: "8K resolution, ultra-detailed, cinematic color grading, depth of field, volumetric lighting, award-winning architectural photography"
-6. أضف بشر وحياة في المشاهد لإضفاء الواقعية
-7. اجعل كل مشهد مختلفاً تماماً ومكملاً للآخر
-
-أعد JSON بهذا الشكل بالضبط (لا تضف أي نص خارج الـ JSON):
+Respond ONLY with valid JSON (no markdown, no extra text):
 {
-  "title": "عنوان شعري للمشروع بالعربية",
-  "culturalContext": "السياق الثقافي والجغرافي المستنتج",
-  "mainElements": ["عنصر1", "عنصر2", "عنصر3"],
-  "atmosphere": "وصف الأجواء العامة",
-  "cinematicStyle": "الأسلوب السينمائي المختار",
+  "title": "poetic title in the description's language",
+  "culturalContext": "detected cultural/geographic context",
+  "detectedLanguage": "ISO 639-1 code (ar/en/ja/fr/zh/it/es/hi)",
+  "scenarioType": "design|develop|deteriorate|compare|imagine",
+  "mainElements": ["element1", "element2", "element3"],
+  "atmosphere": "overall atmosphere description",
+  "cinematicStyle": "chosen cinematic style",
   "scenes": [
-    {"type": "exterior", "label": "المنظر الخارجي", "prompt": "Ultra photorealistic...", "arabicCaption": "جملة شعرية قصيرة بالعربية"},
-    {"type": "aerial", "label": "المنظر الجوي", "prompt": "Ultra photorealistic...", "arabicCaption": "جملة شعرية قصيرة بالعربية"},
-    {"type": "interior", "label": "الفضاء الداخلي", "prompt": "Ultra photorealistic...", "arabicCaption": "جملة شعرية قصيرة بالعربية"},
-    {"type": "detail", "label": "التفاصيل المعمارية", "prompt": "Ultra photorealistic...", "arabicCaption": "جملة شعرية قصيرة بالعربية"},
-    {"type": "atmosphere", "label": "الأجواء والمشهد", "prompt": "Ultra photorealistic...", "arabicCaption": "جملة شعرية قصيرة بالعربية"}
+    {"type": "exterior", "label": "label in description language", "prompt": "Ultra photorealistic...", "arabicCaption": "جملة شعرية قصيرة"},
+    {"type": "aerial", "label": "label in description language", "prompt": "Ultra photorealistic...", "arabicCaption": "جملة شعرية قصيرة"},
+    {"type": "interior", "label": "label in description language", "prompt": "Ultra photorealistic...", "arabicCaption": "جملة شعرية قصيرة"},
+    {"type": "detail", "label": "label in description language", "prompt": "Ultra photorealistic...", "arabicCaption": "جملة شعرية قصيرة"},
+    {"type": "atmosphere", "label": "label in description language", "prompt": "Ultra photorealistic...", "arabicCaption": "جملة شعرية قصيرة"}
   ]
 }`;
 
   const userContent: any[] = [
-    { type: "text", text: `الوصف: ${description}` },
+    { type: "text", text: `Description: ${description}` },
   ];
 
   if (referenceImageUrl) {
@@ -82,10 +85,10 @@ ${previousFeedback ? `\nملاحظات التحسين من المستخدم: ${p
     const result = await invokeLLM({
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: referenceImageUrl ? userContent : `الوصف: ${description}` },
+        { role: "user", content: referenceImageUrl ? userContent : `Description: ${description}` },
       ],
       responseFormat: { type: "json_object" },
-      maxTokens: 3000,
+      maxTokens: 3500,
     });
 
     const content = typeof result.choices[0].message.content === "string"
@@ -94,81 +97,104 @@ ${previousFeedback ? `\nملاحظات التحسين من المستخدم: ${p
 
     const parsed = JSON.parse(content);
 
-    // التحقق من صحة البيانات
     if (!parsed.scenes || !Array.isArray(parsed.scenes) || parsed.scenes.length === 0) {
       throw new Error("Invalid scenes structure");
     }
 
-    return parsed;
+    return {
+      ...parsed,
+      scenarioType: parsed.scenarioType || "imagine",
+      detectedLanguage: parsed.detectedLanguage || "ar",
+    };
   } catch (err) {
     console.error("[KhayalRouter] LLM analysis failed, using fallback:", err);
-    // Fallback احترافي
+
+    // Intelligent fallback based on keywords
+    let scenarioType = "imagine";
+    const lowerDesc = description.toLowerCase();
+    if (/جديد|new|nouveau|新|nuevo|नया|design|تصميم/.test(lowerDesc)) scenarioType = "design";
+    else if (/تطوير|develop|développer|開発|desarrollo|विकास|future|مستقبل/.test(lowerDesc)) scenarioType = "develop";
+    else if (/تدهور|decay|dégradation|廃墟|deterioro|खंडहर|ruin|أطلال/.test(lowerDesc)) scenarioType = "deteriorate";
+    else if (/مقارنة|compare|avant|before|after|比較|comparar/.test(lowerDesc)) scenarioType = "compare";
+
     return {
       title: description.slice(0, 60),
-      culturalContext: "عالمي",
+      culturalContext: "Universal",
+      detectedLanguage: /[\u0600-\u06FF]/.test(description) ? "ar" : "en",
+      scenarioType,
       mainElements: [description.slice(0, 30)],
-      atmosphere: "سينمائي درامي",
-      cinematicStyle: "فوتوريالستيك",
+      atmosphere: "Dramatic cinematic",
+      cinematicStyle: "Photorealistic",
       scenes: [
-        { type: "exterior", label: "المنظر الخارجي", arabicCaption: "حيث يبدأ الخيال",
-          prompt: `Ultra photorealistic cinematic render, ${description}, golden hour lighting, wide establishing shot, 8K resolution, ultra-detailed, cinematic color grading, depth of field, volumetric lighting, award-winning architectural photography` },
-        { type: "aerial", label: "المنظر الجوي", arabicCaption: "من حيث ترى الطيور",
-          prompt: `Ultra photorealistic aerial drone view, ${description}, dramatic sky with clouds, bird's eye perspective, 8K, cinematic, ultra-detailed, volumetric lighting` },
-        { type: "interior", label: "الفضاء الداخلي", arabicCaption: "عالم بداخل عالم",
-          prompt: `Ultra photorealistic interior architectural render, ${description}, warm ambient lighting, people inside, ultra-detailed, 8K, cinematic photography, depth of field` },
-        { type: "detail", label: "التفاصيل المعمارية", arabicCaption: "الجمال في التفاصيل",
-          prompt: `Ultra photorealistic close-up architectural detail, ${description}, sharp focus, dramatic shadows, macro lens, 8K, ultra-detailed` },
-        { type: "atmosphere", label: "الأجواء والمشهد", arabicCaption: "لحظة تسكن الذاكرة",
-          prompt: `Ultra photorealistic atmospheric cinematic scene, ${description}, moody dramatic lighting, blue hour, people silhouettes, 8K, film photography style, cinematic color grading` },
+        {
+          type: "exterior", label: "Exterior View", arabicCaption: "حيث يبدأ الخيال",
+          prompt: `Ultra photorealistic cinematic render, ${description}, golden hour lighting, wide establishing shot, people walking, 8K resolution, ultra-detailed, cinematic color grading, depth of field, volumetric lighting, award-winning architectural photography`,
+        },
+        {
+          type: "aerial", label: "Aerial View", arabicCaption: "من حيث ترى الطيور",
+          prompt: `Ultra photorealistic aerial drone view, ${description}, dramatic sky with clouds, bird's eye perspective, 8K, cinematic, ultra-detailed, volumetric lighting, DJI Mavic Pro photography`,
+        },
+        {
+          type: "interior", label: "Interior Space", arabicCaption: "عالم بداخل عالم",
+          prompt: `Ultra photorealistic interior architectural render, ${description}, warm ambient lighting, people inside, ultra-detailed, 8K, cinematic photography, depth of field, interior design magazine quality`,
+        },
+        {
+          type: "detail", label: "Architectural Detail", arabicCaption: "الجمال في التفاصيل",
+          prompt: `Ultra photorealistic close-up architectural detail, ${description}, sharp focus, dramatic shadows, macro lens, 8K, ultra-detailed, material texture, craftsmanship`,
+        },
+        {
+          type: "atmosphere", label: "Atmospheric Scene", arabicCaption: "لحظة تسكن الذاكرة",
+          prompt: `Ultra photorealistic atmospheric cinematic scene, ${description}, moody dramatic lighting, blue hour, people silhouettes, 8K, film photography style, cinematic color grading, fog and mist`,
+        },
       ],
     };
   }
 }
 
-// ===== Router =====
+// ═══════════════════════════════════════════════════════════════════════════
+// ROUTER
+// ═══════════════════════════════════════════════════════════════════════════
 export const khayalRouter = router({
 
-  // ===== توليد المشهد الكامل =====
+  // ── توليد المشهد الكامل ──
   generateScene: publicProcedure
     .input(z.object({
-      description: z.string().min(3),
-      scenarioType: z.enum(["design", "develop", "deteriorate", "compare", "imagine"]).default("imagine"),
+      description: z.string().min(2),
+      scenarioType: z.string().optional(), // ignored — AI infers automatically
       referenceImageUrl: z.string().url().optional(),
       title: z.string().optional(),
       previousFeedback: z.string().optional(),
-      projectId: z.number().optional(), // لإعادة التوليد مع تحسين
+      projectId: z.number().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
 
-      // 1. تحليل عميق بالذكاء الاصطناعي
+      // 1. تحليل عميق بالذكاء الاصطناعي (متعدد اللغات + استنتاج تلقائي)
       const analysis = await deepAnalyzeDescription(
         input.description,
-        input.scenarioType,
         input.referenceImageUrl,
         input.previousFeedback
       );
 
-      // 2. إنشاء أو تحديث مشروع في قاعدة البيانات
+      // 2. إنشاء مشروع في قاعدة البيانات
       let projectId: number | null = input.projectId || null;
       if (db) {
         if (projectId) {
-          // تحديث مشروع موجود (حلقة تحسين)
           await db.update(khayalProjects)
             .set({ status: "processing", updatedAt: new Date() })
             .where(eq(khayalProjects.id, projectId));
         } else {
-          // إنشاء مشروع جديد
           const [project] = await db.insert(khayalProjects).values({
             title: input.title || analysis.title || input.description.slice(0, 80),
             description: input.description,
             inputType: input.referenceImageUrl ? "mixed" : "text",
-            scenarioType: input.scenarioType,
+            scenarioType: (analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine") || "imagine",
             inputData: {
               description: input.description,
               referenceImageUrl: input.referenceImageUrl,
               culturalContext: analysis.culturalContext,
               cinematicStyle: analysis.cinematicStyle,
+              detectedLanguage: analysis.detectedLanguage,
             },
             status: "processing",
           });
@@ -176,14 +202,13 @@ export const khayalRouter = router({
         }
       }
 
-      // 3. توليد الصور بشكل متوازٍ مع تحسين الـ prompts
+      // 3. توليد الصور بشكل متوازٍ
       const generatedScenes = await Promise.allSettled(
         analysis.scenes.map(async (scene, index) => {
           const originalImages = input.referenceImageUrl
-            ? [{ url: input.referenceImageUrl, mimeType: "image/jpeg" }]
+            ? [{ url: input.referenceImageUrl, mimeType: "image/jpeg" as const }]
             : undefined;
 
-          // إضافة السياق الثقافي للـ prompt
           const enhancedPrompt = `${scene.prompt}, ${analysis.cinematicStyle} style, ${analysis.atmosphere}`;
 
           const { url } = await generateImage({
@@ -191,7 +216,6 @@ export const khayalRouter = router({
             originalImages,
           });
 
-          // حفظ في قاعدة البيانات
           if (db && projectId) {
             await db.insert(khayalScenes).values({
               projectId,
@@ -230,49 +254,44 @@ export const khayalRouter = router({
         projectId,
         scenes: successfulScenes,
         description: input.description,
-        scenarioType: input.scenarioType,
+        scenarioType: analysis.scenarioType,
         title: analysis.title,
         culturalContext: analysis.culturalContext,
         atmosphere: analysis.atmosphere,
         cinematicStyle: analysis.cinematicStyle,
         mainElements: analysis.mainElements,
+        detectedLanguage: analysis.detectedLanguage,
       };
     }),
 
-  // ===== إعادة التوليد مع تحسين (حلقة ذاتية) =====
+  // ── تحسين المشهد (حلقة ذاتية) ──
   refineScene: publicProcedure
     .input(z.object({
       projectId: z.number(),
       feedback: z.string().min(3),
-      sceneType: z.string().optional(), // لتحسين مشهد محدد فقط
+      sceneType: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
       if (!db) throw new Error("قاعدة البيانات غير متاحة");
 
-      // جلب المشروع الأصلي
       const projects = await db.select().from(khayalProjects)
         .where(eq(khayalProjects.id, input.projectId)).limit(1);
 
       if (!projects.length) throw new Error("المشروع غير موجود");
       const project = projects[0];
-
       const inputData = project.inputData as any;
 
-      // إعادة التوليد مع ملاحظات التحسين
       const analysis = await deepAnalyzeDescription(
         project.description || "",
-        project.scenarioType || "imagine",
         inputData?.referenceImageUrl,
         input.feedback
       );
 
-      // تحديث المشروع
       await db.update(khayalProjects)
         .set({ status: "processing", updatedAt: new Date() })
         .where(eq(khayalProjects.id, input.projectId));
 
-      // توليد مشاهد محسّنة
       const scenesToRefine = input.sceneType
         ? analysis.scenes.filter(s => s.type === input.sceneType)
         : analysis.scenes;
@@ -280,7 +299,7 @@ export const khayalRouter = router({
       const generatedScenes = await Promise.allSettled(
         scenesToRefine.map(async (scene, index) => {
           const { url } = await generateImage({
-            prompt: `${scene.prompt}, refined based on feedback: ${input.feedback}`,
+            prompt: `${scene.prompt}, refined: ${input.feedback}`,
           });
 
           if (db) {
@@ -291,7 +310,7 @@ export const khayalRouter = router({
               imageUrl: url || "",
               prompt: scene.prompt,
               arabicCaption: scene.arabicCaption || "",
-              order: index + 100, // نسخة محسّنة
+              order: index + 100,
             });
           }
 
@@ -317,7 +336,7 @@ export const khayalRouter = router({
       };
     }),
 
-  // ===== جلب المشاريع السابقة (الذاكرة) =====
+  // ── جلب المشاريع السابقة ──
   getProjects: publicProcedure.query(async () => {
     const db = await getDb();
     if (!db) return [];
@@ -326,7 +345,7 @@ export const khayalRouter = router({
       .limit(20);
   }),
 
-  // ===== جلب مشاهد مشروع معين =====
+  // ── جلب مشاهد مشروع ──
   getProjectScenes: publicProcedure
     .input(z.object({ projectId: z.number() }))
     .query(async ({ input }) => {
