@@ -17,6 +17,7 @@ import { khayalProjects, khayalScenes } from "../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
 import { analyzeDocument } from "./documentAnalyzer";
 import type { DocumentAnalysisResult } from "./documentAnalyzer";
+import { checkContent, SAFE_CONTENT_DIRECTIVE } from "./contentFilter";
 
 // ═══════════════════════════════════════════════════════════════
 // CAMERA ANGLES — زوايا الكاميرا المحددة لكتلة واحدة
@@ -149,28 +150,52 @@ async function deepAnalyzeDescription(
   // اختيار الزوايا المناسبة حسب عدد المشاهد
   const selectedAngles = CAMERA_ANGLES.slice(0, Math.min(sceneCount, CAMERA_ANGLES.length));
 
-  const systemPrompt = `You are a world-class cinematic director and architectural visualization expert.
+  // تنويع الجو بين المشاهد لخلق رحلة بصرية كاملة
+  const LIGHTING_MOODS = [
+    "golden hour sunrise, warm amber rays piercing through morning mist",
+    "harsh midday sun, dramatic shadows revealing architectural geometry",
+    "soft diffused overcast light, even illumination highlighting textures",
+    "magic hour sunset, deep orange and crimson sky, long dramatic shadows",
+    "blue hour dusk, city lights beginning to glow, deep indigo sky",
+    "night scene, dramatic artificial lighting, moonlit atmosphere",
+    "stormy dramatic sky, dynamic clouds, moody atmospheric lighting",
+    "clear dawn, first light of day, peaceful serene atmosphere",
+  ];
 
-FUNDAMENTAL PRINCIPLE: Generate ${sceneCount} views of THE SAME SINGLE ARCHITECTURAL CONCEPT from different camera angles.
-- ONE building / ONE space / ONE concept
-- MULTIPLE camera angles and lighting conditions
+  const systemPrompt = `You are the world's greatest cinematic director and architectural visualization master.
+Your work surpasses Hollywood CGI studios in photorealism and artistic vision.
+
+${SAFE_CONTENT_DIRECTIVE}
+
+FUNDAMENTAL PRINCIPLE: Generate ${sceneCount} views of THE SAME SINGLE ARCHITECTURAL CONCEPT.
+- ONE building / ONE space / ONE concept — seen from ${sceneCount} different angles
+- MULTIPLE camera angles, each with a DIFFERENT lighting mood for cinematic variety
 - NO different buildings or different concepts per scene
 - The viewer should clearly recognize it's the same place from all angles
+- Each scene must feel like a different moment in time (morning, noon, sunset, night...)
 
 ${geometricConstraint ? geometricConstraint + "\n" : ""}
 
-For each scene, use EXACTLY this camera angle and timing:
-${selectedAngles.map((a, i) => `Scene ${i + 1}: ${a.camera} | ${a.timing}`).join("\n")}
+AI ENRICHMENT DIRECTIVE (exceed user expectations):
+- Automatically add: atmospheric haze, volumetric god rays, lens flare, bokeh
+- Add people/life: pedestrians, cyclists, families — for scale and soul
+- Add environmental context: trees, water reflections, urban surroundings
+- Add micro-details: window reflections, material textures, shadow patterns
+- Make every scene feel like an award-winning architectural photograph
+
+For each scene, use EXACTLY this camera angle and lighting mood:
+${selectedAngles.map((a, i) => `Scene ${i + 1}: ${a.camera} | Lighting: ${LIGHTING_MOODS[i % LIGHTING_MOODS.length]}`).join("\n")}
 
 Prompt rules:
-1. Start with "Ultra photorealistic cinematic render,"
+1. Start with "Ultra photorealistic cinematic render, award-winning architectural photography,"
 2. Include the SAME building description in EVERY scene (consistency is critical)
-3. Add the specific camera angle and lighting for each scene
-4. Include: "8K resolution, ultra-detailed, cinematic color grading, depth of field, volumetric lighting"
-5. Add people/life for scale and realism
+3. Add the specific camera angle and unique lighting for each scene
+4. Include: "8K resolution, ultra-detailed, cinematic color grading, depth of field, volumetric lighting, photorealistic materials, ray-traced reflections"
+5. Add people and life for scale and realism
 6. NEVER change the building's fundamental geometry between scenes
+7. Each prompt should be 80-120 words for maximum quality
 
-${previousFeedback ? `User refinement: ${previousFeedback}` : ""}
+${previousFeedback ? `User refinement request: ${previousFeedback}` : ""}
 ${documentAnalysis ? `Document context: ${documentAnalysis.mainDescription}` : ""}
 
 Respond ONLY with valid JSON:
@@ -183,8 +208,9 @@ Respond ONLY with valid JSON:
   "mainElements": ["el1", "el2", "el3"],
   "atmosphere": "overall atmosphere",
   "cinematicStyle": "cinematic style",
+  "musicMood": "ambient|dramatic|peaceful|epic|mysterious|joyful",
   "scenes": [
-    ${selectedAngles.map((a, i) => `{"type": "${a.type}", "label": "${a.label_ar}", "prompt": "Ultra photorealistic...", "arabicCaption": "short poetic Arabic phrase"}`).join(",\n    ")}
+    ${selectedAngles.map((a, i) => `{"type": "${a.type}", "label": "${a.label_ar}", "prompt": "Ultra photorealistic cinematic render...", "arabicCaption": "short poetic Arabic phrase", "lightingMood": "${LIGHTING_MOODS[i % LIGHTING_MOODS.length].split(",")[0]}"}`).join(",\n    ")}
   ]
 }`;
 
@@ -261,32 +287,48 @@ Respond ONLY with valid JSON:
 // ═══════════════════════════════════════════════════════════════
 // FILM DURATION CALCULATOR
 // ═══════════════════════════════════════════════════════════════
-export function calculateFilmRequirements(durationMinutes: number): {
+export function calculateFilmRequirements(durationSeconds: number): {
   sceneCount: number;
   sceneDurationSec: number;
   estimatedGenerationMinutes: number;
+  estimatedGenerationSeconds: number;
   batchSize: number;
   description: string;
+  durationLabel: string;
 } {
-  // Each scene = ~8 seconds of screen time + 2s transition = 10s total
-  const SCENE_SCREEN_TIME = 10; // seconds
-  const totalSeconds = durationMinutes * 60;
-  const sceneCount = Math.ceil(totalSeconds / SCENE_SCREEN_TIME);
+  // Minimum 5 seconds, no upper limit
+  const clampedSeconds = Math.max(5, durationSeconds);
 
-  // Each image takes ~15-25 seconds to generate (average 20s)
-  const AVG_GEN_TIME = 20; // seconds per image
-  // We generate in parallel batches of 5
-  const BATCH_SIZE = 5;
+  // Each scene = 5-10s screen time depending on total duration
+  // Short films (< 60s): 5s per scene for more scenes
+  // Long films (>= 60s): 8s per scene
+  const SCENE_SCREEN_TIME = clampedSeconds < 60 ? 5 : 8;
+  const sceneCount = Math.max(1, Math.ceil(clampedSeconds / SCENE_SCREEN_TIME));
+
+  // Parallel generation: all scenes generated simultaneously
+  // Each image: ~20s average. With full parallelism, total = ~20s regardless of count
+  // But API rate limits mean we batch: 8 parallel at a time
+  const BATCH_SIZE = 8;
   const batches = Math.ceil(sceneCount / BATCH_SIZE);
-  const estimatedGenerationSeconds = batches * AVG_GEN_TIME * BATCH_SIZE / BATCH_SIZE + batches * 5;
-  const estimatedGenerationMinutes = Math.ceil(estimatedGenerationSeconds / 60);
+  const AVG_GEN_TIME = 22; // seconds per batch
+  const estGenSec = batches * AVG_GEN_TIME;
+  const estimatedGenerationMinutes = Math.ceil(estGenSec / 60);
+
+  // Human-readable duration label
+  const mins = Math.floor(clampedSeconds / 60);
+  const secs = clampedSeconds % 60;
+  const durationLabel = mins > 0
+    ? secs > 0 ? `${mins}م ${secs}ث` : `${mins} دقيقة`
+    : `${secs} ثانية`;
 
   return {
     sceneCount,
     sceneDurationSec: SCENE_SCREEN_TIME,
     estimatedGenerationMinutes,
+    estimatedGenerationSeconds: estGenSec,
     batchSize: BATCH_SIZE,
-    description: `فيلم ${durationMinutes} دقيقة = ${sceneCount} مشهد، وقت التوليد المتوقع: ~${estimatedGenerationMinutes} دقيقة`,
+    durationLabel,
+    description: `فيلم ${durationLabel} = ${sceneCount} مشهد | وقت التوليد المتوقع: ~${estGenSec < 60 ? estGenSec + ' ثانية' : estimatedGenerationMinutes + ' دقيقة'}`,
   };
 }
 
@@ -298,10 +340,17 @@ export const khayalRouter = router({
   // ── تقدير وقت الفيلم (قبل التوليد) ──
   estimateFilm: publicProcedure
     .input(z.object({
-      durationMinutes: z.number().min(1).max(120),
+      durationSeconds: z.number().min(5), // لا حد أعلى
     }))
     .query(({ input }) => {
-      return calculateFilmRequirements(input.durationMinutes);
+      return calculateFilmRequirements(input.durationSeconds);
+    }),
+
+  // ── فحص المحتوى الأخلاقي ──
+  checkContent: publicProcedure
+    .input(z.object({ text: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      return checkContent(input.text, invokeLLM);
     }),
 
   // ── تحليل مستند (PDF / Word / صورة مخطط) ──

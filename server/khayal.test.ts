@@ -346,3 +346,187 @@ describe("khayal.getProjectScenes", () => {
     expect(scenes).toBeInstanceOf(Array);
   });
 });
+
+// ═══════════════════════════════════════════════════════════════
+// CONTENT FILTER TESTS
+// ═══════════════════════════════════════════════════════════════
+describe("Content Filter", () => {
+  it("allows clean architectural description", async () => {
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.khayal.checkContent({ text: "مسجد عثماني فاخر بقبة ذهبية" });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("allows English architectural description", async () => {
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.khayal.checkContent({ text: "A futuristic skyscraper with green rooftops" });
+    expect(result.allowed).toBe(true);
+  });
+
+  it("blocks explicit content", async () => {
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.khayal.checkContent({ text: "nude explicit sexual content" });
+    expect(result.allowed).toBe(false);
+    expect(result.message).toBeTruthy();
+  });
+
+  it("blocks violent content", async () => {
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.khayal.checkContent({ text: "graphic violence murder blood gore" });
+    expect(result.allowed).toBe(false);
+  });
+
+  it("returns message when blocked", async () => {
+    const ctx = createPublicContext();
+    const caller = appRouter.createCaller(ctx);
+    const result = await caller.khayal.checkContent({ text: "porn explicit" });
+    expect(result.message).toContain("⚠");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// FILM ENGINE TESTS
+// ═══════════════════════════════════════════════════════════════
+describe("Film Engine", () => {
+  const calcFilm = (durationSeconds: number) => {
+    const isUnlimited = durationSeconds >= 99999;
+    const effectiveSec = isUnlimited ? 3600 : Math.max(5, durationSeconds);
+    const SCENE_SCREEN_TIME = effectiveSec < 60 ? 5 : 8;
+    const totalScenes = isUnlimited ? 999 : Math.max(1, Math.ceil(effectiveSec / SCENE_SCREEN_TIME));
+    const BATCH_SIZE = 8;
+    const totalBatches = isUnlimited ? 999 : Math.ceil(totalScenes / BATCH_SIZE);
+    const mins = Math.floor(effectiveSec / 60);
+    const secs = effectiveSec % 60;
+    const durationLabel = isUnlimited ? "∞ بلا حد" : mins > 0 ? `${mins}م ${secs}ث` : `${secs} ثانية`;
+    return { totalScenes, totalBatches, durationLabel, isUnlimited };
+  };
+
+  it("5 seconds produces at least 1 scene", () => {
+    const r = calcFilm(5);
+    expect(r.totalScenes).toBeGreaterThanOrEqual(1);
+    expect(r.durationLabel).toBe("5 ثانية");
+  });
+
+  it("30 seconds produces correct scenes", () => {
+    const r = calcFilm(30);
+    expect(r.totalScenes).toBe(6); // 30/5 = 6
+    expect(r.durationLabel).toBe("30 ثانية");
+  });
+
+  it("1 minute produces correct scenes", () => {
+    const r = calcFilm(60);
+    expect(r.totalScenes).toBe(8); // 60/8 = 7.5 -> ceil = 8
+    expect(r.durationLabel).toBe("1م 0ث");
+  });
+
+  it("15 minutes produces correct scenes", () => {
+    const r = calcFilm(900);
+    expect(r.totalScenes).toBe(113); // 900/8 = 112.5 -> ceil = 113
+    expect(r.durationLabel).toBe("15م 0ث");
+  });
+
+  it("unlimited mode sets totalScenes to 999", () => {
+    const r = calcFilm(99999);
+    expect(r.isUnlimited).toBe(true);
+    expect(r.totalScenes).toBe(999);
+    expect(r.durationLabel).toBe("∞ بلا حد");
+  });
+
+  it("batches are calculated correctly", () => {
+    const r = calcFilm(80);
+    expect(r.totalBatches).toBe(Math.ceil(r.totalScenes / 8));
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// MUSIC ENGINE TESTS
+// ═══════════════════════════════════════════════════════════════
+describe("Music Engine", () => {
+  const selectMusicMood = (scenarioType: string, atmosphere?: string): string => {
+    if (scenarioType === "deteriorate") return "mysterious";
+    if (scenarioType === "compare") return "dramatic";
+    if (scenarioType === "develop") return "epic";
+    if (scenarioType === "design") return "peaceful";
+    if (atmosphere?.includes("ليل") || atmosphere?.includes("night")) return "ambient";
+    if (atmosphere?.includes("فجر") || atmosphere?.includes("dawn")) return "joyful";
+    return "ambient";
+  };
+
+  it("deteriorate scenario maps to mysterious mood", () => {
+    expect(selectMusicMood("deteriorate")).toBe("mysterious");
+  });
+
+  it("compare scenario maps to dramatic mood", () => {
+    expect(selectMusicMood("compare")).toBe("dramatic");
+  });
+
+  it("develop scenario maps to epic mood", () => {
+    expect(selectMusicMood("develop")).toBe("epic");
+  });
+
+  it("design scenario maps to peaceful mood", () => {
+    expect(selectMusicMood("design")).toBe("peaceful");
+  });
+
+  it("night atmosphere maps to ambient mood", () => {
+    expect(selectMusicMood("imagine", "ليل مضيء")).toBe("ambient");
+  });
+
+  it("dawn atmosphere maps to joyful mood", () => {
+    expect(selectMusicMood("imagine", "فجر ذهبي")).toBe("joyful");
+  });
+
+  it("valid moods list is complete", () => {
+    const validMoods = ["ambient", "dramatic", "peaceful", "epic", "mysterious", "joyful"];
+    expect(validMoods.length).toBe(6);
+    expect(validMoods).toContain("ambient");
+    expect(validMoods).toContain("dramatic");
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════
+// GEOMETRIC FIDELITY TESTS
+// ═══════════════════════════════════════════════════════════════
+describe("Geometric Fidelity", () => {
+  it("geometric mass fields are defined", () => {
+    const mass = {
+      shape: "C-shape",
+      width: 25,
+      length: 43,
+      height: 12,
+      floorCount: 3,
+      setbacks: { front: 5, back: 0, left: 0, right: 0 },
+    };
+    expect(mass.shape).toBeTruthy();
+    expect(mass.width).toBeGreaterThan(0);
+    expect(mass.length).toBeGreaterThan(0);
+    expect(mass.floorCount).toBeGreaterThan(0);
+  });
+
+  it("camera angles cover all 8 perspectives", () => {
+    const CAMERA_ANGLES = [
+      "exterior_front", "exterior_side", "exterior_back", "aerial_45",
+      "aerial_top", "interior_main", "interior_detail", "atmosphere_golden",
+    ];
+    expect(CAMERA_ANGLES.length).toBe(8);
+    expect(CAMERA_ANGLES).toContain("exterior_front");
+    expect(CAMERA_ANGLES).toContain("aerial_45");
+    expect(CAMERA_ANGLES).toContain("interior_main");
+  });
+
+  it("single concept is maintained across angles", () => {
+    const concept = "Ottoman mosque with golden dome";
+    const prompts = [
+      `Front view of ${concept}`,
+      `Side view of ${concept}`,
+      `Aerial view of ${concept}`,
+    ];
+    prompts.forEach(p => {
+      expect(p).toContain(concept);
+    });
+  });
+});

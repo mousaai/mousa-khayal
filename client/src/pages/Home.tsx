@@ -8,6 +8,7 @@ import KhayalCinematicViewer from "@/components/KhayalCinematicViewer";
 import DocumentUploader from "@/components/DocumentUploader";
 import FilmDirectorModal from "@/components/FilmDirectorModal";
 import type { GenerationResult, DocumentAnalysis } from "@/types/khayal";
+import { musicEngine, selectMusicMood, type MusicMood } from "@/lib/musicEngine";
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
 const PORTAL_SCENES = [
@@ -136,17 +137,19 @@ const UI_LANGS: Record<string, {
 
 const LANG_KEYS = Object.keys(UI_LANGS);
 
-// ── Film progress state ──────────────────────────────────────────────────────
+// ── Film progress state ────────────────────────────────────────────────────────────────────────────
 interface FilmProgress {
   isActive: boolean;
   totalScenes: number;
   completedScenes: number;
   currentBatch: number;
   totalBatches: number;
-  durationMinutes: number;
+  durationSeconds: number;
+  durationLabel: string;
   accumulatedScenes: GenerationResult["scenes"];
   projectId?: number | null;
   isComplete: boolean;
+  musicMood?: MusicMood;
 }
 
 export default function Home() {
@@ -195,6 +198,12 @@ export default function Home() {
 
   const generateMutation = trpc.khayal.generateScene.useMutation();
   const generateFilmMutation = trpc.khayal.generateFilm.useMutation();
+  const checkContentMutation = trpc.khayal.checkContent.useMutation();
+
+  // ── تنظيف الموسيقى عند الخروج ──
+  useEffect(() => {
+    return () => { musicEngine.stop(); };
+  }, []);
 
   // ── Particles ──
   useEffect(() => {
@@ -345,10 +354,28 @@ export default function Home() {
     }
   };
 
+  // ── فحص المحتوى الأخلاقي ──
+  const checkAndGenerate = async (desc: string, onPass: () => void) => {
+    if (!desc.trim()) { onPass(); return; }
+    try {
+      const filterResult = await checkContentMutation.mutateAsync({ text: desc });
+      if (!filterResult.allowed) {
+        alert(filterResult.message || "❗ محتوى غير لائق");
+        return;
+      }
+    } catch {
+      // إذا فشل الفحص نسمح بالمرور
+    }
+    onPass();
+  };
+
   // ── Generate (standard — 5-8 scenes) ──
   const handleGenerate = async () => {
     const desc = prompt.trim() || documentAnalysis?.mainDescription || "";
     if (!desc && !uploadedImageUrl && !urlInput) return;
+
+    // فحص أخلاقي أولاً
+    await checkAndGenerate(desc, async () => {
     setIsGenerating(true);
     setPortalGlow(true);
 
@@ -373,23 +400,38 @@ export default function Home() {
       });
 
       setResult(res as GenerationResult);
+      // تشغيل الموسيقى حسب السيناريو
+      const mood = selectMusicMood(
+        (res as GenerationResult).scenarioType || "imagine",
+        (res as GenerationResult).atmosphere
+      );
+      musicEngine.play(mood, 0.12);
     } catch (err) {
       console.error(err);
     } finally {
       setIsGenerating(false);
     }
+    }); // end checkAndGenerate
   };
 
   // ── Generate Film (batched) ──
-  const handleFilmConfirm = async (durationMinutes: number) => {
+  const handleFilmConfirm = async (durationSeconds: number) => {
     setShowFilmModal(false);
     const desc = prompt.trim() || documentAnalysis?.mainDescription || "خيال حر";
 
-    // Calculate expected scene count (same formula as server)
-    const SCENE_SCREEN_TIME = 10;
-    const totalScenes = Math.ceil((durationMinutes * 60) / SCENE_SCREEN_TIME);
-    const BATCH_SIZE = 5;
-    const totalBatches = Math.ceil(totalScenes / BATCH_SIZE);
+    // فحص أخلاقي أولاً
+    await checkAndGenerate(desc, async () => {
+
+    // حساب عدد المشاهد بنفس معادلة الخادم
+    const isUnlimited = durationSeconds >= 99999;
+    const effectiveSec = isUnlimited ? 3600 : Math.max(5, durationSeconds);
+    const SCENE_SCREEN_TIME = effectiveSec < 60 ? 5 : 8;
+    const totalScenes = isUnlimited ? 999 : Math.max(1, Math.ceil(effectiveSec / SCENE_SCREEN_TIME));
+    const BATCH_SIZE = 8;
+    const totalBatches = isUnlimited ? 999 : Math.ceil(totalScenes / BATCH_SIZE);
+    const mins = Math.floor(effectiveSec / 60);
+    const secs = effectiveSec % 60;
+    const durationLabel = isUnlimited ? "∞ بلا حد" : mins > 0 ? `${mins}م ${secs}ث` : `${secs} ثانية`;
 
     setFilmProgress({
       isActive: true,
@@ -397,11 +439,15 @@ export default function Home() {
       completedScenes: 0,
       currentBatch: 0,
       totalBatches,
-      durationMinutes,
+      durationSeconds: effectiveSec,
+      durationLabel,
       accumulatedScenes: [],
       projectId: null,
       isComplete: false,
     });
+
+    // تشغيل موسيقى درامية أثناء التوليد
+    musicEngine.play("dramatic", 0.1);
 
     let currentProjectId: number | null = null;
     let allScenes: GenerationResult["scenes"] = [];
@@ -411,7 +457,7 @@ export default function Home() {
       try {
         const batchResult = await generateFilmMutation.mutateAsync({
           description: desc,
-          durationMinutes,
+          durationMinutes: Math.ceil(effectiveSec / 60),
           referenceImageUrl: uploadedImageUrl || urlInput || undefined,
           documentAnalysis: documentAnalysis || undefined,
           batchIndex: batchIdx,
@@ -432,14 +478,19 @@ export default function Home() {
         } : null);
 
         if (batchResult.isComplete) break;
+        // إذا وصلنا للحد الأعلى في وضع بلا حد نتوقف بعد 500 مشهد
+        if (isUnlimited && allScenes.length >= 500) break;
       } catch (err) {
         console.error(`[Film] Batch ${batchIdx} failed:`, err);
-        // Continue to next batch on error
       }
     }
 
-    // Show result
+    musicEngine.stop();
+
+    // عرض النتيجة
     if (allScenes.length > 0 && lastResult) {
+      const mood = selectMusicMood(lastResult.scenarioType || "imagine", lastResult.atmosphere);
+      musicEngine.play(mood, 0.12);
       setFilmProgress(null);
       setResult({
         projectId: currentProjectId,
@@ -460,6 +511,7 @@ export default function Home() {
     } else {
       setFilmProgress(null);
     }
+    }); // end checkAndGenerate
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -508,7 +560,7 @@ export default function Home() {
 
           <h2 className="text-2xl font-bold text-white mb-2">{lang.filmProgress}</h2>
           <p className="text-purple-300 text-sm mb-8">
-            {filmProgress.durationMinutes} {activeLang === "AR" ? "دقيقة" : "min"} · {filmProgress.totalScenes} {activeLang === "AR" ? "مشهد" : "scenes"}
+            {filmProgress.durationLabel} · {filmProgress.totalScenes >= 999 ? "∞" : filmProgress.totalScenes} {activeLang === "AR" ? "مشهد" : "scenes"}
           </p>
 
           {/* Progress bar */}
