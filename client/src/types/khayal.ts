@@ -7,6 +7,14 @@ export interface GeneratedScene {
   order?: number;
 }
 
+export interface FilmRequirements {
+  sceneCount: number;
+  sceneDurationSec: number;
+  estimatedGenerationMinutes: number;
+  batchSize: number;
+  description: string;
+}
+
 export interface GenerationResult {
   projectId?: number | null;
   description: string;
@@ -17,4 +25,32 @@ export interface GenerationResult {
   atmosphere?: string;
   cinematicStyle?: string;
   mainElements?: string[];
+  detectedLanguage?: string;
+  unifiedConcept?: string;
+  filmRequirements?: FilmRequirements;
+  // Film batch fields
+  batchIndex?: number;
+  totalScenes?: number;
+  isComplete?: boolean;
+  progress?: number;
+}
+
+export interface DocumentAnalysis {
+  extractedText: string;
+  projectTitle: string;
+  projectType: string;
+  dimensions: Array<{ element: string; value: string; unit: string }>;
+  architecturalElements: string[];
+  geometricMass: {
+    shape: string;
+    estimatedWidth: string;
+    estimatedLength: string;
+    estimatedHeight: string;
+    floorCount: number;
+    setbacks: { front: string; back: string; left: string; right: string };
+  };
+  mainDescription: string;
+  culturalContext: string;
+  language: string;
+  confidence: number;
 }

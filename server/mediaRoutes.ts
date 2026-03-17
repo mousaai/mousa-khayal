@@ -29,11 +29,12 @@ router.post("/api/transcribe", upload.single("audio"), async (req, res) => {
     const key = `audio-temp/${nanoid()}.${ext}`;
     const { url: audioUrl } = await storagePut(key, req.file.buffer, req.file.mimetype);
 
-    // تحويل الصوت إلى نص
+    // تحويل الصوت إلى نص — يكتشف اللغة تلقائياً
+    const lang = (req.body?.language as string) || undefined;
     const result = await transcribeAudio({
       audioUrl,
-      language: "ar",
-      prompt: "تفريغ وصف معماري أو خيالي",
+      language: lang, // undefined = auto-detect
+      prompt: "Describe an architectural or imaginative scene",
     });
 
     if ("error" in result) {

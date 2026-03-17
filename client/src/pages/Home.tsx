@@ -1,11 +1,13 @@
 /**
  * Home.tsx — منصة خيال الرئيسية
- * ميكروفون تفاعلي حي + بوابة كونية + دعم متعدد اللغات + بدون تصنيفات يدوية
+ * ميكروفون تفاعلي حي + دعم المستندات + فيلم إخراجي + دعم متعدد اللغات
  */
 import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import KhayalCinematicViewer from "@/components/KhayalCinematicViewer";
-import type { GenerationResult } from "@/types/khayal";
+import DocumentUploader from "@/components/DocumentUploader";
+import FilmDirectorModal from "@/components/FilmDirectorModal";
+import type { GenerationResult, DocumentAnalysis } from "@/types/khayal";
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
 const PORTAL_SCENES = [
@@ -31,7 +33,8 @@ const EXAMPLE_PROMPTS = [
 // ── نصوص الواجهة متعددة اللغات ───────────────────────────────────────────────
 const UI_LANGS: Record<string, {
   placeholder: string; btn: string; listening: string; processing: string;
-  examples: string; tagline: string; sub: string;
+  examples: string; tagline: string; sub: string; filmBtn: string;
+  docBtn: string; filmProgress: string;
 }> = {
   AR: {
     placeholder: "صِف ما تتخيله... مبنى، حديقة، مدينة، مشهد طبيعي، عالم خيالي...",
@@ -41,6 +44,9 @@ const UI_LANGS: Record<string, {
     examples: "أمثلة للإلهام",
     tagline: "خيال",
     sub: "حوّل أي وصف إلى مشهد سينمائي",
+    filmBtn: "فيلم إخراجي",
+    docBtn: "مستند / مخطط",
+    filmProgress: "جاري تصوير الفيلم...",
   },
   EN: {
     placeholder: "Describe what you imagine... a building, garden, city, sci-fi world...",
@@ -50,6 +56,9 @@ const UI_LANGS: Record<string, {
     examples: "Inspiration examples",
     tagline: "Khayal",
     sub: "Transform any description into a cinematic scene",
+    filmBtn: "Director's Film",
+    docBtn: "Document / Plan",
+    filmProgress: "Filming in progress...",
   },
   JA: {
     placeholder: "想像するものを説明してください... 建物、庭園、都市、SF世界...",
@@ -59,6 +68,9 @@ const UI_LANGS: Record<string, {
     examples: "インスピレーション例",
     tagline: "خيال",
     sub: "あらゆる説明を映画的シーンに変換",
+    filmBtn: "映画制作",
+    docBtn: "ドキュメント",
+    filmProgress: "撮影中...",
   },
   FR: {
     placeholder: "Décrivez ce que vous imaginez... un bâtiment, jardin, ville, monde SF...",
@@ -68,6 +80,9 @@ const UI_LANGS: Record<string, {
     examples: "Exemples d'inspiration",
     tagline: "خيال",
     sub: "Transformez toute description en scène cinématographique",
+    filmBtn: "Film de réalisateur",
+    docBtn: "Document / Plan",
+    filmProgress: "Tournage en cours...",
   },
   ZH: {
     placeholder: "描述您想象的内容... 建筑、花园、城市、科幻世界...",
@@ -77,6 +92,9 @@ const UI_LANGS: Record<string, {
     examples: "灵感示例",
     tagline: "خيال",
     sub: "将任何描述转化为电影场景",
+    filmBtn: "导演电影",
+    docBtn: "文档 / 图纸",
+    filmProgress: "拍摄中...",
   },
   IT: {
     placeholder: "Descrivi cosa immagini... un edificio, giardino, città, mondo fantascientifico...",
@@ -86,6 +104,9 @@ const UI_LANGS: Record<string, {
     examples: "Esempi di ispirazione",
     tagline: "خيال",
     sub: "Trasforma qualsiasi descrizione in una scena cinematografica",
+    filmBtn: "Film del regista",
+    docBtn: "Documento / Pianta",
+    filmProgress: "Riprese in corso...",
   },
   ES: {
     placeholder: "Describe lo que imaginas... un edificio, jardín, ciudad, mundo de ciencia ficción...",
@@ -95,6 +116,9 @@ const UI_LANGS: Record<string, {
     examples: "Ejemplos de inspiración",
     tagline: "خيال",
     sub: "Transforma cualquier descripción en una escena cinematográfica",
+    filmBtn: "Película del director",
+    docBtn: "Documento / Plano",
+    filmProgress: "Rodando...",
   },
   HI: {
     placeholder: "वर्णन करें जो आप कल्पना करते हैं... एक इमारत, बगीचा, शहर, काल्पनिक दुनिया...",
@@ -104,10 +128,26 @@ const UI_LANGS: Record<string, {
     examples: "प्रेरणा के उदाहरण",
     tagline: "خيال",
     sub: "किसी भी विवरण को सिनेमाई दृश्य में बदलें",
+    filmBtn: "निर्देशक की फिल्म",
+    docBtn: "दस्तावेज़ / योजना",
+    filmProgress: "फिल्मांकन जारी है...",
   },
 };
 
 const LANG_KEYS = Object.keys(UI_LANGS);
+
+// ── Film progress state ──────────────────────────────────────────────────────
+interface FilmProgress {
+  isActive: boolean;
+  totalScenes: number;
+  completedScenes: number;
+  currentBatch: number;
+  totalBatches: number;
+  durationMinutes: number;
+  accumulatedScenes: GenerationResult["scenes"];
+  projectId?: number | null;
+  isComplete: boolean;
+}
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
@@ -121,9 +161,17 @@ export default function Home() {
   const [waveData, setWaveData] = useState<number[]>(Array(28).fill(0.5));
 
   // File / URL
-  const [uploadedFiles, setUploadedFiles] = useState<File[]>([]);
+  const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInput, setUrlInput] = useState("");
+
+  // Document analysis
+  const [documentAnalysis, setDocumentAnalysis] = useState<DocumentAnalysis | null>(null);
+  const [showDocUploader, setShowDocUploader] = useState(false);
+
+  // Film director
+  const [showFilmModal, setShowFilmModal] = useState(false);
+  const [filmProgress, setFilmProgress] = useState<FilmProgress | null>(null);
 
   // UI
   const [bgIdx, setBgIdx] = useState(0);
@@ -140,13 +188,13 @@ export default function Home() {
   const audioChunksRef = useRef<Blob[]>([]);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const animFrameRef = useRef<number>(0);
   const waveAnimRef = useRef<number>(0);
 
   const lang = UI_LANGS[activeLang] || UI_LANGS.AR;
   const isRTL = activeLang === "AR";
 
   const generateMutation = trpc.khayal.generateScene.useMutation();
+  const generateFilmMutation = trpc.khayal.generateFilm.useMutation();
 
   // ── Particles ──
   useEffect(() => {
@@ -183,7 +231,7 @@ export default function Home() {
   }, []);
 
   // ── Portal glow on typing ──
-  useEffect(() => { setPortalGlow(prompt.length > 0); }, [prompt]);
+  useEffect(() => { setPortalGlow(prompt.length > 0 || !!documentAnalysis); }, [prompt, documentAnalysis]);
 
   // ── Auto-resize textarea ──
   useEffect(() => {
@@ -202,7 +250,6 @@ export default function Home() {
       const dataArray = new Uint8Array(bufferLength);
       analyser.getByteTimeDomainData(dataArray);
 
-      // Compute RMS volume
       let sum = 0;
       for (let i = 0; i < bufferLength; i++) {
         const v = (dataArray[i] - 128) / 128;
@@ -211,15 +258,13 @@ export default function Home() {
       const rms = Math.sqrt(sum / bufferLength);
       setVolume(rms);
 
-      // Build 28-bar waveform
       const barCount = 28;
       const step = Math.floor(bufferLength / barCount);
       const bars = Array.from({ length: barCount }, (_, i) => {
-        const val = dataArray[i * step] / 128.0; // 0..2
+        const val = dataArray[i * step] / 128.0;
         return Math.max(0.05, Math.min(1, Math.abs(val - 1) * 2.5 + 0.05));
       });
       setWaveData(bars);
-
       waveAnimRef.current = requestAnimationFrame(draw);
     };
     draw();
@@ -243,8 +288,6 @@ export default function Home() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-      // Connect Web Audio API for live visualization
       const audioCtx = new AudioContext();
       audioCtxRef.current = audioCtx;
       const source = audioCtx.createMediaStreamSource(stream);
@@ -286,33 +329,47 @@ export default function Home() {
     }
   }, [isRecording, startWaveAnimation, stopWaveAnimation]);
 
-  // ── File upload ──
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    setUploadedFiles(prev => [...prev, ...files]);
+  // ── Image upload (for reference image, not documents) ──
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !file.type.startsWith("image/")) return;
+
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const res = await fetch("/api/upload", { method: "POST", body: fd });
+      const data = await res.json();
+      if (data.url) setUploadedImageUrl(data.url);
+    } catch {
+      // ignore
+    }
   };
 
-  // ── Generate ──
+  // ── Generate (standard — 5-8 scenes) ──
   const handleGenerate = async () => {
-    if (!prompt.trim() && uploadedFiles.length === 0 && !urlInput) return;
+    const desc = prompt.trim() || documentAnalysis?.mainDescription || "";
+    if (!desc && !uploadedImageUrl && !urlInput) return;
     setIsGenerating(true);
     setPortalGlow(true);
 
     try {
-      let fileUrls: string[] = [];
-      for (const file of uploadedFiles) {
-        const fd = new FormData();
-        fd.append("file", file);
-        const res = await fetch("/api/upload", { method: "POST", body: fd });
-        const data = await res.json();
-        if (data.url) fileUrls.push(data.url);
-      }
-
       const res = await generateMutation.mutateAsync({
-        description: prompt || "خيال حر",
-        scenarioType: "imagine", // AI infers automatically from description
-        referenceImageUrl: fileUrls[0] || urlInput || undefined,
-        title: prompt.slice(0, 60) || "خيال",
+        description: desc || "خيال حر",
+        referenceImageUrl: uploadedImageUrl || urlInput || undefined,
+        title: (desc || "خيال").slice(0, 60),
+        sceneCount: 5,
+        documentAnalysis: documentAnalysis ? {
+          extractedText: documentAnalysis.extractedText,
+          projectTitle: documentAnalysis.projectTitle,
+          projectType: documentAnalysis.projectType,
+          dimensions: documentAnalysis.dimensions,
+          architecturalElements: documentAnalysis.architecturalElements,
+          geometricMass: documentAnalysis.geometricMass,
+          mainDescription: documentAnalysis.mainDescription,
+          culturalContext: documentAnalysis.culturalContext,
+          language: documentAnalysis.language,
+          confidence: documentAnalysis.confidence,
+        } : undefined,
       });
 
       setResult(res as GenerationResult);
@@ -323,6 +380,88 @@ export default function Home() {
     }
   };
 
+  // ── Generate Film (batched) ──
+  const handleFilmConfirm = async (durationMinutes: number) => {
+    setShowFilmModal(false);
+    const desc = prompt.trim() || documentAnalysis?.mainDescription || "خيال حر";
+
+    // Calculate expected scene count (same formula as server)
+    const SCENE_SCREEN_TIME = 10;
+    const totalScenes = Math.ceil((durationMinutes * 60) / SCENE_SCREEN_TIME);
+    const BATCH_SIZE = 5;
+    const totalBatches = Math.ceil(totalScenes / BATCH_SIZE);
+
+    setFilmProgress({
+      isActive: true,
+      totalScenes,
+      completedScenes: 0,
+      currentBatch: 0,
+      totalBatches,
+      durationMinutes,
+      accumulatedScenes: [],
+      projectId: null,
+      isComplete: false,
+    });
+
+    let currentProjectId: number | null = null;
+    let allScenes: GenerationResult["scenes"] = [];
+    let lastResult: any = null;
+
+    for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
+      try {
+        const batchResult = await generateFilmMutation.mutateAsync({
+          description: desc,
+          durationMinutes,
+          referenceImageUrl: uploadedImageUrl || urlInput || undefined,
+          documentAnalysis: documentAnalysis || undefined,
+          batchIndex: batchIdx,
+          projectId: currentProjectId || undefined,
+        });
+
+        currentProjectId = batchResult.projectId || currentProjectId;
+        allScenes = [...allScenes, ...batchResult.scenes];
+        lastResult = batchResult;
+
+        setFilmProgress(prev => prev ? {
+          ...prev,
+          completedScenes: allScenes.length,
+          currentBatch: batchIdx + 1,
+          accumulatedScenes: allScenes,
+          projectId: currentProjectId,
+          isComplete: batchResult.isComplete,
+        } : null);
+
+        if (batchResult.isComplete) break;
+      } catch (err) {
+        console.error(`[Film] Batch ${batchIdx} failed:`, err);
+        // Continue to next batch on error
+      }
+    }
+
+    // Show result
+    if (allScenes.length > 0 && lastResult) {
+      setFilmProgress(null);
+      setResult({
+        projectId: currentProjectId,
+        description: desc,
+        scenarioType: lastResult.scenarioType || "imagine",
+        scenes: allScenes,
+        title: lastResult.title,
+        culturalContext: lastResult.culturalContext,
+        atmosphere: lastResult.atmosphere,
+        cinematicStyle: lastResult.cinematicStyle,
+        mainElements: lastResult.mainElements,
+        detectedLanguage: lastResult.detectedLanguage,
+        unifiedConcept: lastResult.unifiedConcept,
+        filmRequirements: lastResult.filmRequirements,
+        totalScenes: lastResult.totalScenes,
+        isComplete: true,
+      });
+    } else {
+      setFilmProgress(null);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -330,6 +469,7 @@ export default function Home() {
     }
   };
 
+  // ── Show result viewer ──
   if (result) {
     return (
       <KhayalCinematicViewer
@@ -340,6 +480,84 @@ export default function Home() {
           setResult(null);
         }}
       />
+    );
+  }
+
+  // ── Show film progress ──
+  if (filmProgress?.isActive) {
+    const progressPct = filmProgress.totalScenes > 0
+      ? Math.round((filmProgress.completedScenes / filmProgress.totalScenes) * 100)
+      : 0;
+
+    return (
+      <div
+        className="min-h-screen bg-[#020408] flex flex-col items-center justify-center px-4"
+        dir={isRTL ? "rtl" : "ltr"}
+      >
+        {/* Background */}
+        <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0" style={{ backgroundImage: `url(${SPACE_BG})`, backgroundSize: "cover", opacity: 0.3 }} />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#020408] via-transparent to-[#020408] opacity-90" />
+        </div>
+
+        <div className="relative z-10 w-full max-w-lg text-center">
+          {/* Film reel icon */}
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center mx-auto mb-6 shadow-2xl" style={{ boxShadow: "0 0 60px rgba(139,92,246,0.4)" }}>
+            <span className="text-3xl">🎬</span>
+          </div>
+
+          <h2 className="text-2xl font-bold text-white mb-2">{lang.filmProgress}</h2>
+          <p className="text-purple-300 text-sm mb-8">
+            {filmProgress.durationMinutes} {activeLang === "AR" ? "دقيقة" : "min"} · {filmProgress.totalScenes} {activeLang === "AR" ? "مشهد" : "scenes"}
+          </p>
+
+          {/* Progress bar */}
+          <div className="w-full bg-white/10 rounded-full h-3 mb-4 overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-500"
+              style={{
+                width: `${progressPct}%`,
+                background: "linear-gradient(90deg, #7c3aed, #ec4899, #0ea5e9)",
+                boxShadow: "0 0 12px rgba(124,58,237,0.6)",
+              }}
+            />
+          </div>
+
+          <div className="flex justify-between text-xs text-gray-400 mb-8">
+            <span>{filmProgress.completedScenes} / {filmProgress.totalScenes} {activeLang === "AR" ? "مشهد" : "scenes"}</span>
+            <span>{progressPct}%</span>
+          </div>
+
+          {/* Batch indicator */}
+          <div className="flex justify-center gap-2 mb-6">
+            {Array.from({ length: filmProgress.totalBatches }, (_, i) => (
+              <div
+                key={i}
+                className="w-2 h-2 rounded-full transition-all duration-300"
+                style={{
+                  background: i < filmProgress.currentBatch
+                    ? "#a78bfa"
+                    : i === filmProgress.currentBatch
+                    ? "#ec4899"
+                    : "rgba(255,255,255,0.15)",
+                  transform: i === filmProgress.currentBatch ? "scale(1.5)" : "scale(1)",
+                }}
+              />
+            ))}
+          </div>
+
+          {/* Live scenes preview */}
+          {filmProgress.accumulatedScenes.length > 0 && (
+            <div className="grid grid-cols-4 gap-2">
+              {filmProgress.accumulatedScenes.slice(-8).map((scene, i) => (
+                <div key={i} className="aspect-video rounded-lg overflow-hidden bg-white/5">
+                  <img src={scene.imageUrl} alt={scene.label} className="w-full h-full object-cover opacity-80" />
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
     );
   }
 
@@ -422,11 +640,9 @@ export default function Home() {
 
         {/* ── COSMIC PORTAL ── */}
         <div className="relative flex items-center justify-center mb-6 mt-8" style={{ width: 260, height: 260 }}>
-          {/* Outer rings */}
           <div className="absolute rounded-full border border-purple-500/15" style={{ width: 260, height: 260, animation: "spin 22s linear infinite" }} />
           <div className="absolute rounded-full border border-blue-500/10" style={{ width: 230, height: 230, animation: "spin 16s linear infinite reverse" }} />
 
-          {/* Portal glow halo */}
           {portalGlow && (
             <div className="absolute rounded-full pointer-events-none" style={{
               width: 280, height: 280,
@@ -435,7 +651,6 @@ export default function Home() {
             }} />
           )}
 
-          {/* Portal circle */}
           <div className="absolute rounded-full overflow-hidden" style={{
             width: 200, height: 200,
             border: `2px solid ${portalGlow ? "rgba(139,92,246,0.6)" : "rgba(139,92,246,0.25)"}`,
@@ -444,16 +659,13 @@ export default function Home() {
               : "0 0 20px rgba(139,92,246,0.15)",
             transition: "all 0.6s ease",
           }}>
-            {/* Scene images inside portal */}
             {PORTAL_SCENES.map((src, i) => (
               <img key={i} src={src} alt="" className="absolute inset-0 w-full h-full object-cover"
                 style={{ opacity: i === portalIdx ? 0.85 : 0, transition: "opacity 1.5s ease" }} />
             ))}
-            {/* Portal overlay */}
             <div className="absolute inset-0" style={{ background: "radial-gradient(circle at center, rgba(139,92,246,0.2) 0%, rgba(2,4,8,0.5) 100%)" }} />
           </div>
 
-          {/* Orbiting dots */}
           {[0, 1, 2].map(i => (
             <div key={i} className="absolute w-2.5 h-2.5 rounded-full" style={{
               background: ["#a78bfa", "#60a5fa", "#34d399"][i],
@@ -464,7 +676,7 @@ export default function Home() {
         </div>
 
         {/* ── TITLE ── */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <h1 className="font-black leading-none mb-2" style={{
             fontSize: "clamp(3rem, 8vw, 5rem)",
             background: "linear-gradient(135deg, #fff 0%, #c084fc 50%, #60a5fa 100%)",
@@ -476,6 +688,52 @@ export default function Home() {
           <p className="text-sm font-light" style={{ color: "rgba(196,181,253,0.6)", letterSpacing: "0.05em" }}>
             {lang.sub}
           </p>
+        </div>
+
+        {/* ══════════════════════════════════════════════════════════
+            DOCUMENT UPLOADER (collapsible)
+        ══════════════════════════════════════════════════════════ */}
+        <div className="w-full max-w-3xl mb-3">
+          <button
+            onClick={() => setShowDocUploader(v => !v)}
+            className="flex items-center gap-2 text-xs px-3 py-1.5 rounded-xl transition-all mb-2"
+            style={{
+              background: showDocUploader || documentAnalysis ? "rgba(96,165,250,0.12)" : "rgba(255,255,255,0.04)",
+              border: `1px solid ${showDocUploader || documentAnalysis ? "rgba(96,165,250,0.35)" : "rgba(255,255,255,0.08)"}`,
+              color: showDocUploader || documentAnalysis ? "#60a5fa" : "rgba(148,163,184,0.5)",
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
+            </svg>
+            <span>{lang.docBtn}</span>
+            {documentAnalysis && (
+              <span className="ml-1 px-1.5 py-0.5 rounded-full text-[10px] bg-green-500/20 text-green-400 border border-green-500/30">
+                ✓ {documentAnalysis.projectTitle.slice(0, 20)}
+              </span>
+            )}
+          </button>
+
+          {showDocUploader && (
+            <div className="mb-3">
+              <DocumentUploader
+                currentAnalysis={documentAnalysis}
+                onAnalysisComplete={(analysis, imageUrl) => {
+                  setDocumentAnalysis(analysis);
+                  if (imageUrl && imageUrl.startsWith("http")) setUploadedImageUrl(imageUrl);
+                  // Auto-fill prompt if empty
+                  if (!prompt.trim()) {
+                    setPrompt(analysis.mainDescription.slice(0, 200));
+                  }
+                  setShowDocUploader(false);
+                }}
+                onClear={() => {
+                  setDocumentAnalysis(null);
+                  setUploadedImageUrl(null);
+                }}
+              />
+            </div>
+          )}
         </div>
 
         {/* ══════════════════════════════════════════════════════════
@@ -499,22 +757,18 @@ export default function Home() {
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={lang.placeholder}
+              placeholder={documentAnalysis ? documentAnalysis.mainDescription.slice(0, 80) + "..." : lang.placeholder}
               dir={isRTL ? "rtl" : "ltr"}
               className="w-full bg-transparent text-white placeholder-white/20 resize-none outline-none px-5 pt-4 pb-2 text-base leading-relaxed"
               style={{ fontFamily: "'Tajawal', 'Cairo', sans-serif", minHeight: 72, maxHeight: 180 }}
             />
 
-            {/* Uploaded files preview */}
-            {uploadedFiles.length > 0 && (
-              <div className="px-5 pb-2 flex flex-wrap gap-2">
-                {uploadedFiles.map((f, i) => (
-                  <div key={i} className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs" style={{ background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.2)", color: "#60a5fa" }}>
-                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    <span className="max-w-[120px] truncate">{f.name}</span>
-                    <button onClick={() => setUploadedFiles(prev => prev.filter((_, j) => j !== i))} className="text-white/30 hover:text-white/70">✕</button>
-                  </div>
-                ))}
+            {/* Reference image preview */}
+            {uploadedImageUrl && uploadedImageUrl.startsWith("http") && (
+              <div className="px-5 pb-2 flex items-center gap-2">
+                <img src={uploadedImageUrl} alt="reference" className="w-10 h-10 rounded-lg object-cover border border-blue-500/30" />
+                <span className="text-xs text-blue-400">صورة مرجعية</span>
+                <button onClick={() => setUploadedImageUrl(null)} className="text-white/30 hover:text-white/70 text-xs">✕</button>
               </div>
             )}
 
@@ -535,12 +789,11 @@ export default function Home() {
             {/* ── BOTTOM BAR ── */}
             <div className="flex items-center justify-between px-4 pb-3 pt-1 gap-3">
 
-              {/* Left: mic + upload + url */}
+              {/* Left: mic + upload + url + film */}
               <div className="flex items-center gap-2">
 
                 {/* ── MICROPHONE with live waveform ── */}
                 <div className="flex items-center gap-1.5">
-                  {/* Waveform bars */}
                   <div
                     className="flex items-center gap-[2px] overflow-hidden rounded-lg transition-all duration-300"
                     style={{
@@ -568,7 +821,6 @@ export default function Home() {
                     ))}
                   </div>
 
-                  {/* Mic button */}
                   <button
                     onClick={handleVoiceRecord}
                     className="relative flex items-center justify-center rounded-xl transition-all duration-200 hover:scale-110 active:scale-95 flex-shrink-0"
@@ -587,7 +839,6 @@ export default function Home() {
                     }}
                     title={isRecording ? "إيقاف التسجيل" : "تسجيل صوتي"}
                   >
-                    {/* Pulse rings */}
                     {isRecording && (
                       <>
                         <div className="absolute rounded-xl pointer-events-none" style={{ inset: -4, border: "1px solid rgba(239,68,68,0.4)", animation: "micPulse 1.2s ease-out infinite" }} />
@@ -604,7 +855,6 @@ export default function Home() {
                     )}
                   </button>
 
-                  {/* Mic status label */}
                   {micState !== "idle" && (
                     <span className="text-xs" style={{ color: micState === "listening" ? "#ef4444" : "#a78bfa", animation: "fadeIn 0.3s ease" }}>
                       {micState === "listening" ? lang.listening : lang.processing}
@@ -612,18 +862,18 @@ export default function Home() {
                   )}
                 </div>
 
-                {/* Upload */}
+                {/* Image upload */}
                 <button
                   onClick={() => fileInputRef.current?.click()}
                   className="w-[34px] h-[34px] rounded-xl flex items-center justify-center transition-all hover:scale-110"
                   style={{ background: "rgba(96,165,250,0.08)", border: "1px solid rgba(96,165,250,0.2)", color: "#60a5fa" }}
-                  title="رفع صور أو مستندات"
+                  title="رفع صورة مرجعية"
                 >
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/>
                   </svg>
                 </button>
-                <input ref={fileInputRef} type="file" multiple accept="image/*,.pdf,.doc,.docx" onChange={handleFileUpload} className="hidden" />
+                <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
 
                 {/* URL */}
                 <button
@@ -640,12 +890,28 @@ export default function Home() {
                     <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
                   </svg>
                 </button>
+
+                {/* Film director button */}
+                <button
+                  onClick={() => setShowFilmModal(true)}
+                  disabled={!prompt.trim() && !documentAnalysis}
+                  className="flex items-center gap-1.5 px-3 h-[34px] rounded-xl text-xs font-bold transition-all hover:scale-105 disabled:opacity-30 disabled:cursor-not-allowed"
+                  style={{
+                    background: "rgba(236,72,153,0.1)",
+                    border: "1px solid rgba(236,72,153,0.3)",
+                    color: "#ec4899",
+                  }}
+                  title={lang.filmBtn}
+                >
+                  <span>🎬</span>
+                  <span className="hidden sm:inline">{lang.filmBtn}</span>
+                </button>
               </div>
 
               {/* Right: generate button */}
               <button
                 onClick={handleGenerate}
-                disabled={isGenerating || (!prompt.trim() && uploadedFiles.length === 0 && !urlInput)}
+                disabled={isGenerating || (!prompt.trim() && !documentAnalysis && !uploadedImageUrl && !urlInput)}
                 className="flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 flex-shrink-0"
                 style={{
                   fontFamily: "'Tajawal', sans-serif",
@@ -686,7 +952,10 @@ export default function Home() {
               ))}
             </div>
             <p style={{ color: "rgba(196,181,253,0.7)", fontSize: 14 }}>
-              يُحلّل الخيال ويُشكّل المشاهد السينمائية...
+              {documentAnalysis
+                ? `يُحلّل ${documentAnalysis.projectTitle} ويُشكّل المشاهد...`
+                : "يُحلّل الخيال ويُشكّل المشاهد السينمائية..."
+              }
             </p>
           </div>
         )}
@@ -727,8 +996,8 @@ export default function Home() {
             { icon: "🕌", label: "تراث" },
             { icon: "🚀", label: "خيال علمي" },
             { icon: "🌆", label: "مدن" },
-            { icon: "🏭", label: "صناعة" },
-            { icon: "⏳", label: "محاكاة زمنية" },
+            { icon: "📄", label: "مستندات" },
+            { icon: "🎬", label: "أفلام" },
             { icon: "🌍", label: "كل الحضارات" },
           ].map((cap, i) => (
             <div key={i} className="flex items-center gap-1 text-xs" style={{ color: "rgba(148,163,184,0.4)" }}>
@@ -739,6 +1008,14 @@ export default function Home() {
         </div>
 
       </div>
+
+      {/* ── FILM DIRECTOR MODAL ── */}
+      <FilmDirectorModal
+        open={showFilmModal}
+        onClose={() => setShowFilmModal(false)}
+        onConfirm={handleFilmConfirm}
+        description={prompt.trim() || documentAnalysis?.mainDescription || "خيال حر"}
+      />
 
       {/* ═══════════════════════════════════════════════════════════
           CSS ANIMATIONS
