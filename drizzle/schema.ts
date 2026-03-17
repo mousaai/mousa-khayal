@@ -58,6 +58,7 @@ export const khayalScenes = mysqlTable("khayal_scenes", {
   sceneLabel: varchar("sceneLabel", { length: 255 }),
   imageUrl: text("imageUrl"),
   prompt: text("prompt"),
+  arabicCaption: text("arabicCaption"),
   order: int("order").default(0),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });

@@ -1,0 +1,1 @@
+ALTER TABLE `khayal_scenes` ADD `arabicCaption` text;

@@ -6,7 +6,7 @@
  */
 import { useState, useRef, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
-import type { GenerationResult } from "@/pages/Home";
+import type { GenerationResult } from "@/types/khayal";
 
 type ScenarioType = "design" | "develop" | "deteriorate" | "compare" | "imagine";
 
