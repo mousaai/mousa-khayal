@@ -959,6 +959,51 @@ export default function Home() {
               </div>
             )}
 
+            {/* ── OUTPUT MODE ROW ── */}
+            <div className="flex items-center gap-1.5 px-4 pt-1 pb-0">
+              <span className="text-xs" style={{ color: "rgba(255,255,255,0.3)", fontFamily: "'Tajawal', sans-serif" }}>
+                {activeLang === "AR" ? "نوع الإخراج:" : "Output:"}
+              </span>
+              <div className="flex items-center gap-1 rounded-xl overflow-hidden flex-shrink-0" style={{ border: "1px solid rgba(96,165,250,0.2)", background: "rgba(8,9,20,0.6)" }}>
+                <button
+                  onClick={() => setOutputMode("images")}
+                  className="px-2.5 py-1.5 text-xs font-bold transition-all"
+                  style={{
+                    background: outputMode === "images" ? "rgba(52,211,153,0.2)" : "transparent",
+                    color: outputMode === "images" ? "#34d399" : "rgba(255,255,255,0.35)",
+                    fontFamily: "'Tajawal', sans-serif",
+                  }}
+                  title="صور فقط — بدون فيديو (30-60 ثانية)"
+                >
+                  🎨 {activeLang === "AR" ? "صور" : "Images"}
+                </button>
+                <button
+                  onClick={() => setOutputMode("fast")}
+                  className="px-2.5 py-1.5 text-xs font-bold transition-all"
+                  style={{
+                    background: outputMode === "fast" ? "rgba(96,165,250,0.2)" : "transparent",
+                    color: outputMode === "fast" ? "#60a5fa" : "rgba(255,255,255,0.35)",
+                    fontFamily: "'Tajawal', sans-serif",
+                  }}
+                  title="720p — سريع (3-5 دقائق)"
+                >
+                  ⚡ {activeLang === "AR" ? "سريع" : "Fast"}
+                </button>
+                <button
+                  onClick={() => setOutputMode("pro")}
+                  className="px-2.5 py-1.5 text-xs font-bold transition-all"
+                  style={{
+                    background: outputMode === "pro" ? "rgba(167,139,250,0.2)" : "transparent",
+                    color: outputMode === "pro" ? "#a78bfa" : "rgba(255,255,255,0.35)",
+                    fontFamily: "'Tajawal', sans-serif",
+                  }}
+                  title="1080p + انتقالات سينمائية (8-12 دقيقة)"
+                >
+                  ✨ {activeLang === "AR" ? "احترافي" : "Pro"}
+                </button>
+              </div>
+            </div>
+
             {/* ── BOTTOM BAR ── */}
             <div className="flex items-center justify-between px-4 pb-3 pt-1 gap-3">
 
@@ -1078,46 +1123,6 @@ export default function Home() {
 
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                 <input ref={docInputRef} type="file" accept=".pdf,.doc,.docx,.txt,image/*" onChange={handleDocUpload} className="hidden" />
-              </div>
-
-              {/* Output mode toggle — صور / سريع / احترافي */}
-              <div className="flex items-center gap-1 rounded-xl overflow-hidden flex-shrink-0" style={{ border: "1px solid rgba(96,165,250,0.2)", background: "rgba(8,9,20,0.6)" }}>
-                <button
-                  onClick={() => setOutputMode("images")}
-                  className="px-2.5 py-1.5 text-xs font-bold transition-all"
-                  style={{
-                    background: outputMode === "images" ? "rgba(52,211,153,0.2)" : "transparent",
-                    color: outputMode === "images" ? "#34d399" : "rgba(255,255,255,0.35)",
-                    fontFamily: "'Tajawal', sans-serif",
-                  }}
-                  title="صور فقط — بدون فيديو (30-60 ثانية)"
-                >
-                  🎨 {activeLang === "AR" ? "صور" : "Images"}
-                </button>
-                <button
-                  onClick={() => setOutputMode("fast")}
-                  className="px-2.5 py-1.5 text-xs font-bold transition-all"
-                  style={{
-                    background: outputMode === "fast" ? "rgba(96,165,250,0.2)" : "transparent",
-                    color: outputMode === "fast" ? "#60a5fa" : "rgba(255,255,255,0.35)",
-                    fontFamily: "'Tajawal', sans-serif",
-                  }}
-                  title="720p — سريع (3-5 دقائق)"
-                >
-                  ⚡ {activeLang === "AR" ? "سريع" : "Fast"}
-                </button>
-                <button
-                  onClick={() => setOutputMode("pro")}
-                  className="px-2.5 py-1.5 text-xs font-bold transition-all"
-                  style={{
-                    background: outputMode === "pro" ? "rgba(167,139,250,0.2)" : "transparent",
-                    color: outputMode === "pro" ? "#a78bfa" : "rgba(255,255,255,0.35)",
-                    fontFamily: "'Tajawal', sans-serif",
-                  }}
-                  title="1080p + انتقالات سينمائية (8-12 دقيقة)"
-                >
-                  ✨ {activeLang === "AR" ? "احترافي" : "Pro"}
-                </button>
               </div>
 
               {/* Right: generate button */}
