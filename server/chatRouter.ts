@@ -26,11 +26,16 @@ export type IntentType =
   | "edit_scene"
   | "question"
   | "clarify"
-  | "greeting";
+  | "greeting"
+  | "immersive"; // وضع "أنا هناك" — جولة غمر 360°
+
+// وضع الإنتاج المُستنتج تلقائياً
+export type OutputMode = "images" | "fast" | "pro" | "immersive";
 
 export interface DetectedIntent {
   type: IntentType;
   confidence: number; // 0-1
+  outputMode?: OutputMode; // الوضع المُستنتج تلقائياً
   params: {
     description?: string;
     language?: "ar" | "en";
@@ -68,20 +73,39 @@ export async function detectIntent(
     .map((m) => `${m.role === "user" ? "المستخدم" : "خيال"}: ${m.content}`)
     .join("\n");
 
-  const systemPrompt = `أنت محلل قصد لمنصة "خيال" — منصة تحويل الأفكار إلى مرئيات سينمائية.
+  const systemPrompt = `أنت محلل قصد لمنصة "خيال" — منصة تحويل أي فكرة إلى مرئيات سينمائية بلا أزرار.
 
-حلّل رسالة المستخدم وحدد القصد من بين:
-- image: يريد توليد صورة سينمائية واحدة
-- video: يريد إنتاج فيديو كامل (متعدد المشاهد)
-- script: يريد كتابة سيناريو فقط بدون إنتاج
-- edit_scene: يريد تعديل مشهد في سيناريو موجود
-- question: سؤال عام عن المنصة أو موضوع ما
-- greeting: تحية أو كلام عام
-- clarify: الرسالة غامضة وتحتاج توضيح
+حلّل رسالة المستخدم وحدد:
+1. القصد (type):
+   - image: يريد صورة واحدة أو وصف بسيط قصير
+   - video: يريد فيديو كامل متعدد المشاهد
+   - immersive: يصف مكاناً يريد التواجد داخله (أنا في / داخل / بداخل / أتخيل نفسي / لو كنت)
+   - script: يريد سيناريو فقط بدون إنتاج
+   - edit_scene: يريد تعديل مشهد موجود
+   - question: سؤال عام
+   - greeting: تحية
+   - clarify: غامض جداً
+
+2. وضع الإنتاج (outputMode) — اختر تلقائياً:
+   - "images": وصف بسيط أو طلب صورة واحدة
+   - "fast": فيديو قصير أو متوسط أو غير محدد
+   - "pro": مشروع كبير / مبنى / وثائقي / تسويقي / علمي / تعليمي تفصيلي
+   - "immersive": وضع "أنا هناك" — جولة 360° داخل بيئة
+
+قواعد اختيار outputMode:
+- "صورة مسجد" → images
+- "فيديو عن المدينة" → fast
+- "فيلم عن مشروع معماري" → pro
+- "أنا في جحر نملة" → immersive
+- "تخيل نفسي داخل صدفة" → immersive
+- "لو كنت ذرة كربون" → immersive
+- "فيلم تسويقي" → pro
+- "فيلم تعليمي عن الفيزياء" → pro
 
 أجب بـ JSON فقط بهذا الشكل:
 {
   "type": "video",
+  "outputMode": "pro",
   "confidence": 0.95,
   "params": {
     "description": "النص الكامل للوصف",
@@ -119,12 +143,17 @@ export async function detectIntent(
                 enum: [
                   "image",
                   "video",
+                  "immersive",
                   "script",
                   "edit_scene",
                   "question",
                   "greeting",
                   "clarify",
                 ],
+              },
+              outputMode: {
+                type: "string",
+                enum: ["images", "fast", "pro", "immersive"],
               },
               confidence: { type: "number" },
               params: {
@@ -144,7 +173,7 @@ export async function detectIntent(
               domain: { type: "string" },
               suggestedReply: { type: "string" },
             },
-            required: ["type", "confidence", "params"],
+            required: ["type", "confidence", "params", "outputMode"],
             additionalProperties: false,
           },
         },
@@ -182,6 +211,23 @@ function quickIntentDetect(msg: string): DetectedIntent {
     };
   }
 
+  // وضع "أنا هناك" — الغمر الكامل
+  const immersiveKeywords = [
+    "أنا في ", "أنا داخل", "أنا بداخل", "أتخيل نفسي", "تخيل نفسي",
+    "لو كنت", "لو كنت في", "داخل ", "بداخل ", "من داخل",
+    "أشعر أنني في", "كأنني في", "أريد أن أكون في",
+    "i am inside", "imagine myself in", "if i were",
+  ];
+  if (immersiveKeywords.some((k) => arabic.toLowerCase().includes(k.toLowerCase()))) {
+    return {
+      type: "immersive",
+      outputMode: "immersive",
+      confidence: 0.95,
+      params: { description: msg },
+      suggestedReply: "سأضعك داخل هذه البيئة من 6 زوايا مختلفة...",
+    };
+  }
+
   // فيديو
   const videoKeywords = [
     "فيديو",
@@ -199,8 +245,11 @@ function quickIntentDetect(msg: string): DetectedIntent {
   if (videoKeywords.some((k) => arabic.includes(k))) {
     const sceneMatch = arabic.match(/(\d+)\s*(مشهد|مشاهد|scenes?)/i);
     const langMatch = lower.includes("english") || lower.includes("إنجليزي") ? "en" : "ar";
+    // تحديد outputMode حسب المحتوى
+    const isProContent = ["مشروع", "معماري", "وثائقي", "تسويقي", "تعليمي", "علمي", "صحي", "تاريخي", "documentary", "marketing", "educational", "scientific"].some(k => arabic.includes(k));
     return {
       type: "video",
+      outputMode: isProContent ? "pro" : "fast",
       confidence: 0.92,
       params: {
         description: msg,
@@ -224,6 +273,7 @@ function quickIntentDetect(msg: string): DetectedIntent {
   if (imageKeywords.some((k) => arabic.includes(k))) {
     return {
       type: "image",
+      outputMode: "images",
       confidence: 0.9,
       params: { description: msg },
     };
@@ -242,6 +292,7 @@ function quickIntentDetect(msg: string): DetectedIntent {
   if (scriptKeywords.some((k) => arabic.includes(k))) {
     return {
       type: "script",
+      outputMode: "fast",
       confidence: 0.88,
       params: { description: msg },
     };
@@ -282,10 +333,11 @@ function quickIntentDetect(msg: string): DetectedIntent {
     };
   }
 
-  // افتراضي: فيديو إذا كان النص طويلاً
+  // افتراضي: فيديو إذا كان النص طويلاً (الذكاء يختار الوضع)
   if (msg.length > 20) {
     return {
       type: "video",
+      outputMode: "fast",
       confidence: 0.6,
       params: { description: msg, language: "ar", sceneCount: 6 },
     };
