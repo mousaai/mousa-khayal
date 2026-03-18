@@ -1032,25 +1032,45 @@ export default function Home() {
               )}
 
               {videoJob.status === "done" && videoJob.videoUrl && (
-                <div className="mt-2">
-                  <video
-                    src={videoJob.videoUrl}
-                    controls
-                    autoPlay
-                    className="w-full rounded-xl"
-                    style={{ maxHeight: 300, background: "#000" }}
-                  />
-                  <a
-                    href={videoJob.videoUrl}
-                    download="khayal-video.mp4"
-                    className="mt-2 flex items-center justify-center gap-2 w-full py-2 rounded-xl text-sm font-bold transition-all hover:scale-105"
-                    style={{ background: "rgba(52,211,153,0.15)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399", fontFamily: "'Tajawal', sans-serif" }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
-                    </svg>
-                    {activeLang === "AR" ? "تحميل الفيديو" : "Download Video"}
-                  </a>
+                <div className="mt-2 space-y-2">
+                  {/* مشغّل الفيديو — playsInline ضروري لـ Safari/iPhone */}
+                  <div className="relative w-full rounded-xl overflow-hidden" style={{ background: "#000", aspectRatio: "16/9" }}>
+                    <video
+                      src={videoJob.videoUrl}
+                      controls
+                      playsInline
+                      preload="metadata"
+                      className="w-full h-full object-contain"
+                      style={{ display: "block" }}
+                    />
+                  </div>
+                  {/* أزرار الإجراءات */}
+                  <div className="flex gap-2">
+                    <a
+                      href={videoJob.videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105 active:scale-95"
+                      style={{ background: "rgba(52,211,153,0.15)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399", fontFamily: "'Tajawal', sans-serif" }}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                      </svg>
+                      {activeLang === "AR" ? "تحميل" : "Download"}
+                    </a>
+                    <a
+                      href={videoJob.videoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105 active:scale-95"
+                      style={{ background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.25)", color: "#60a5fa", fontFamily: "'Tajawal', sans-serif" }}
+                    >
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
+                      </svg>
+                      {activeLang === "AR" ? "فتح" : "Open"}
+                    </a>
+                  </div>
                 </div>
               )}
 
