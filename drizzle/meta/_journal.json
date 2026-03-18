@@ -36,6 +36,13 @@
       "when": 1773839892225,
       "tag": "0004_chunky_joseph",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1773869099739,
+      "tag": "0005_living_warbird",
+      "breakpoints": true
     }
   ]
 }

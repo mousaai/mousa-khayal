@@ -749,6 +749,118 @@ export const khayalRouter = router({
     }),
 
   // ══════════════════════════════════════════════════════════════
+  // وضع "أنا هناك" — جولة غمر 360° من داخل أي بيئة
+  // ══════════════════════════════════════════════════════════════
+  immersiveView: publicProcedure
+    .input(z.object({
+      description: z.string().min(2),
+      referenceImageUrl: z.string().url().optional(),
+      language: z.enum(["ar", "en"]).optional().default("ar"),
+    }))
+    .mutation(async ({ input }) => {
+      // 1. فحص المحتوى الأخلاقي
+      const contentCheck = await checkContent(input.description, invokeLLM);
+      if (!contentCheck.allowed) {
+        throw new Error(contentCheck.message || "المحتوى غير مناسب");
+      }
+
+      // 2. تحليل البيئة وتوليد 6 زوايا غمرية بالـ LLM
+      const systemPrompt = `You are the world's greatest immersive experience director.
+You specialize in placing the viewer INSIDE any environment — no matter how small, large, real, or imaginary.
+
+${SAFE_CONTENT_DIRECTIVE}
+
+TASK: The user wants to be placed INSIDE the described environment.
+Generate 6 immersive camera angles as if the viewer IS THERE, experiencing it from within.
+
+IMMERSIVE ANGLE TYPES:
+1. eye_level — Standing/floating at eye level inside the environment, looking forward
+2. look_up — Looking straight up from inside (ceiling, sky, canopy, stars above)
+3. look_down — Looking straight down at the ground/floor beneath
+4. look_back — Turning around 180°, seeing what's behind
+5. close_detail — Extreme close-up of a fascinating detail in the environment
+6. panoramic — Wide 360° panoramic view showing the full environment all around
+
+FOR EACH ANGLE:
+- The viewer IS INSIDE the environment (first-person or very close third-person)
+- Include sensory details: light quality, atmosphere, scale, textures
+- Make it feel REAL and IMMERSIVE
+- Adapt scale: if inside a shell = macro photography scale; if inside a forest = human scale; if inside an atom = quantum visualization
+
+Rules for prompts:
+- Start with: "Ultra photorealistic immersive first-person view, inside [environment],"
+- Include: the specific angle description
+- Include: "8K resolution, ultra-detailed, volumetric lighting, photorealistic, immersive atmosphere, cinematic quality"
+- 60-100 words per prompt
+
+Respond ONLY with valid JSON:
+{
+  "title": "poetic Arabic title for this immersive experience",
+  "titleEn": "English title",
+  "environment": "brief description of the environment type",
+  "detectedLanguage": "ISO 639-1",
+  "immersiveAngles": [
+    {
+      "type": "eye_level|look_up|look_down|look_back|close_detail|panoramic",
+      "label_ar": "Arabic label",
+      "label_en": "English label",
+      "prompt": "full image generation prompt",
+      "caption_ar": "short poetic Arabic caption"
+    }
+  ]
+}`;
+
+      let angles: Array<{ type: string; label_ar: string; label_en: string; prompt: string; caption_ar: string }>;
+
+      try {
+        const result = await invokeLLM({
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: `Place me inside: ${input.description}` },
+          ],
+          responseFormat: { type: "json_object" },
+          maxTokens: 3000,
+        });
+        const content = typeof result.choices[0].message.content === "string"
+          ? result.choices[0].message.content
+          : JSON.stringify(result.choices[0].message.content);
+        const parsed = JSON.parse(content);
+        angles = parsed.immersiveAngles || [];
+
+        // 3. توليد الصور بالتوازي
+        const generatedAngles = await Promise.allSettled(
+          angles.map(async (angle) => {
+            const { url } = await generateImage({ prompt: angle.prompt });
+            return {
+              type: angle.type,
+              label_ar: angle.label_ar,
+              label_en: angle.label_en,
+              caption_ar: angle.caption_ar,
+              imageUrl: url,
+              prompt: angle.prompt,
+            };
+          })
+        );
+
+        const successfulAngles = generatedAngles
+          .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
+          .map(r => r.value);
+
+        return {
+          title: parsed.title || input.description.slice(0, 60),
+          titleEn: parsed.titleEn || input.description.slice(0, 60),
+          environment: parsed.environment || input.description,
+          detectedLanguage: parsed.detectedLanguage || "ar",
+          angles: successfulAngles,
+          description: input.description,
+        };
+      } catch (err) {
+        console.error("[ImmersiveView] Failed:", err);
+        throw new Error("فشل توليد الجولة الغمرية. حاول مرة أخرى.");
+      }
+    }),
+
+  // ══════════════════════════════════════════════════════════════
   // المقوم 1+2+3: توليد كامل بالمحركات الجديدة
   // ══════════════════════════════════════════════════════════════
   generateWithDomainEngine: publicProcedure

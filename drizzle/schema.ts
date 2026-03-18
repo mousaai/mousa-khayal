@@ -1,4 +1,4 @@
-import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json } from "drizzle-orm/mysql-core";
+import { int, mysqlEnum, mysqlTable, text, timestamp, varchar, json, bigint } from "drizzle-orm/mysql-core";
 
 /**
  * Core user table backing auth flow.
@@ -119,3 +119,14 @@ export const videoJobs = mysqlTable("video_jobs", {
 
 export type VideoJobRecord = typeof videoJobs.$inferSelect;
 export type InsertVideoJob = typeof videoJobs.$inferInsert;
+// جدول سجل المحتوى المرفوض — للمراجعة القانونية والأمنية
+export const contentViolations = mysqlTable("content_violations", {
+  id: int("id").autoincrement().primaryKey(),
+  textSnippet: varchar("textSnippet", { length: 200 }).notNull(),
+  category: varchar("category", { length: 50 }).notNull(),
+  checkType: mysqlEnum("checkType", ["pattern", "ai"]).notNull(),
+  createdAt: bigint("createdAt", { mode: "number" }).notNull(),
+});
+
+export type ContentViolation = typeof contentViolations.$inferSelect;
+export type InsertContentViolation = typeof contentViolations.$inferInsert;

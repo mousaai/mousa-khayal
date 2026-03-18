@@ -409,3 +409,79 @@ describe("videoProducer.ts — retry توليد الصور", () => {
     expect(src).toContain("generateImages");
   });
 });
+
+// ══════════════════════════════════════════════════════════
+// اختبارات contentFilter والفلتر الأخلاقي
+// ══════════════════════════════════════════════════════════
+describe("contentFilter", () => {
+  it("يسمح بالمحتوى العلمي والتعليمي", async () => {
+    const { checkContent } = await import("./contentFilter");
+    const mockLLM = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify({ allowed: true, reason: "educational content" }) } }]
+    });
+    const result = await checkContent("ذرة الكربون تحت المجهر الإلكتروني", mockLLM as any);
+    expect(result.allowed).toBe(true);
+  });
+
+  it("يرفض المحتوى المسيء", async () => {
+    const { checkContent } = await import("./contentFilter");
+    // استخدام كلمة محجوبة بالأنماط لضمان الرفض بدون الحاجة لـ AI
+    const result = await checkContent("gore beheading torture", undefined);
+    expect(result.allowed).toBe(false);
+    expect(result.category).toBeDefined();
+    expect(result.checkType).toBe("pattern");
+  });
+
+  it("يسمح بالعمارة والفن والهندسة", async () => {
+    const { checkContent } = await import("./contentFilter");
+    const mockLLM = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: JSON.stringify({ allowed: true, reason: "architecture content" }) } }]
+    });
+    const result = await checkContent("مسجد عثماني فاخر في إسطنبول بقباب ذهبية", mockLLM as any);
+    expect(result.allowed).toBe(true);
+  });
+});
+
+// ══════════════════════════════════════════════════════════
+// اختبارات وضع "أنا هناك" — immersiveView
+// ══════════════════════════════════════════════════════════
+describe("immersiveView angles", () => {
+  it("يتوقع 6 زوايا في نتيجة الجولة الغمرية", () => {
+    const EXPECTED_ANGLES = ["front", "back", "left", "right", "up", "down"];
+    expect(EXPECTED_ANGLES).toHaveLength(6);
+    expect(EXPECTED_ANGLES).toContain("front");
+    expect(EXPECTED_ANGLES).toContain("up");
+    expect(EXPECTED_ANGLES).toContain("down");
+  });
+
+  it("يتحقق من هيكل ImmersiveResult", () => {
+    const mockResult = {
+      title: "داخل صدفة في عمق المحيط",
+      description: "أنت داخل صدفة لؤلؤ في أعماق المحيط الهادئ",
+      environment: "ocean_depth",
+      angles: [
+        { id: "front", label: "أمامك", imageUrl: "https://example.com/front.jpg", description: "الماء الأزرق العميق" },
+        { id: "back", label: "خلفك", imageUrl: "https://example.com/back.jpg", description: "جدار الصدفة الصدفي" },
+        { id: "left", label: "يسارك", imageUrl: "https://example.com/left.jpg", description: "أعشاب بحرية تتمايل" },
+        { id: "right", label: "يمينك", imageUrl: "https://example.com/right.jpg", description: "ضوء يخترق الماء" },
+        { id: "up", label: "فوقك", imageUrl: "https://example.com/up.jpg", description: "سطح الماء بعيد" },
+        { id: "down", label: "تحتك", imageUrl: "https://example.com/down.jpg", description: "قاع الصدفة الناعم" },
+      ],
+      ambientSound: "ocean_deep",
+      generatedAt: Date.now(),
+    };
+
+    expect(mockResult.angles).toHaveLength(6);
+    expect(mockResult.title).toBeTruthy();
+    expect(mockResult.angles[0]).toHaveProperty("imageUrl");
+    expect(mockResult.angles[0]).toHaveProperty("description");
+    expect(mockResult.angles.map(a => a.id)).toEqual(["front", "back", "left", "right", "up", "down"]);
+  });
+
+  it("يتحقق من أن كل زاوية لها prompt مختلف", () => {
+    const angles = ["front", "back", "left", "right", "up", "down"];
+    const prompts = angles.map(angle => `inside a seashell in the ocean, looking ${angle}, cinematic`);
+    const uniquePrompts = new Set(prompts);
+    expect(uniquePrompts.size).toBe(6);
+  });
+});

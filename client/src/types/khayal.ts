@@ -45,6 +45,24 @@ export interface GenerationResult {
   progress?: number;
 }
 
+export interface ImmersiveAngle {
+  type: "eye_level" | "look_up" | "look_down" | "look_back" | "close_detail" | "panoramic";
+  label_ar: string;
+  label_en: string;
+  caption_ar: string;
+  imageUrl: string;
+  prompt: string;
+}
+
+export interface ImmersiveResult {
+  title: string;
+  titleEn: string;
+  environment: string;
+  detectedLanguage: string;
+  angles: ImmersiveAngle[];
+  description: string;
+}
+
 export interface DocumentAnalysis {
   extractedText: string;
   projectTitle: string;

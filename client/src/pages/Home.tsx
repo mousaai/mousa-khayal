@@ -6,7 +6,8 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import KhayalCinematicViewer from "@/components/KhayalCinematicViewer";
-import type { GenerationResult, DocumentAnalysis } from "@/types/khayal";
+import ImmersiveViewer from "@/components/ImmersiveViewer";
+import type { GenerationResult, DocumentAnalysis, ImmersiveResult } from "@/types/khayal";
 import { musicEngine, selectMusicMood } from "@/lib/musicEngine";
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
@@ -20,12 +21,36 @@ const SPACE_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkP
 
 // ── أمثلة ────────────────────────────────────────────────────────────────────
 const EXAMPLE_PROMPTS = [
-  { text: "أحلق في السماء فوق أبوظبي وأرى المدينة بكل تفاصيلها", lang: "AR", hint: "فيديو" },
+  // ── معمار وعمران ──
   { text: "مسجد عثماني فاخر في إسطنبول، قباب ذهبية تحت ضوء الغروب", lang: "AR", hint: "صورة" },
-  { text: "A cinematic journey through a futuristic Dubai skyline", lang: "EN", hint: "video" },
-  { text: "اكتب سيناريو فيلم قصير عن رحلة في الفضاء", lang: "AR", hint: "سيناريو" },
+  { text: "فيلا إماراتية تراثية قديمة فيها فناء في الوسط فيه شجرة الزيتون", lang: "AR", hint: "صورة" },
+  { text: "A futuristic skyscraper made of glass and vertical gardens in Dubai", lang: "EN", hint: "image" },
+  { text: "مبنى متحف عملاق في شكل نملة عملاقة في بطنها قاعة عرض فيها فيل", lang: "AR", hint: "صورة" },
+  { text: "جسر معلق فوق وادٍ سحيق في جبال الألب، ضباب الصباح", lang: "AR", hint: "صورة" },
+  { text: "مدينة مستقبلية تحت الماء، أبراج زجاجية وأسماك تسبح حولها", lang: "AR", hint: "فيديو" },
+  // ── علوم وتعليم ──
+  { text: "تخيّل ذرة الكربون من الداخل، الإلكترونات تدور حول النواة بألوان نيون", lang: "AR", hint: "فيديو" },
+  { text: "Visualize the Pythagorean theorem as a glowing 3D geometric proof", lang: "EN", hint: "image" },
+  { text: "قانون الجاذبية لنيوتن: تفاحة تسقط بالتصوير البطيء مع خطوط القوة", lang: "AR", hint: "فيديو" },
+  { text: "تفاعل كيميائي بين الصوديوم والماء، انفجار مضيء بألوان الطيف", lang: "AR", hint: "صورة" },
+  { text: "المجرة درب التبانة من الأعلى، ملايين النجوم بألوان كونية", lang: "AR", hint: "صورة" },
+  { text: "خلية حية تحت المجهر، الميتوكوندريا تتحرك داخل السيتوبلازم", lang: "AR", hint: "فيديو" },
+  { text: "Visualize the Fibonacci spiral in nature: shells, galaxies, flowers", lang: "EN", hint: "video" },
+  { text: "الثقب الأسود يبتلع نجماً، موجات الجاذبية تتموج في الفضاء", lang: "AR", hint: "فيديو" },
+  // ── طبيعة وبيئة ──
+  { text: "أحلق في السماء فوق أبوظبي وأرى المدينة بكل تفاصيلها", lang: "AR", hint: "فيديو" },
   { text: "جبل وكهف فيه سرير نوم مريح وكلب على باب الكهف", lang: "AR", hint: "صورة" },
+  { text: "غابة مطيرة استوائية في الفجر، ضوء يخترق الأشجار وضباب خفيف", lang: "AR", hint: "صورة" },
+  { text: "شلال جليدي في أيسلندا تحت الشفق القطبي الأخضر", lang: "AR", hint: "صورة" },
+  // ── خيال وإبداع ──
+  { text: "نملة صغيرة تأكل آيس كريم ملوّن، تصوير ماكرو سينمائي دقيق", lang: "AR", hint: "صورة" },
+  { text: "اكتب سيناريو فيلم قصير عن رحلة في الفضاء", lang: "AR", hint: "سيناريو" },
+  { text: "A cinematic journey through a futuristic Dubai skyline at night", lang: "EN", hint: "video" },
+  { text: "قطة تقود سيارة رياضية في الصحراء، غروب الشمس", lang: "AR", hint: "صورة" },
+  { text: "مدينة عائمة في السماء بين الغيوم، أبراج معلقة بسلاسل ذهبية", lang: "AR", hint: "صورة" },
   { text: "京都の静かな竹林に囲まれた古い日本の神社", lang: "JA", hint: "image" },
+  { text: "Un château médiéval flottant sur un lac de nuages au coucher du soleil", lang: "FR", hint: "image" },
+  { text: "Visualiza el ADN humano desenrollándose en una danza cósmica de colores", lang: "ES", hint: "video" },
 ];
 
 // ── نصوص الواجهة ─────────────────────────────────────────────────────────────
@@ -151,8 +176,12 @@ export default function Home() {
   const [volume, setVolume] = useState(0);
   const [waveData, setWaveData] = useState<number[]>(Array(24).fill(0.5));
 
-  // ── وضع الإخراج: صور / فيديو سريع / فيديو احترافي ──
-  const [outputMode, setOutputMode] = useState<"images" | "fast" | "pro">("fast");
+  // ── وضع الإخراج: صور / فيديو سريع / فيديو احترافي / أنا هناك ──
+  const [outputMode, setOutputMode] = useState<"images" | "fast" | "pro" | "immersive">("fast");
+
+  // ── نتيجة وضع أنا هناك ──
+  const [immersiveResult, setImmersiveResult] = useState<ImmersiveResult | null>(null);
+  const [isGeneratingImmersive, setIsGeneratingImmersive] = useState(false);
   const videoQuality: "fast" | "pro" = outputMode === "pro" ? "pro" : "fast";
 
   // ── UI ──
@@ -184,6 +213,7 @@ export default function Home() {
   const quickProduceMutation = trpc.video.quickProduce.useMutation();
   const generateScriptMutation = trpc.video.generateScript.useMutation();
   const analyzeDocMutation = trpc.khayal.analyzeDocument.useMutation();
+  const immersiveViewMutation = trpc.khayal.immersiveView.useMutation();
   const detectIntentMutation = trpc.chat.detectIntent.useMutation();
 
   const jobStatusQuery = trpc.video.getJobStatus.useQuery(
@@ -586,6 +616,25 @@ export default function Home() {
     await checkAndGenerate(finalDesc, async () => {
       const intent = detectedIntent || "image";
 
+      // ── وضع أنا هناك ──
+      if (outputMode === "immersive") {
+        setIsGeneratingImmersive(true);
+        setPortalGlow(true);
+        try {
+          const res = await immersiveViewMutation.mutateAsync({
+            description: finalDesc || "خيال حر",
+            referenceImageUrl: uploadedImageUrl || urlInput || undefined,
+            language: langCode,
+          });
+          setImmersiveResult(res as ImmersiveResult);
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setIsGeneratingImmersive(false);
+        }
+        return;
+      }
+
       // إذا اختار المستخدم وضع "صور" صراحةً → توليد صور فقط بغض النظر عن القصد المكتشف
       if (outputMode === "images") {
         setIsGenerating(true);
@@ -715,6 +764,16 @@ export default function Home() {
       handleGenerate();
     }
   };
+
+  // ── عرض وضع أنا هناك ──
+  if (immersiveResult) {
+    return (
+      <ImmersiveViewer
+        result={immersiveResult}
+        onBack={() => setImmersiveResult(null)}
+      />
+    );
+  }
 
   // ── عرض نتيجة الصورة ──
   if (result) {
@@ -1001,6 +1060,19 @@ export default function Home() {
                 >
                   ✨ {activeLang === "AR" ? "احترافي" : "Pro"}
                 </button>
+                <button
+                  onClick={() => setOutputMode("immersive")}
+                  className="px-2.5 py-1.5 text-xs font-bold transition-all"
+                  style={{
+                    background: outputMode === "immersive" ? "rgba(255,170,68,0.2)" : "transparent",
+                    color: outputMode === "immersive" ? "#ffaa44" : "rgba(255,255,255,0.35)",
+                    fontFamily: "'Tajawal', sans-serif",
+                    borderRight: "none",
+                  }}
+                  title="جولة غمر 360° — 6 زوايا سينمائية من داخل أي بيئة"
+                >
+                  🌍 {activeLang === "AR" ? "أنا هناك" : "I'm There"}
+                </button>
               </div>
             </div>
 
@@ -1128,27 +1200,36 @@ export default function Home() {
               {/* Right: generate button */}
               <button
                 onClick={handleGenerate}
-                disabled={isGenerating || isGeneratingScript || !hasContent}
+                disabled={isGenerating || isGeneratingScript || isGeneratingImmersive || !hasContent}
                 className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 flex-shrink-0"
                 style={{
                   fontFamily: "'Tajawal', sans-serif",
-                  background: (isGenerating || isGeneratingScript)
+                  background: (isGenerating || isGeneratingScript || isGeneratingImmersive)
                     ? "rgba(139,92,246,0.3)"
+                    : outputMode === "immersive"
+                    ? "linear-gradient(135deg, #b45309 0%, #f59e0b 50%, #fbbf24 100%)"
                     : detectedIntent === "video"
                     ? "linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 100%)"
                     : detectedIntent === "script"
                     ? "linear-gradient(135deg, #065f46 0%, #10b981 100%)"
                     : "linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #0ea5e9 100%)",
                   color: "white",
-                  boxShadow: (isGenerating || isGeneratingScript) ? "none" : "0 0 20px rgba(124,58,237,0.4)",
+                  boxShadow: (isGenerating || isGeneratingScript || isGeneratingImmersive) ? "none" : outputMode === "immersive" ? "0 0 20px rgba(251,191,36,0.4)" : "0 0 20px rgba(124,58,237,0.4)",
                   minWidth: 110,
                 }}
               >
-                {(isGenerating || isGeneratingScript) ? (
+                {isGeneratingImmersive ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                    <span>{activeLang === "AR" ? "ينقلك هناك..." : "Teleporting..."}</span>
+                  </>
+                ) : (isGenerating || isGeneratingScript) ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>{activeLang === "AR" ? "يُشكّل..." : "Generating..."}</span>
                   </>
+                ) : outputMode === "immersive" ? (
+                  <span>🌍 {activeLang === "AR" ? "انقلني هناك" : "Take Me There"}</span>
                 ) : (
                   <span>{lang.btn}</span>
                 )}
