@@ -89,6 +89,47 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
   const [isMusicOn, setIsMusicOn] = useState(false);
   const [imageErrors, setImageErrors] = useState<Record<number, boolean>>({});
   // ── حالة شاشة تقدم تصدير الفيديو ──
+  // ── حالة المحادثة الذكية ──
+  const [showChat, setShowChat] = useState(false);
+  const [chatMessages, setChatMessages] = useState<Array<{role: "user" | "assistant"; text: string}>>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatLoading, setIsChatLoading] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  const chatMutation = trpc.chat.chatWithContext.useMutation();
+
+  const handleChatSend = async () => {
+    const text = chatInput.trim();
+    if (!text || isChatLoading) return;
+    setChatInput("");
+    const userMsg = { role: "user" as const, text };
+    setChatMessages(prev => [...prev, userMsg]);
+    setIsChatLoading(true);
+    try {
+      const history = [...chatMessages, userMsg].map(m => ({ role: m.role, content: m.text }));
+      const res = await chatMutation.mutateAsync({
+        message: text,
+        history,
+        productionContext: {
+          status: "done",
+          progress: 100,
+          outputType: "image" as const,
+          description: result.description,
+          sceneCount: result.scenes.length,
+        },
+      });
+      setChatMessages(prev => [...prev, { role: "assistant", text: res.reply }]);
+    } catch {
+      setChatMessages(prev => [...prev, { role: "assistant", text: "عذراً، حدث خطأ. حاول مجدداً." }]);
+    } finally {
+      setIsChatLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (chatEndRef.current) chatEndRef.current.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
   const [videoExport, setVideoExport] = useState<{
     phase: "loading" | "recording" | "encoding" | "done";
     currentScene: number;
@@ -1050,6 +1091,90 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
             </button>
             <button onClick={() => setShowRefinePanel(false)}
               className="px-4 py-2 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all text-sm">إلغاء</button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Chat overlay ── */}
+      {/* زر فتح المحادثة */}
+      {!showChat && (
+        <button
+          onClick={() => {
+            setShowChat(true);
+            if (chatMessages.length === 0) {
+              setChatMessages([{ role: "assistant", text: `مرحباً! أنا خيال 🌟 يمكنك سؤالي عن أي شيء — تعديل المشاهد، إضافة عناصر، تغيير الأجواء، أو أي سؤال آخر.` }]);
+            }
+          }}
+          className="absolute bottom-20 left-6 z-30 flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-bold text-white transition-all hover:scale-105"
+          style={{ background: `linear-gradient(135deg, ${accentColor}cc, #60a5fa99)`, backdropFilter: "blur(16px)", border: `1px solid ${accentColor}40`, boxShadow: `0 4px 24px ${accentColor}30` }}
+        >
+          <span style={{ fontSize: "16px" }}>✦</span>
+          <span>تحدّث مع خيال</span>
+        </button>
+      )}
+
+      {/* نافذة المحادثة */}
+      {showChat && (
+        <div
+          className="absolute bottom-20 left-6 z-30 flex flex-col rounded-2xl overflow-hidden"
+          style={{ width: "340px", height: "420px", background: "rgba(6,7,14,0.97)", border: `1px solid ${accentColor}30`, backdropFilter: "blur(24px)", boxShadow: `0 8px 48px ${accentColor}20` }}
+          dir="rtl"
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: `1px solid ${accentColor}20` }}>
+            <div className="flex items-center gap-2">
+              <span style={{ color: accentColor, fontSize: "16px" }}>✦</span>
+              <span className="text-white font-bold text-sm">خيال — مساعدك الذكي</span>
+            </div>
+            <button onClick={() => setShowChat(false)} className="text-white/30 hover:text-white text-xs transition-colors">✕</button>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-2">
+            {chatMessages.map((msg, i) => (
+              <div key={i} className={`flex ${msg.role === "user" ? "justify-start" : "justify-end"}`}>
+                <div
+                  className="max-w-[85%] px-3 py-2 rounded-2xl text-xs leading-relaxed"
+                  style={msg.role === "user"
+                    ? { background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.85)", borderRadius: "16px 16px 4px 16px" }
+                    : { background: `linear-gradient(135deg, ${accentColor}25, #60a5fa15)`, color: "white", border: `1px solid ${accentColor}20`, borderRadius: "16px 16px 16px 4px" }
+                  }
+                >
+                  {msg.text}
+                </div>
+              </div>
+            ))}
+            {isChatLoading && (
+              <div className="flex justify-end">
+                <div className="px-3 py-2 rounded-2xl text-xs" style={{ background: `${accentColor}15`, color: accentColor, border: `1px solid ${accentColor}20` }}>
+                  <span className="animate-pulse">يفكّر...</span>
+                </div>
+              </div>
+            )}
+            <div ref={chatEndRef} />
+          </div>
+
+          {/* Input */}
+          <div className="p-3" style={{ borderTop: `1px solid ${accentColor}15` }}>
+            <div className="flex gap-2">
+              <input
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleChatSend()}
+                placeholder="اسأل أو اطلب تعديلاً..."
+                className="flex-1 rounded-xl px-3 py-2 text-xs text-white placeholder-white/20 outline-none"
+                style={{ background: "rgba(255,255,255,0.06)", border: `1px solid ${accentColor}20` }}
+                dir="rtl"
+              />
+              <button
+                onClick={handleChatSend}
+                disabled={!chatInput.trim() || isChatLoading}
+                className="px-3 py-2 rounded-xl text-xs font-bold text-white transition-all disabled:opacity-30 hover:scale-105"
+                style={{ background: `linear-gradient(135deg, ${accentColor}, #60a5fa)` }}
+              >
+                ✦
+              </button>
+            </div>
           </div>
         </div>
       )}

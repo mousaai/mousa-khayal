@@ -430,6 +430,132 @@ export const chatRouter = router({
     }),
 
   /**
+   * محادثة ذكية مع وعي بحالة الإنتاج
+   * تُستخدم أثناء الإنتاج وبعده للإجابة على الأسئلة وتنفيذ التعديلات
+   */
+  chatWithContext: publicProcedure
+    .input(
+      z.object({
+        message: z.string().min(1).max(2000),
+        history: z
+          .array(
+            z.object({
+              role: z.enum(["user", "assistant"]),
+              content: z.string(),
+            })
+          )
+          .optional()
+          .default([]),
+        // سياق الإنتاج الحالي
+        productionContext: z
+          .object({
+            status: z.enum(["idle", "producing", "done", "failed"]).optional(),
+            progress: z.number().optional(),
+            currentStep: z.string().optional(),
+            jobId: z.string().optional(),
+            outputType: z.enum(["video", "image", "script"]).optional(),
+            description: z.string().optional(),
+            sceneCount: z.number().optional(),
+            estimatedMinutes: z.number().optional(),
+          })
+          .optional(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const ctx = input.productionContext;
+      const msg = input.message.toLowerCase();
+
+      // ─── ردود سريعة لأسئلة الوقت والحالة ───
+      const timeKeywords = ["كم يستغرق", "كم الوقت", "متى ينتهي", "كم باقي", "وقت", "how long", "when"];
+      const statusKeywords = ["ما المرحلة", "وين وصل", "كم نسبة", "كم بالمية", "progress", "status"];
+      const stopKeywords = ["أوقف", "إلغاء", "stop", "cancel", "وقف"];
+      const editKeywords = ["عدّل", "غيّر", "أضف", "احذف", "بدّل", "edit", "change", "modify"];
+
+      if (ctx?.status === "producing") {
+        if (timeKeywords.some((k) => msg.includes(k))) {
+          const remaining = ctx.estimatedMinutes
+            ? Math.max(1, Math.round(ctx.estimatedMinutes * (1 - (ctx.progress || 0) / 100)))
+            : null;
+          const reply = remaining
+            ? `⏱️ الإنتاج في مرحلة **${ctx.currentStep || "المعالجة"}** — اكتمل **${ctx.progress || 0}%**\n\nالوقت المتبقي تقريباً: **${remaining} دقيقة${remaining === 1 ? "" : ""}`
+            : `⏱️ الإنتاج جارٍ في مرحلة **${ctx.currentStep || "المعالجة"}** — اكتمل **${ctx.progress || 0}%**\n\nسيظهر الفيديو هنا عند الانتهاء.`;
+          return { reply, action: null };
+        }
+
+        if (statusKeywords.some((k) => msg.includes(k))) {
+          const reply = `📊 الحالة الآن:\n• المرحلة: **${ctx.currentStep || "جاري الإنتاج"}**\n• التقدم: **${ctx.progress || 0}%**\n• نوع الإخراج: **${ctx.outputType === "video" ? "فيديو" : ctx.outputType === "image" ? "صورة" : "سيناريو"}**`;
+          return { reply, action: null };
+        }
+
+        if (stopKeywords.some((k) => msg.includes(k))) {
+          return {
+            reply: "⚠️ لا يمكن إيقاف الإنتاج بعد بدئه — لكن يمكنك بدء إنتاج جديد بعد الانتهاء. هل تريد تعديل الوصف للمرة القادمة؟",
+            action: null,
+          };
+        }
+      }
+
+      if (ctx?.status === "done") {
+        if (editKeywords.some((k) => msg.includes(k))) {
+          // تحليل طلب التعديل
+          const sceneMatch = input.message.match(/المشهد\s*(\d+)|scene\s*(\d+)/i);
+          const sceneIndex = sceneMatch ? parseInt(sceneMatch[1] || sceneMatch[2]) - 1 : null;
+
+          return {
+            reply: sceneIndex !== null
+              ? `✏️ فهمت — تريد تعديل **المشهد ${sceneIndex + 1}**. سأُعيد إنتاج هذا المشهد بالتعديلات المطلوبة.`
+              : `✏️ فهمت طلب التعديل. هل تريد:\n1. إعادة إنتاج الفيديو كاملاً بالتعديلات\n2. تعديل مشهد محدد فقط\n\nأخبرني برقم المشهد أو قل "أعد الإنتاج كاملاً".`,
+            action: sceneIndex !== null ? { type: "edit_scene", sceneIndex } : { type: "ask_edit_scope" },
+          };
+        }
+
+        if (["أعد", "redo", "restart", "من جديد", "مرة ثانية"].some((k) => msg.includes(k))) {
+          return {
+            reply: "🔄 حسناً! سأُعيد الإنتاج. هل تريد نفس الوصف أم تعديله؟",
+            action: { type: "restart_production", description: ctx.description },
+          };
+        }
+      }
+
+      // ─── رد ذكي عام بالسياق الكامل ───
+      const contextSummary = ctx
+        ? `
+سياق الإنتاج الحالي:
+- الحالة: ${ctx.status === "producing" ? "جاري الإنتاج" : ctx.status === "done" ? "مكتمل" : ctx.status === "failed" ? "فشل" : "لا يوجد إنتاج"}
+- التقدم: ${ctx.progress || 0}%
+- المرحلة: ${ctx.currentStep || "غير محدد"}
+- النوع: ${ctx.outputType || "غير محدد"}
+- الوصف: ${ctx.description || "غير محدد"}
+`
+        : "";
+
+      const historyForLLM = input.history.slice(-8).map((m) => ({
+        role: m.role as "user" | "assistant",
+        content: m.content,
+      }));
+
+      const response = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: `أنت مساعد منصة "خيال" الذكي — منصة تحويل الأفكار إلى مرئيات سينمائية.
+
+أنت تتحدث مع المستخدم أثناء أو بعد إنتاج محتوى. كن ودوداً، موجزاً، ومفيداً.
+${contextSummary}
+إذا سأل عن الوقت أو التقدم، أجب بناءً على السياق. إذا طلب تعديلاً، اسأل عن التفاصيل.
+أجب بالعربية دائماً ما لم يكتب بالإنجليزية.`,
+          },
+          ...historyForLLM,
+          { role: "user" as const, content: input.message },
+        ],
+      });
+
+      const rawMsg = response.choices?.[0]?.message?.content;
+      const reply = (typeof rawMsg === "string" ? rawMsg : null) || "كيف يمكنني مساعدتك؟";
+      return { reply, action: null };
+    }),
+
+  /**
    * توليد سيناريو من رسالة طبيعية
    */
   generateScript: publicProcedure

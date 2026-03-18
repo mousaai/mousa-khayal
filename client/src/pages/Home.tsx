@@ -62,6 +62,14 @@ const UI_LANGS: Record<string, { placeholder: string; btn: string; listening: st
 
 const LANG_KEYS = Object.keys(UI_LANGS);
 
+// ── رسائل المحادثة ───────────────────────────────────────────────────────────
+interface ChatMsg {
+  role: "user" | "assistant";
+  content: string;
+  timestamp: number;
+  isThinking?: boolean;
+}
+
 // ── حالة إنتاج الفيديو ────────────────────────────────────────────────────────
 interface VideoJobState {
   jobId: string;
@@ -98,6 +106,14 @@ export default function Home() {
   const [scriptResult, setScriptResult] = useState<string | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
 
+  // ── محادثة ذكية ──
+  const [chatMessages, setChatMessages] = useState<ChatMsg[]>([]);
+  const [chatInput, setChatInput] = useState("");
+  const [isChatSending, setIsChatSending] = useState(false);
+  const [showChat, setShowChat] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+  const chatInputRef = useRef<HTMLInputElement>(null);
+
   // ── Mic ──
   const [isRecording, setIsRecording] = useState(false);
   const [micState, setMicState] = useState<"idle" | "listening" | "processing">("idle");
@@ -127,6 +143,7 @@ export default function Home() {
   const isRTL = ["AR", "FA", "UR", "HE"].includes(activeLang);
 
   // ── tRPC mutations ──
+  const chatWithContextMutation = trpc.chat.chatWithContext.useMutation();
   const generateMutation = trpc.khayal.generateScene.useMutation();
   const checkContentMutation = trpc.khayal.checkContent.useMutation();
   const quickProduceMutation = trpc.video.quickProduce.useMutation();
@@ -141,6 +158,86 @@ export default function Home() {
       refetchInterval: 2000,
     }
   );
+
+  // ── إظهار المحادثة عند بدء الإنتاج أو اكتمال الصور ──
+  useEffect(() => {
+    if (videoJob && !showChat) {
+      setShowChat(true);
+      if (chatMessages.length === 0) {
+        setChatMessages([{
+          role: "assistant",
+          content: "🎬 بدأ إنتاج الفيديو! يمكنك سؤالي عن أي شيء — كم يستغرق، ما المرحلة الحالية، أو طلب تعديلات بعد الانتهاء.",
+          timestamp: Date.now(),
+        }]);
+      }
+    }
+  }, [videoJob]);
+
+  // ── إظهار المحادثة بعد اكتمال الصور ──
+  useEffect(() => {
+    if (result && !showChat) {
+      setShowChat(true);
+      if (chatMessages.length === 0) {
+        setChatMessages([{
+          role: "assistant",
+          content: "🎨 اكتملت الصور! يمكنك طلب تعديلات — غيّر الألوان، أضف تفاصيل، أو اطلب صوراً بزوايا مختلفة.",
+          timestamp: Date.now(),
+        }]);
+      }
+    }
+  }, [result]);
+
+  // ── تمرير المحادثة للأسفل تلقائياً ──
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [chatMessages]);
+
+  // ── إرسال رسالة في المحادثة ──
+  const handleChatSend = async () => {
+    if (!chatInput.trim() || isChatSending) return;
+    const userMsg: ChatMsg = { role: "user", content: chatInput.trim(), timestamp: Date.now() };
+    const thinkingMsg: ChatMsg = { role: "assistant", content: "...", timestamp: Date.now() + 1, isThinking: true };
+    setChatMessages(prev => [...prev, userMsg, thinkingMsg]);
+    setChatInput("");
+    setIsChatSending(true);
+    try {
+      const productionContext = videoJob ? {
+        status: videoJob.status === "pending" ? "producing" : videoJob.status as "idle" | "producing" | "done" | "failed",
+        progress: videoJob.progress,
+        currentStep: videoJob.currentStep,
+        jobId: videoJob.jobId,
+        outputType: "video" as const,
+        description: prompt,
+        sceneCount: 5,
+        estimatedMinutes: 8,
+      } : undefined;
+      const history = chatMessages
+        .filter(m => !m.isThinking)
+        .slice(-10)
+        .map(m => ({ role: m.role, content: m.content }));
+      const res = await chatWithContextMutation.mutateAsync({
+        message: userMsg.content,
+        history,
+        productionContext,
+      });
+      setChatMessages(prev => [
+        ...prev.filter(m => !m.isThinking),
+        { role: "assistant", content: res.reply, timestamp: Date.now() },
+      ]);
+      // تنفيذ الإجراء إذا وجد
+      if (res.action?.type === "restart_production" && res.action.description) {
+        setPrompt(res.action.description as string);
+        setVideoJob(null);
+      }
+    } catch {
+      setChatMessages(prev => [
+        ...prev.filter(m => !m.isThinking),
+        { role: "assistant", content: "عذراً، حدث خطأ. حاول مرة أخرى.", timestamp: Date.now() },
+      ]);
+    } finally {
+      setIsChatSending(false);
+    }
+  };
 
   // ── مزامنة حالة الوظيفة ──
   useEffect(() => {
@@ -963,6 +1060,130 @@ export default function Home() {
                 </p>
               )}
             </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════
+              شريط المحادثة الذكية مع خيال
+          ══════════════════════════════════════════════════════════ */}
+          {showChat && (
+            <div
+              className="mt-4 rounded-2xl overflow-hidden transition-all"
+              style={{
+                background: "rgba(6,7,16,0.95)",
+                border: "1px solid rgba(139,92,246,0.2)",
+                backdropFilter: "blur(20px)",
+                animation: "fadeIn 0.3s ease",
+              }}
+            >
+              {/* Header */}
+              <div
+                className="flex items-center justify-between px-4 py-2.5 cursor-pointer"
+                style={{ borderBottom: "1px solid rgba(139,92,246,0.1)" }}
+                onClick={() => setShowChat(v => !v)}
+              >
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-purple-400" style={{ animation: "micPulse 2s ease-out infinite" }} />
+                  <span className="text-xs font-bold" style={{ color: "rgba(196,181,253,0.8)", fontFamily: "'Tajawal', sans-serif" }}>
+                    {activeLang === "AR" ? "تحدّث مع خيال" : "Chat with Khayal"}
+                  </span>
+                  <span className="text-[10px]" style={{ color: "rgba(148,163,184,0.35)" }}>
+                    {activeLang === "AR" ? "اسأل، عدّل، استفسر..." : "Ask, edit, inquire..."}
+                  </span>
+                </div>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(148,163,184,0.4)" strokeWidth="2">
+                  <path d="M18 15l-6-6-6 6" />
+                </svg>
+              </div>
+
+              {/* Messages */}
+              <div
+                className="overflow-y-auto px-4 py-3 flex flex-col gap-2"
+                style={{ maxHeight: 260, minHeight: chatMessages.length > 0 ? 80 : 0 }}
+                dir={isRTL ? "rtl" : "ltr"}
+              >
+                {chatMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`flex ${msg.role === "user" ? (isRTL ? "justify-start" : "justify-end") : (isRTL ? "justify-end" : "justify-start")}`}
+                  >
+                    <div
+                      className="max-w-[85%] px-3 py-2 rounded-xl text-xs leading-relaxed"
+                      style={{
+                        fontFamily: "'Tajawal', sans-serif",
+                        background: msg.role === "user"
+                          ? "rgba(139,92,246,0.18)"
+                          : "rgba(255,255,255,0.05)",
+                        border: `1px solid ${msg.role === "user" ? "rgba(139,92,246,0.3)" : "rgba(255,255,255,0.08)"}`,
+                        color: msg.role === "user" ? "rgba(196,181,253,0.9)" : "rgba(255,255,255,0.75)",
+                        whiteSpace: "pre-wrap",
+                      }}
+                    >
+                      {msg.isThinking ? (
+                        <div className="flex items-center gap-1">
+                          {[0,1,2].map(j => (
+                            <div key={j} className="w-1.5 h-1.5 rounded-full bg-purple-400/60"
+                              style={{ animation: "bounce 1.2s ease-in-out infinite", animationDelay: `${j * 0.2}s` }} />
+                          ))}
+                        </div>
+                      ) : msg.content}
+                    </div>
+                  </div>
+                ))}
+                <div ref={chatEndRef} />
+              </div>
+
+              {/* Input */}
+              <div
+                className="flex items-center gap-2 px-3 py-2"
+                style={{ borderTop: "1px solid rgba(139,92,246,0.08)" }}
+                dir={isRTL ? "rtl" : "ltr"}
+              >
+                <input
+                  ref={chatInputRef}
+                  value={chatInput}
+                  onChange={e => setChatInput(e.target.value)}
+                  onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleChatSend(); } }}
+                  placeholder={activeLang === "AR" ? "اسأل خيال... كم يستغرق؟ عدّل المشهد الثاني..." : "Ask Khayal... how long? edit scene 2..."}
+                  className="flex-1 bg-transparent text-white/70 placeholder-white/20 outline-none text-xs"
+                  style={{ fontFamily: "'Tajawal', sans-serif" }}
+                  dir={isRTL ? "rtl" : "ltr"}
+                />
+                <button
+                  onClick={handleChatSend}
+                  disabled={!chatInput.trim() || isChatSending}
+                  className="flex-shrink-0 w-7 h-7 rounded-lg flex items-center justify-center transition-all hover:scale-110 disabled:opacity-30"
+                  style={{ background: "rgba(139,92,246,0.2)", border: "1px solid rgba(139,92,246,0.3)" }}
+                >
+                  {isChatSending ? (
+                    <div className="w-3 h-3 border border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
+                  ) : (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2.5">
+                      <line x1="22" y1="2" x2="11" y2="13" />
+                      <polygon points="22 2 15 22 11 13 2 9 22 2" />
+                    </svg>
+                  )}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* زر فتح المحادثة إذا لم تكن ظاهرة */}
+          {!showChat && (videoJob || scriptResult || result) && (
+            <button
+              onClick={() => setShowChat(true)}
+              className="mt-3 w-full py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-all hover:scale-[1.01]"
+              style={{
+                background: "rgba(139,92,246,0.08)",
+                border: "1px solid rgba(139,92,246,0.2)",
+                color: "rgba(196,181,253,0.6)",
+                fontFamily: "'Tajawal', sans-serif",
+              }}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+              </svg>
+              {activeLang === "AR" ? "تحدّث مع خيال" : "Chat with Khayal"}
+            </button>
           )}
 
           {/* ══════════════════════════════════════════════════════════
