@@ -104,11 +104,30 @@ export default function Home() {
   // ── فيديو ── (مع localStorage persistence)
   const [videoJob, setVideoJob] = useState<VideoJobState | null>(() => {
     try {
+      // دعم ?reset=1 لمسح الحالة فوراً
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("reset") === "1") {
+        localStorage.removeItem("khayal_video_job");
+        localStorage.removeItem("khayal_chat");
+        // إزالة المعامل من URL
+        window.history.replaceState({}, "", window.location.pathname);
+        return null;
+      }
+
       const saved = localStorage.getItem("khayal_video_job");
       if (saved) {
         const parsed: VideoJobState = JSON.parse(saved);
-        // استئناف فقط إذا كان الـ job لا يزال يعمل (ليس done أو failed)
+        // استئناف فقط إذا كان ال― job لا يزال يعمل (ليس done أو failed)
         if (parsed.status === "pending" || parsed.status === "processing") {
+          // مسح الجوبات العالقة أكثر من 45 دقيقة تلقائياً
+          const savedAt = (parsed as any).savedAt;
+          if (savedAt) {
+            const ageMs = Date.now() - savedAt;
+            if (ageMs > 45 * 60 * 1000) { // 45 دقيقة
+              localStorage.removeItem("khayal_video_job");
+              return null;
+            }
+          }
           return parsed;
         }
       }
@@ -260,7 +279,13 @@ export default function Home() {
   // ── حفظ videoJob في localStorage عند كل تغيير ──
   useEffect(() => {
     if (videoJob) {
-      try { localStorage.setItem("khayal_video_job", JSON.stringify(videoJob)); } catch { /* ignore */ }
+      try {
+        // حفظ وقت الحفظ لكشف الجوبات العالقة لاحقاً
+        const toSave = videoJob.status === "pending" || videoJob.status === "processing"
+          ? { ...videoJob, savedAt: (videoJob as any).savedAt || Date.now() }
+          : videoJob;
+        localStorage.setItem("khayal_video_job", JSON.stringify(toSave));
+      } catch { /* ignore */ }
     } else {
       try { localStorage.removeItem("khayal_video_job"); } catch { /* ignore */ }
     }
@@ -1101,7 +1126,20 @@ export default function Home() {
                     {videoJob.status === "done" ? "✅ اكتمل الإنتاج!" : videoJob.status === "failed" ? "❌ فشل الإنتاج" : "🎬 جاري إنتاج الفيديو..."}
                   </span>
                 </div>
-                <button onClick={() => setVideoJob(null)} className="text-white/30 hover:text-white/70 text-xs transition-colors">✕</button>
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("khayal_video_job");
+                    localStorage.removeItem("khayal_chat");
+                    setVideoJob(null);
+                    setShowChat(false);
+                    setChatMessages([]);
+                  }}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                  style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontFamily: "'Tajawal', sans-serif" }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
+                  إلغاء
+                </button>
               </div>
 
               {videoJob.status !== "done" && videoJob.status !== "failed" && (

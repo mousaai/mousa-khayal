@@ -291,3 +291,9 @@
 - [x] انتقالات xfade سينمائية حقيقية بين المشاهد (fade/dissolve/wipe/zoomin/fadeblack/slide) في FFmpeg
 - [x] خيار جودة: سريع (720p/ultrafast) أو احترافي (1080p/medium+xfade) في الواجهة والخادم
 - [x] Runway ML مفعّل افتراضياً (useRunway=true) مع Fallback تلقائي إلى Ken Burns
+
+## 🔴 إصلاح عاجل — تعليق الصفحة على localStorage القديم (مارس 18 - الجلسة السابعة)
+- [x] مسح localStorage تلقائياً إذا كان ال― job عالقاً أكثر من 45 دقيقة (savedAt)
+- [x] دعم ?reset=1 في URL لمسح الحالة فوراً
+- [x] زر "إلغاء" بارز (أحمر) في لوحة الإنتاج يمسح كل شيء ويعيد الصفحة
+- [x] حفظ savedAt عند تخزين الجوب في localStorage
