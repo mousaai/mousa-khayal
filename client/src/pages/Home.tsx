@@ -6,7 +6,6 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import KhayalCinematicViewer from "@/components/KhayalCinematicViewer";
 import DocumentUploader from "@/components/DocumentUploader";
-import FilmDirectorModal from "@/components/FilmDirectorModal";
 import type { GenerationResult, DocumentAnalysis } from "@/types/khayal";
 import VideoProductionPanel from "@/components/VideoProductionPanel";
 import KhayalChat from "@/components/KhayalChat";
@@ -568,29 +567,39 @@ export default function Home() {
   if (showVideoProducer) {
     return (
       <div
-        className="min-h-screen bg-[#020408] flex flex-col"
+        className="min-h-screen flex flex-col relative overflow-hidden"
         dir="rtl"
-        style={{ fontFamily: "'Tajawal', 'Cairo', sans-serif" }}
+        style={{ fontFamily: "'Tajawal', 'Cairo', sans-serif", background: "#020408" }}
       >
+        {/* ── نفس خلفية الصفحة الرئيسية ── */}
+        <div className="absolute inset-0 z-0 pointer-events-none">
+          <div className="absolute inset-0" style={{ backgroundImage: `url(${SPACE_BG})`, backgroundSize: "cover", backgroundPosition: "center", opacity: 0.35 }} />
+          {PORTAL_SCENES.map((src, i) => (
+            <div key={i} className="absolute inset-0" style={{ backgroundImage: `url(${src})`, backgroundSize: "cover", backgroundPosition: "center", opacity: i === bgIdx ? 0.08 : 0, transition: "opacity 2s ease" }} />
+          ))}
+          <div className="absolute inset-0 bg-gradient-to-b from-[#020408] via-transparent to-[#020408] opacity-80" />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 35%, rgba(120,60,220,0.12) 0%, transparent 70%)" }} />
+        </div>
+
         {/* Header */}
         <div
-          className="flex items-center gap-3 px-4 py-3 border-b border-white/10"
-          style={{ background: "rgba(8,9,20,0.95)", backdropFilter: "blur(12px)" }}
+          className="relative z-10 flex items-center gap-3 px-4 py-3 border-b border-purple-500/15"
+          style={{ background: "rgba(2,4,8,0.85)", backdropFilter: "blur(16px)" }}
         >
           <button
             onClick={() => setShowVideoProducer(false)}
-            className="flex items-center gap-2 text-blue-400 hover:text-blue-200 text-sm transition-colors"
+            className="flex items-center gap-2 text-purple-400 hover:text-purple-200 text-sm transition-colors"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M19 12H5M12 19l-7-7 7-7"/>
             </svg>
-            <span>خيال</span>
+            <span style={{ fontFamily: "'Tajawal', sans-serif" }}>خيال</span>
           </button>
-          <span className="text-white/20">/</span>
-          <span className="text-purple-300 text-sm font-bold">المساعد الذكي</span>
+          <span className="text-white/15">/</span>
+          <span className="text-sm font-bold" style={{ color: "#a78bfa" }}>المساعد الذكي</span>
         </div>
         {/* Chat — يأخذ كل المساحة المتبقية */}
-        <div className="flex-1 overflow-hidden">
+        <div className="relative z-10 flex-1 overflow-hidden">
           <KhayalChat />
         </div>
       </div>
@@ -1055,21 +1064,6 @@ export default function Home() {
                   <span className="hidden sm:inline">فيديو</span>
                 </button>
 
-                {/* Film director button */}
-                <button
-                  onClick={() => setShowFilmModal(true)}
-                  disabled={!prompt.trim() && !documentAnalysis}
-                  className="flex items-center gap-1.5 px-3 h-[34px] rounded-xl text-xs font-bold transition-all hover:scale-105 disabled:opacity-30 disabled:cursor-not-allowed"
-                  style={{
-                    background: "rgba(236,72,153,0.1)",
-                    border: "1px solid rgba(236,72,153,0.3)",
-                    color: "#ec4899",
-                  }}
-                  title={lang.filmBtn}
-                >
-                  <span>🎬</span>
-                  <span className="hidden sm:inline">{lang.filmBtn}</span>
-                </button>
               </div>
 
               {/* Right: generate button */}
@@ -1172,14 +1166,6 @@ export default function Home() {
         </div>
 
       </div>
-
-      {/* ── FILM DIRECTOR MODAL ── */}
-      <FilmDirectorModal
-        open={showFilmModal}
-        onClose={() => setShowFilmModal(false)}
-        onConfirm={handleFilmConfirm}
-        description={prompt.trim() || documentAnalysis?.mainDescription || "خيال حر"}
-      />
 
       {/* ═══════════════════════════════════════════════════════════
           CSS ANIMATIONS
