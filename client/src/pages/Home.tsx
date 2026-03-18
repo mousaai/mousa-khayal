@@ -1128,6 +1128,34 @@ export default function Home() {
                   {videoJob.error || "حدث خطأ أثناء الإنتاج"}
                 </p>
               )}
+              {/* زر إنتاج جديد — يظهر عند اكتمال الإنتاج أو فشله */}
+              {(videoJob.status === "done" || videoJob.status === "failed") && (
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("khayal_video_job");
+                    setVideoJob(null);
+                    setResult(null);
+                    setPrompt("");
+                    setUploadedImageUrl(null);
+                    setDocumentAnalysis(null);
+                    setUrlInput("");
+                    setChatMessages([]);
+                    setShowChat(false);
+                  }}
+                  className="mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105 active:scale-95"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(124,58,237,0.2), rgba(79,70,229,0.2))",
+                    border: "1px solid rgba(124,58,237,0.4)",
+                    color: "#c4b5fd",
+                    fontFamily: "'Tajawal', sans-serif",
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M12 5v14M5 12l7-7 7 7"/>
+                  </svg>
+                  ✨ إنتاج جديد
+                </button>
+              )}
             </div>
           )}
 

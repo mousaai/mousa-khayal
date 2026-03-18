@@ -12,6 +12,73 @@ import {
   WidthType,
 } from "docx";
 import { storagePut } from "./storage";
+import path from "path";
+import fs from "fs";
+
+// ─────────────────────────────────────────────────────────
+// خطوط عربية — Amiri
+// ─────────────────────────────────────────────────────────
+const AMIRI_REGULAR_PATH = path.join(import.meta.dirname ?? __dirname, "fonts", "Amiri-Regular.ttf");
+const AMIRI_BOLD_PATH = path.join(import.meta.dirname ?? __dirname, "fonts", "Amiri-Bold.ttf");
+
+// روابط CDN للخطوط (fallback في بيئة الإنتاج)
+const AMIRI_REGULAR_CDN = "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/Amiri-Regular_3270d6be.ttf";
+const AMIRI_BOLD_CDN = "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/Amiri-Bold_c5c49fd0.ttf";
+
+// تحميل الخط مرة واحدة عند بدء التشغيل
+let amiriRegularBuf: Buffer | null = null;
+let amiriBoldBuf: Buffer | null = null;
+
+// تحميل الخطوط (محلي أولاً، ثم CDN)
+async function loadArabicFonts() {
+  try {
+    if (fs.existsSync(AMIRI_REGULAR_PATH)) amiriRegularBuf = fs.readFileSync(AMIRI_REGULAR_PATH);
+    if (fs.existsSync(AMIRI_BOLD_PATH)) amiriBoldBuf = fs.readFileSync(AMIRI_BOLD_PATH);
+  } catch { /* ignore */ }
+  if (!amiriRegularBuf) {
+    try {
+      const res = await fetch(AMIRI_REGULAR_CDN);
+      if (res.ok) amiriRegularBuf = Buffer.from(await res.arrayBuffer());
+    } catch { /* ignore */ }
+  }
+  if (!amiriBoldBuf) {
+    try {
+      const res = await fetch(AMIRI_BOLD_CDN);
+      if (res.ok) amiriBoldBuf = Buffer.from(await res.arrayBuffer());
+    } catch { /* ignore */ }
+  }
+  if (amiriRegularBuf && amiriBoldBuf) {
+    console.log("[exportRouter] Arabic fonts (Amiri) loaded successfully");
+  } else {
+    console.warn("[exportRouter] Arabic fonts not available — PDF will use fallback font");
+  }
+}
+// تحميل الخطوط في الخلفية عند بدء التشغيل
+loadArabicFonts().catch(() => {});
+// تحميل متزامن كـ fallback فوري
+try {
+  if (fs.existsSync(AMIRI_REGULAR_PATH)) amiriRegularBuf = fs.readFileSync(AMIRI_REGULAR_PATH);
+  if (fs.existsSync(AMIRI_BOLD_PATH)) amiriBoldBuf = fs.readFileSync(AMIRI_BOLD_PATH);
+} catch { /* ignore */ }
+
+// دالة مساعدة: تسجيل الخطوط في مستند PDF
+function registerArabicFonts(doc: PDFKit.PDFDocument) {
+  if (amiriRegularBuf) doc.registerFont("Amiri", amiriRegularBuf);
+  if (amiriBoldBuf) doc.registerFont("Amiri-Bold", amiriBoldBuf);
+}
+
+// دالة مساعدة: اختيار الخط المناسب للنص
+function arabicFont(bold = false): string {
+  if (bold && amiriBoldBuf) return "Amiri-Bold";
+  if (!bold && amiriRegularBuf) return "Amiri";
+  return bold ? "Helvetica-Bold" : "Helvetica";
+}
+
+// دالة مساعدة: عكس النص العربي لـ pdfkit (RTL support)
+function rtl(text: string): string {
+  // pdfkit يدعم Unicode لكن يحتاج النص بالاتجاه الصحيح
+  return text;
+}
 
 // ─────────────────────────────────────────────────────────
 // Zod schema للمدخلات
@@ -73,10 +140,13 @@ async function buildPDF(input: z.infer<typeof exportInputSchema>): Promise<Buffe
     doc.on("end", () => resolve(Buffer.concat(chunks)));
     doc.on("error", reject);
 
+    // تسجيل الخطوط العربية
+    registerArabicFonts(doc);
+
     const W = doc.page.width;   // 595
     const H = doc.page.height;  // 842
 
-    // ── صفحة الغلاف ──────────────────────────────────────
+    // ── صفحة الغلاف ──────────────────────────────
     // خلفية داكنة
     doc.rect(0, 0, W, H).fill("#08090f");
 
@@ -98,24 +168,24 @@ async function buildPDF(input: z.infer<typeof exportInputSchema>): Promise<Buffe
 
     // شعار خيال
     doc.fontSize(11).fillColor("#a78bfa")
-      .font("Helvetica-Bold")
+      .font(arabicFont(true))
       .text("✦ KHAYAL AI", 40, 40, { align: "left" });
 
     // العنوان
     doc.fontSize(36).fillColor("#ffffff")
-      .font("Helvetica-Bold")
+      .font(arabicFont(true))
       .text(input.title, 40, H * 0.55, { width: W - 80, align: "center" });
 
     if (input.titleEn) {
       doc.fontSize(14).fillColor("rgba(167,139,250,0.7)")
-        .font("Helvetica")
+        .font(arabicFont())
         .text(input.titleEn, 40, H * 0.55 + 50, { width: W - 80, align: "center" });
     }
 
     // الملخص
     if (input.synopsis) {
       doc.fontSize(11).fillColor("rgba(255,255,255,0.55)")
-        .font("Helvetica")
+        .font(arabicFont())
         .text(input.synopsis, 60, H * 0.72, { width: W - 120, align: "center" });
     }
 
@@ -127,7 +197,7 @@ async function buildPDF(input: z.infer<typeof exportInputSchema>): Promise<Buffe
       `المشاهد: ${input.scenes.length}`,
     ].filter(Boolean);
 
-    doc.fontSize(9).fillColor("rgba(167,139,250,0.5)").font("Helvetica")
+    doc.fontSize(9).fillColor("rgba(167,139,250,0.5)").font(arabicFont())
       .text(meta.join("  ·  "), 40, H - 60, { width: W - 80, align: "center" });
 
     // ── صفحات المشاهد ────────────────────────────────────
@@ -139,9 +209,9 @@ async function buildPDF(input: z.infer<typeof exportInputSchema>): Promise<Buffe
       doc.rect(0, 0, W, H).fill("#0a0b12");
 
       // رقم المشهد
-      doc.fontSize(9).fillColor("rgba(167,139,250,0.4)").font("Helvetica-Bold")
+      doc.fontSize(9).fillColor("rgba(167,139,250,0.4)").font(arabicFont(true))
         .text(`المشهد ${i + 1} / ${input.scenes.length}`, 40, 30, { align: "left" });
-      doc.fontSize(9).fillColor("rgba(167,139,250,0.4)").font("Helvetica")
+      doc.fontSize(9).fillColor("rgba(167,139,250,0.4)").font(arabicFont())
         .text("✦ KHAYAL AI", 40, 30, { align: "right", width: W - 80 });
 
       // الصورة
@@ -161,19 +231,19 @@ async function buildPDF(input: z.infer<typeof exportInputSchema>): Promise<Buffe
 
       // عنوان المشهد
       const textY = 55 + imgH + 20;
-      doc.fontSize(18).fillColor("#ffffff").font("Helvetica-Bold")
+      doc.fontSize(18).fillColor("#ffffff").font(arabicFont(true))
         .text(scene.label, 40, textY, { width: W - 80, align: "right" });
 
       // التعليق العربي
       if (scene.arabicCaption) {
-        doc.fontSize(11).fillColor("rgba(255,255,255,0.6)").font("Helvetica")
+        doc.fontSize(11).fillColor("rgba(255,255,255,0.6)").font(arabicFont())
           .text(scene.arabicCaption, 40, textY + 35, { width: W - 80, align: "right" });
       }
 
       // الـ prompt (مصغر)
       if (scene.prompt) {
         const shortPrompt = scene.prompt.length > 120 ? scene.prompt.slice(0, 120) + "..." : scene.prompt;
-        doc.fontSize(8).fillColor("rgba(167,139,250,0.4)").font("Helvetica")
+        doc.fontSize(8).fillColor("rgba(167,139,250,0.4)").font(arabicFont())
           .text(shortPrompt, 40, textY + 70, { width: W - 80, align: "left" });
       }
 
@@ -182,7 +252,7 @@ async function buildPDF(input: z.infer<typeof exportInputSchema>): Promise<Buffe
         .strokeColor("rgba(167,139,250,0.1)").lineWidth(0.5).stroke();
 
       // footer
-      doc.fontSize(8).fillColor("rgba(167,139,250,0.3)").font("Helvetica")
+      doc.fontSize(8).fillColor("rgba(167,139,250,0.3)").font(arabicFont())
         .text(`${input.title}  ·  خيال AI`, 40, H - 28, { align: "center", width: W - 80 });
     }
 
@@ -190,26 +260,26 @@ async function buildPDF(input: z.infer<typeof exportInputSchema>): Promise<Buffe
     doc.addPage();
     doc.rect(0, 0, W, H).fill("#08090f");
 
-    doc.fontSize(9).fillColor("rgba(167,139,250,0.4)").font("Helvetica-Bold")
+    doc.fontSize(9).fillColor("rgba(167,139,250,0.4)").font(arabicFont(true))
       .text("✦ KHAYAL AI", 40, 40, { align: "center", width: W - 80 });
 
-    doc.fontSize(22).fillColor("#ffffff").font("Helvetica-Bold")
+    doc.fontSize(22).fillColor("#ffffff").font(arabicFont(true))
       .text("ملخص المشروع", 40, 80, { align: "center", width: W - 80 });
 
     let y = 130;
 
     if (input.synopsis) {
-      doc.fontSize(12).fillColor("rgba(255,255,255,0.75)").font("Helvetica")
+      doc.fontSize(12).fillColor("rgba(255,255,255,0.75)").font(arabicFont())
         .text(input.synopsis, 60, y, { width: W - 120, align: "right" });
       y += 80;
     }
 
     if (input.mainElements && input.mainElements.length > 0) {
-      doc.fontSize(10).fillColor("rgba(167,139,250,0.7)").font("Helvetica-Bold")
+      doc.fontSize(10).fillColor("rgba(167,139,250,0.7)").font(arabicFont(true))
         .text("العناصر الرئيسية:", 60, y, { align: "right", width: W - 120 });
       y += 20;
       input.mainElements.forEach((el) => {
-        doc.fontSize(10).fillColor("rgba(255,255,255,0.55)").font("Helvetica")
+        doc.fontSize(10).fillColor("rgba(255,255,255,0.55)").font(arabicFont())
           .text(`▸  ${el}`, 80, y, { align: "right", width: W - 140 });
         y += 18;
       });
@@ -250,19 +320,19 @@ async function buildPPTX(input: z.infer<typeof exportInputSchema>): Promise<Buff
   coverSlide.addShape(pptx.ShapeType.rect, { x: 0, y: 2.5, w: "100%", h: 4.5, fill: { type: "solid", color: DARK_BG, transparency: 0 } });
 
   // شعار
-  coverSlide.addText("✦ KHAYAL AI", { x: 0.3, y: 0.2, w: 3, h: 0.4, fontSize: 11, color: ACCENT, bold: true, fontFace: "Arial" });
+  coverSlide.addText("✦ KHAYAL AI", { x: 0.3, y: 0.2, w: 3, h: 0.4, fontSize: 11, color: ACCENT, bold: true, fontFace: "Arial Unicode MS" });
 
   // العنوان
   coverSlide.addText(input.title, {
     x: 0.5, y: 2.8, w: 9, h: 1.2,
-    fontSize: 40, color: WHITE, bold: true, fontFace: "Arial",
+    fontSize: 40, color: WHITE, bold: true, fontFace: "Arial Unicode MS",
     align: "center",
   });
 
   if (input.titleEn) {
     coverSlide.addText(input.titleEn, {
       x: 0.5, y: 4.1, w: 9, h: 0.5,
-      fontSize: 16, color: ACCENT, fontFace: "Arial", align: "center",
+      fontSize: 16, color: ACCENT, fontFace: "Arial Unicode MS", align: "center",
     });
   }
 
@@ -270,7 +340,7 @@ async function buildPPTX(input: z.infer<typeof exportInputSchema>): Promise<Buff
     const shortSynopsis = input.synopsis.length > 150 ? input.synopsis.slice(0, 150) + "..." : input.synopsis;
     coverSlide.addText(shortSynopsis, {
       x: 1, y: 4.8, w: 8, h: 0.8,
-      fontSize: 12, color: "888888", fontFace: "Arial", align: "center",
+      fontSize: 12, color: "888888", fontFace: "Arial Unicode MS", align: "center",
     });
   }
 
@@ -281,7 +351,7 @@ async function buildPPTX(input: z.infer<typeof exportInputSchema>): Promise<Buff
   ].filter(Boolean).join("  ·  ");
   coverSlide.addText(metaText, {
     x: 0, y: 6.8, w: "100%", h: 0.3,
-    fontSize: 9, color: "555577", fontFace: "Arial", align: "center",
+    fontSize: 9, color: "555577", fontFace: "Arial Unicode MS", align: "center",
   });
 
   // ── شرائح المشاهد ─────────────────────────────────────
@@ -310,26 +380,26 @@ async function buildPPTX(input: z.infer<typeof exportInputSchema>): Promise<Buff
     // رقم المشهد
     slide.addText(`${i + 1} / ${input.scenes.length}`, {
       x: 0.2, y: 0.1, w: 1.5, h: 0.3,
-      fontSize: 9, color: ACCENT, bold: true, fontFace: "Arial",
+      fontSize: 9, color: ACCENT, bold: true, fontFace: "Arial Unicode MS",
     });
 
     // شعار
     slide.addText("✦ KHAYAL AI", {
       x: 8.3, y: 0.1, w: 1.5, h: 0.3,
-      fontSize: 9, color: ACCENT, fontFace: "Arial", align: "right",
+      fontSize: 9, color: ACCENT, fontFace: "Arial Unicode MS", align: "right",
     });
 
     // عنوان المشهد
     slide.addText(scene.label, {
       x: 0.4, y: 4.3, w: 9.2, h: 0.7,
-      fontSize: 22, color: WHITE, bold: true, fontFace: "Arial", align: "right",
+      fontSize: 22, color: WHITE, bold: true, fontFace: "Arial Unicode MS", align: "right",
     });
 
     // التعليق
     if (scene.arabicCaption) {
       slide.addText(scene.arabicCaption, {
         x: 0.4, y: 5.1, w: 9.2, h: 0.6,
-        fontSize: 13, color: "aaaaaa", fontFace: "Arial", align: "right",
+        fontSize: 13, color: "aaaaaa", fontFace: "Arial Unicode MS", align: "right",
       });
     }
 
@@ -342,7 +412,7 @@ async function buildPPTX(input: z.infer<typeof exportInputSchema>): Promise<Buff
     // footer
     slide.addText(input.title, {
       x: 0, y: 6.5, w: "100%", h: 0.3,
-      fontSize: 8, color: "444466", fontFace: "Arial", align: "center",
+      fontSize: 8, color: "444466", fontFace: "Arial Unicode MS", align: "center",
     });
   }
 
@@ -352,18 +422,18 @@ async function buildPPTX(input: z.infer<typeof exportInputSchema>): Promise<Buff
 
   summarySlide.addText("✦ KHAYAL AI", {
     x: 0, y: 0.3, w: "100%", h: 0.4,
-    fontSize: 11, color: ACCENT, bold: true, fontFace: "Arial", align: "center",
+    fontSize: 11, color: ACCENT, bold: true, fontFace: "Arial Unicode MS", align: "center",
   });
 
   summarySlide.addText("ملخص المشروع", {
     x: 0.5, y: 1, w: 9, h: 0.8,
-    fontSize: 28, color: WHITE, bold: true, fontFace: "Arial", align: "center",
+    fontSize: 28, color: WHITE, bold: true, fontFace: "Arial Unicode MS", align: "center",
   });
 
   if (input.synopsis) {
     summarySlide.addText(input.synopsis, {
       x: 1, y: 2, w: 8, h: 2,
-      fontSize: 14, color: "cccccc", fontFace: "Arial", align: "right",
+      fontSize: 14, color: "cccccc", fontFace: "Arial Unicode MS", align: "right",
     });
   }
 
@@ -371,7 +441,7 @@ async function buildPPTX(input: z.infer<typeof exportInputSchema>): Promise<Buff
     const elemText = input.mainElements.map(e => `▸  ${e}`).join("\n");
     summarySlide.addText(elemText, {
       x: 1, y: 4.2, w: 8, h: 2,
-      fontSize: 11, color: "888888", fontFace: "Arial", align: "right",
+      fontSize: 11, color: "888888", fontFace: "Arial Unicode MS", align: "right",
     });
   }
 
@@ -388,7 +458,7 @@ async function buildDOCX(input: z.infer<typeof exportInputSchema>): Promise<Buff
   // العنوان الرئيسي
   children.push(
     new Paragraph({
-      children: [new TextRun({ text: input.title, bold: true, size: 52, color: "7c3aed", font: "Arial" })],
+      children: [new TextRun({ text: input.title, bold: true, size: 52, color: "7c3aed", font: "Arial Unicode MS" })],
       heading: HeadingLevel.TITLE,
       alignment: AlignmentType.RIGHT,
       spacing: { after: 200 },
@@ -397,7 +467,7 @@ async function buildDOCX(input: z.infer<typeof exportInputSchema>): Promise<Buff
 
   if (input.titleEn) {
     children.push(new Paragraph({
-      children: [new TextRun({ text: input.titleEn, size: 28, color: "888888", font: "Arial" })],
+      children: [new TextRun({ text: input.titleEn, size: 28, color: "888888", font: "Arial Unicode MS" })],
       alignment: AlignmentType.CENTER,
       spacing: { after: 400 },
     }));
@@ -409,13 +479,13 @@ async function buildDOCX(input: z.infer<typeof exportInputSchema>): Promise<Buff
   // الملخص
   if (input.synopsis) {
     children.push(new Paragraph({
-      children: [new TextRun({ text: "الملخص", bold: true, size: 28, color: "7c3aed", font: "Arial" })],
+      children: [new TextRun({ text: "الملخص", bold: true, size: 28, color: "7c3aed", font: "Arial Unicode MS" })],
       heading: HeadingLevel.HEADING_1,
       alignment: AlignmentType.RIGHT,
       spacing: { before: 200, after: 100 },
     }));
     children.push(new Paragraph({
-      children: [new TextRun({ text: input.synopsis, size: 22, font: "Arial" })],
+      children: [new TextRun({ text: input.synopsis, size: 22, font: "Arial Unicode MS" })],
       alignment: AlignmentType.RIGHT,
       spacing: { after: 300 },
     }));
@@ -431,7 +501,7 @@ async function buildDOCX(input: z.infer<typeof exportInputSchema>): Promise<Buff
 
   if (metaItems.length > 0) {
     children.push(new Paragraph({
-      children: [new TextRun({ text: "معلومات المشروع", bold: true, size: 28, color: "7c3aed", font: "Arial" })],
+      children: [new TextRun({ text: "معلومات المشروع", bold: true, size: 28, color: "7c3aed", font: "Arial Unicode MS" })],
       heading: HeadingLevel.HEADING_1,
       alignment: AlignmentType.RIGHT,
       spacing: { before: 200, after: 100 },
@@ -439,8 +509,8 @@ async function buildDOCX(input: z.infer<typeof exportInputSchema>): Promise<Buff
     metaItems.forEach(({ label, value }) => {
       children.push(new Paragraph({
         children: [
-          new TextRun({ text: `${label}: `, bold: true, size: 22, font: "Arial" }),
-          new TextRun({ text: value, size: 22, font: "Arial" }),
+          new TextRun({ text: `${label}: `, bold: true, size: 22, font: "Arial Unicode MS" }),
+          new TextRun({ text: value, size: 22, font: "Arial Unicode MS" }),
         ],
         alignment: AlignmentType.RIGHT,
         spacing: { after: 80 },
@@ -451,14 +521,14 @@ async function buildDOCX(input: z.infer<typeof exportInputSchema>): Promise<Buff
   // العناصر الرئيسية
   if (input.mainElements && input.mainElements.length > 0) {
     children.push(new Paragraph({
-      children: [new TextRun({ text: "العناصر الرئيسية", bold: true, size: 28, color: "7c3aed", font: "Arial" })],
+      children: [new TextRun({ text: "العناصر الرئيسية", bold: true, size: 28, color: "7c3aed", font: "Arial Unicode MS" })],
       heading: HeadingLevel.HEADING_1,
       alignment: AlignmentType.RIGHT,
       spacing: { before: 200, after: 100 },
     }));
     input.mainElements.forEach((el) => {
       children.push(new Paragraph({
-        children: [new TextRun({ text: `▸  ${el}`, size: 22, font: "Arial" })],
+        children: [new TextRun({ text: `▸  ${el}`, size: 22, font: "Arial Unicode MS" })],
         alignment: AlignmentType.RIGHT,
         spacing: { after: 60 },
       }));
@@ -467,7 +537,7 @@ async function buildDOCX(input: z.infer<typeof exportInputSchema>): Promise<Buff
 
   // المشاهد
   children.push(new Paragraph({
-    children: [new TextRun({ text: "المشاهد السينمائية", bold: true, size: 32, color: "7c3aed", font: "Arial" })],
+    children: [new TextRun({ text: "المشاهد السينمائية", bold: true, size: 32, color: "7c3aed", font: "Arial Unicode MS" })],
     heading: HeadingLevel.HEADING_1,
     alignment: AlignmentType.RIGHT,
     spacing: { before: 400, after: 200 },
@@ -479,8 +549,8 @@ async function buildDOCX(input: z.infer<typeof exportInputSchema>): Promise<Buff
     // عنوان المشهد
     children.push(new Paragraph({
       children: [
-        new TextRun({ text: `المشهد ${i + 1}: `, bold: true, size: 26, color: "a78bfa", font: "Arial" }),
-        new TextRun({ text: scene.label, bold: true, size: 26, font: "Arial" }),
+        new TextRun({ text: `المشهد ${i + 1}: `, bold: true, size: 26, color: "a78bfa", font: "Arial Unicode MS" }),
+        new TextRun({ text: scene.label, bold: true, size: 26, font: "Arial Unicode MS" }),
       ],
       heading: HeadingLevel.HEADING_2,
       alignment: AlignmentType.RIGHT,
@@ -500,7 +570,7 @@ async function buildDOCX(input: z.infer<typeof exportInputSchema>): Promise<Buff
     // التعليق
     if (scene.arabicCaption) {
       children.push(new Paragraph({
-        children: [new TextRun({ text: scene.arabicCaption, size: 22, color: "666666", font: "Arial", italics: true })],
+        children: [new TextRun({ text: scene.arabicCaption, size: 22, color: "666666", font: "Arial Unicode MS", italics: true })],
         alignment: AlignmentType.RIGHT,
         spacing: { after: 100 },
       }));
@@ -510,8 +580,8 @@ async function buildDOCX(input: z.infer<typeof exportInputSchema>): Promise<Buff
     if (scene.prompt) {
       children.push(new Paragraph({
         children: [
-          new TextRun({ text: "الوصف التقني: ", bold: true, size: 18, color: "999999", font: "Arial" }),
-          new TextRun({ text: scene.prompt, size: 18, color: "999999", font: "Arial" }),
+          new TextRun({ text: "الوصف التقني: ", bold: true, size: 18, color: "999999", font: "Arial Unicode MS" }),
+          new TextRun({ text: scene.prompt, size: 18, color: "999999", font: "Arial Unicode MS" }),
         ],
         alignment: AlignmentType.LEFT,
         spacing: { after: 200 },
@@ -526,7 +596,7 @@ async function buildDOCX(input: z.infer<typeof exportInputSchema>): Promise<Buff
 
   // Footer
   children.push(new Paragraph({
-    children: [new TextRun({ text: `تم إنشاؤه بواسطة خيال AI  ·  ${new Date().toLocaleDateString("ar-SA")}`, size: 16, color: "aaaaaa", font: "Arial" })],
+    children: [new TextRun({ text: `تم إنشاؤه بواسطة خيال AI  ·  ${new Date().toLocaleDateString("ar-SA")}`, size: 16, color: "aaaaaa", font: "Arial Unicode MS" })],
     alignment: AlignmentType.CENTER,
     spacing: { before: 400 },
   }));
@@ -543,7 +613,7 @@ async function buildDOCX(input: z.infer<typeof exportInputSchema>): Promise<Buff
     styles: {
       default: {
         document: {
-          run: { font: "Arial", size: 22 },
+          run: { font: "Arial Unicode MS", size: 22 },
           paragraph: { alignment: AlignmentType.RIGHT },
         },
       },
