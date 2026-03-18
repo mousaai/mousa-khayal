@@ -12,12 +12,12 @@ import { musicEngine, selectMusicMood, type MusicMood } from "@/lib/musicEngine"
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
 const PORTAL_SCENES = [
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/khayal_bg1_arabic_city-8Wa5PtssoJfMK2RA5MW2cT.webp",
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/khayal_bg2_japan-6xDFhodE3d7QLwCUpaVEhe.webp",
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/khayal_bg3_future-HL7rh3UKxbcdCBogEhTRiN.webp",
-  "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/khayal_bg4_nature-3KN8mPQzqMAnzE5Kkg9WMT.webp",
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/bg1_arabic_b191f500.webp",
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/bg2_japan_f80bdd07.webp",
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/bg3_future_25da11b8.webp",
+  "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/bg4_nature_75d33de9.webp",
 ];
-const SPACE_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/khayal_portal_bg-oHnxyxTZx3h9RPmBuw3ZWw.webp";
+const SPACE_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/space_bg_f67dfcac.webp";
 
 // ── أنواع الفيلم الـ 12 ──────────────────────────────────────────────────────
 const FILM_GENRES = [
