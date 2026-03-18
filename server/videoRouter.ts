@@ -70,6 +70,7 @@ const productionOptionsSchema = z.object({
   musicVolume: z.number().min(0).max(1).default(0.12),
   useRunway: z.boolean().default(true),
   useElevenLabs: z.boolean().default(true),
+  quality: z.enum(["fast", "pro"]).default("fast"), // fast=720p/ultrafast, pro=1080p/medium+xfade
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -189,6 +190,7 @@ export const videoRouter = router({
               musicVolume: input.options?.musicVolume ?? 0.12,
               useRunway: input.options?.useRunway ?? true,
               useElevenLabs: input.options?.useElevenLabs ?? true,
+              quality: input.options?.quality ?? "fast",
             },
             async (update: Partial<VideoJob>) => {
               await updateJobInDB(jobId, {
@@ -291,6 +293,7 @@ export const videoRouter = router({
               musicVolume: input.options?.musicVolume ?? 0.12,
               useRunway: input.options?.useRunway ?? true,
               useElevenLabs: input.options?.useElevenLabs ?? true,
+              quality: input.options?.quality ?? "fast",
             },
             async (update: Partial<VideoJob>) => {
               await updateJobInDB(jobId, {

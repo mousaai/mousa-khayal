@@ -124,19 +124,30 @@ export interface VideoProductionOptions {
   musicVolume?: number;
   useRunway?: boolean;   // تفعيل Runway Image-to-Video (افتراضي: true)
   useElevenLabs?: boolean; // تفعيل ElevenLabs TTS (افتراضي: true)
+  quality?: "fast" | "pro"; // جودة الفيديو: fast=720p/ultrafast, pro=1080p/medium+xfade (افتراضي: fast)
 }
 
 // ═══════════════════════════════════════════════════════════
 // الإعدادات — النسخة 3.0
 // ═══════════════════════════════════════════════════════════
 
-const ASPECT_CONFIGS: Record<AspectRatio, { width: number; height: number; runwayRatio: string }> = {
-  // تقليل الدقة من 1920x1080 إلى 1280x720 لتسريع FFmpeg بمقدار 3-4x
+// إعدادات الدقة لكل وضع
+const ASPECT_CONFIGS_FAST: Record<AspectRatio, { width: number; height: number; runwayRatio: string }> = {
   "16:9": { width: 1280, height: 720, runwayRatio: "1280:720" },
   "9:16": { width: 720, height: 1280, runwayRatio: "720:1280" },
   "1:1":  { width: 1080, height: 1080, runwayRatio: "1104:832" },
   "4:3":  { width: 1024, height: 768, runwayRatio: "1104:832" },
 };
+
+const ASPECT_CONFIGS_PRO: Record<AspectRatio, { width: number; height: number; runwayRatio: string }> = {
+  "16:9": { width: 1920, height: 1080, runwayRatio: "1280:720" },
+  "9:16": { width: 1080, height: 1920, runwayRatio: "720:1280" },
+  "1:1":  { width: 1080, height: 1080, runwayRatio: "1104:832" },
+  "4:3":  { width: 1440, height: 1080, runwayRatio: "1104:832" },
+};
+
+// للتوافق مع الكود القديم الذي يستخدم ASPECT_CONFIGS مباشرة
+const ASPECT_CONFIGS = ASPECT_CONFIGS_FAST;
 
 const CONFIG = {
   width: 1280,
@@ -227,9 +238,13 @@ export class VideoProducer {
       musicVolume = 0.12,
       useRunway = true,
       useElevenLabs = true,
+      quality = "fast",
     } = options;
 
-    const dims = ASPECT_CONFIGS[aspectRatio];
+    // اختيار الدقة حسب وضع الجودة
+    const dims = quality === "pro"
+      ? ASPECT_CONFIGS_PRO[aspectRatio]
+      : ASPECT_CONFIGS_FAST[aspectRatio];
 
     const report = (step: string, progress: number) => {
       onProgress?.({ status: "processing", currentStep: step, progress });
@@ -280,9 +295,13 @@ export class VideoProducer {
         scenePaths = await this.buildScenes(script.scenes, imagePaths, dims, report);
       }
 
-      // ── الخطوة 4: دمج المشاهد ──────────────────────────
-      report("دمج المشاهد...", 80);
-      const mergedPath = await this.mergeScenes(scenePaths);
+            // ── الخطوة 4: دمج المشاهد ────────────────────
+      const mergeLabel = quality === "pro"
+        ? "دمج المشاهد مع انتقالات سينمائية..."
+        : "دمج المشاهد..."
+      report(mergeLabel, 80);
+      const transitions = script.scenes.map(s => s.transition);
+      const mergedPath = await this.mergeScenes(scenePaths, transitions, quality);
 
       // ── الخطوة 5: إضافة الصوت ──────────────────────────
       report("إضافة الصوت...", 88);
@@ -735,14 +754,17 @@ export class VideoProducer {
     duration: number,
     motion: MotionEffect,
     dims: { width: number; height: number },
-    outputPath: string
+    outputPath: string,
+    quality: "fast" | "pro" = "fast"
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const motionFn = MOTION_EFFECTS[motion] ?? MOTION_EFFECTS["zoom_in"];
       // MOTION_EFFECTS تتضمن scale+format+crop بشكل كامل
       const fullFilter = motionFn(duration, dims.width, dims.height, CONFIG.fps);
 
-      console.log(`[buildSceneVideo] imgPath=${imgPath} dims=${dims.width}x${dims.height} motion=${motion}`);
+      const preset = quality === "pro" ? "medium" : "ultrafast";
+      const crf = quality === "pro" ? 18 : 23;
+      console.log(`[buildSceneVideo] imgPath=${imgPath} dims=${dims.width}x${dims.height} motion=${motion} quality=${quality}`);
 
       ffmpeg()
         .input(imgPath)
@@ -750,8 +772,8 @@ export class VideoProducer {
         .videoFilter(fullFilter)
         .duration(duration)
         .fps(CONFIG.fps)
-         .videoCodec("libx264")
-        .outputOptions(["-preset ultrafast", "-crf 23", "-pix_fmt yuv420p"])
+        .videoCodec("libx264")
+        .outputOptions([`-preset ${preset}`, `-crf ${crf}`, "-pix_fmt yuv420p"])
         .output(outputPath)
         .on("end", () => resolve())
         .on("error", (err: Error) => {
@@ -765,23 +787,124 @@ export class VideoProducer {
   // الخطوة 4: دمج المشاهد
   // ─────────────────────────────────────────────────────────
 
-  private mergeScenes(scenePaths: string[]): Promise<string> {
+  private mergeScenes(
+    scenePaths: string[],
+    transitions?: Array<TransitionEffect | undefined>,
+    quality: "fast" | "pro" = "fast"
+  ): Promise<string> {
     return new Promise(async (resolve, reject) => {
-      const concatFile = path.join(this.workDir, "concat.txt");
       const mergedPath = path.join(this.workDir, "merged.mp4");
 
-      const concatContent = scenePaths.map(p => `file '${p}'`).join("\n");
-      await fs.writeFile(concatFile, concatContent);
+      // إذا مشهد واحد فقط أو وضع سريع: concat مباشر
+      if (scenePaths.length === 1 || quality === "fast") {
+        const concatFile = path.join(this.workDir, "concat.txt");
+        const concatContent = scenePaths.map(p => `file '${p}'`).join("\n");
+        await fs.writeFile(concatFile, concatContent);
+        ffmpeg()
+          .input(concatFile)
+          .inputOptions(["-f concat", "-safe 0"])
+          .videoCodec("copy")
+          .output(mergedPath)
+          .on("end", () => resolve(mergedPath))
+          .on("error", (err: Error) => reject(err))
+          .run();
+        return;
+      }
 
-      // استخدام copy codec لتجنب إعادة الترميز وتسريع الدمج بشكل كبير
-      ffmpeg()
-        .input(concatFile)
-        .inputOptions(["-f concat", "-safe 0"])
-        .videoCodec("copy")
-        .output(mergedPath)
-        .on("end", () => resolve(mergedPath))
-        .on("error", (err: Error) => reject(err))
-        .run();
+      // وضع احترافي: xfade انتقالات سينمائية بين المشاهد
+      // خريطة الانتقالات إلى أسماء xfade المدعومة في FFmpeg
+      const XFADE_MAP: Record<TransitionEffect, string> = {
+        fade:       "fade",
+        dissolve:   "dissolve",
+        wipe_left:  "wipeleft",
+        wipe_right: "wiperight",
+        zoom_fade:  "zoomin",
+        blur_fade:  "fadeblack",
+        slide_left: "slideleft",
+        slide_right: "slideright",
+      };
+
+      const XFADE_DURATION = 0.8; // ثانية للانتقال
+
+      try {
+        // حساب offset لكل انتقال بناءً على مدة المشاهد
+        // نحتاج مدة كل مشهد — نقرأها من ffprobe
+        const getDuration = (filePath: string): Promise<number> =>
+          new Promise((res, rej) => {
+            ffmpeg.ffprobe(filePath, (err: any, data: any) => {
+              if (err) rej(err);
+              else res(data.format.duration as number);
+            });
+          });
+
+        const durations = await Promise.all(scenePaths.map(getDuration));
+
+        // بناء filter_complex لـ xfade
+        let cmd = ffmpeg();
+        scenePaths.forEach(p => cmd.input(p));
+
+        let filterParts: string[] = [];
+        let currentLabel = "[0:v]";
+        let cumulativeOffset = 0;
+
+        for (let i = 1; i < scenePaths.length; i++) {
+          const transition = transitions?.[i - 1];
+          const xfadeType = transition ? (XFADE_MAP[transition] ?? "fade") : "fade";
+          const offset = Math.max(0.1, cumulativeOffset + durations[i - 1] - XFADE_DURATION);
+          cumulativeOffset = offset;
+          const outLabel = i === scenePaths.length - 1 ? "[vout]" : `[v${i}]`;
+          filterParts.push(
+            `${currentLabel}[${i}:v]xfade=transition=${xfadeType}:duration=${XFADE_DURATION}:offset=${offset.toFixed(2)}${outLabel}`
+          );
+          currentLabel = outLabel;
+        }
+
+        const preset = quality === "pro" ? "medium" : "ultrafast";
+        const crf = quality === "pro" ? 18 : 23;
+
+        cmd
+          .complexFilter(filterParts.join(";")+";")
+          .outputOptions([
+            "-map", "[vout]",
+            "-c:v", "libx264",
+            `-preset ${preset}`,
+            `-crf ${crf}`,
+            "-pix_fmt", "yuv420p",
+          ])
+          .output(mergedPath)
+          .on("end", () => resolve(mergedPath))
+          .on("error", (err: Error) => {
+            // Fallback: concat بدون انتقالات إذا فشل xfade
+            console.warn(`[mergeScenes] xfade failed, falling back to concat: ${err.message}`);
+            const concatFile = path.join(this.workDir, "concat_fb.txt");
+            const concatContent = scenePaths.map(p => `file '${p}'`).join("\n");
+            fs.writeFile(concatFile, concatContent).then(() => {
+              ffmpeg()
+                .input(concatFile)
+                .inputOptions(["-f concat", "-safe 0"])
+                .videoCodec("copy")
+                .output(mergedPath)
+                .on("end", () => resolve(mergedPath))
+                .on("error", (err2: Error) => reject(err2))
+                .run();
+            }).catch(reject);
+          })
+          .run();
+      } catch (probeErr) {
+        // Fallback إذا فشل ffprobe
+        console.warn(`[mergeScenes] ffprobe failed, using concat: ${probeErr}`);
+        const concatFile = path.join(this.workDir, "concat_fb2.txt");
+        const concatContent = scenePaths.map(p => `file '${p}'`).join("\n");
+        await fs.writeFile(concatFile, concatContent);
+        ffmpeg()
+          .input(concatFile)
+          .inputOptions(["-f concat", "-safe 0"])
+          .videoCodec("copy")
+          .output(mergedPath)
+          .on("end", () => resolve(mergedPath))
+          .on("error", (err: Error) => reject(err))
+          .run();
+      }
     });
   }
 

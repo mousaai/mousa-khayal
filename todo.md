@@ -286,3 +286,8 @@
 - [x] إصلاح التعليق عند 72% (تسريع FFmpeg: 1280x720 + ultrafast + copy codec)
 - [x] إصلاح خطأ "حدث خطأ" في المحادثة (تحسين رسائل الخطأ)
 - [x] المحادثة تستقبل سياق الإنتاج بشكل صحيح (jobId + status + progress)
+
+## 🎬 رفع جودة الإخراج — مارس 18 (الجلسة السادسة)
+- [x] انتقالات xfade سينمائية حقيقية بين المشاهد (fade/dissolve/wipe/zoomin/fadeblack/slide) في FFmpeg
+- [x] خيار جودة: سريع (720p/ultrafast) أو احترافي (1080p/medium+xfade) في الواجهة والخادم
+- [x] Runway ML مفعّل افتراضياً (useRunway=true) مع Fallback تلقائي إلى Ken Burns

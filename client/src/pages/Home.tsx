@@ -132,6 +132,9 @@ export default function Home() {
   const [volume, setVolume] = useState(0);
   const [waveData, setWaveData] = useState<number[]>(Array(24).fill(0.5));
 
+  // ── جودة الفيديو ──
+  const [videoQuality, setVideoQuality] = useState<"fast" | "pro">("fast");
+
   // ── UI ──
   const [bgIdx, setBgIdx] = useState(0);
   const [portalIdx, setPortalIdx] = useState(0);
@@ -568,7 +571,7 @@ export default function Home() {
             language: langCode,
             voice: langCode === "ar" ? "ar_male_formal" : "en_male_formal",
             sceneCount: 5,
-            options: { aspectRatio: "16:9", mode: "production", musicVolume: 0.12, useRunway: true, useElevenLabs: true },
+            options: { aspectRatio: "16:9", mode: "production", musicVolume: 0.12, useRunway: true, useElevenLabs: true, quality: videoQuality },
           });
           setVideoJob({ jobId: result.jobId, status: "pending", progress: 0, currentStep: "جاري التحضير..." });
         } catch (err) {
@@ -1013,6 +1016,36 @@ export default function Home() {
                 <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageUpload} className="hidden" />
                 <input ref={docInputRef} type="file" accept=".pdf,.doc,.docx,.txt,image/*" onChange={handleDocUpload} className="hidden" />
               </div>
+
+              {/* Quality toggle — يظهر فقط عند intent=video */}
+              {detectedIntent === "video" && (
+                <div className="flex items-center gap-1 rounded-xl overflow-hidden flex-shrink-0" style={{ border: "1px solid rgba(96,165,250,0.2)", background: "rgba(8,9,20,0.6)" }}>
+                  <button
+                    onClick={() => setVideoQuality("fast")}
+                    className="px-2.5 py-1.5 text-xs font-bold transition-all"
+                    style={{
+                      background: videoQuality === "fast" ? "rgba(96,165,250,0.2)" : "transparent",
+                      color: videoQuality === "fast" ? "#60a5fa" : "rgba(255,255,255,0.35)",
+                      fontFamily: "'Tajawal', sans-serif",
+                    }}
+                    title="720p — سريع (3-5 دقائق)"
+                  >
+                    ⚡ {activeLang === "AR" ? "سريع" : "Fast"}
+                  </button>
+                  <button
+                    onClick={() => setVideoQuality("pro")}
+                    className="px-2.5 py-1.5 text-xs font-bold transition-all"
+                    style={{
+                      background: videoQuality === "pro" ? "rgba(167,139,250,0.2)" : "transparent",
+                      color: videoQuality === "pro" ? "#a78bfa" : "rgba(255,255,255,0.35)",
+                      fontFamily: "'Tajawal', sans-serif",
+                    }}
+                    title="1080p + انتقالات سينمائية (8-12 دقيقة)"
+                  >
+                    ✨ {activeLang === "AR" ? "احترافي" : "Pro"}
+                  </button>
+                </div>
+              )}
 
               {/* Right: generate button */}
               <button
