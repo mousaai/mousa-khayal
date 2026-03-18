@@ -1,7 +1,8 @@
 /**
- * videoRouter.ts v3.0 — محرك الفيديو الاحترافي
- * يتبع منهج الإخراج v3.0:
- * سيناريو → صور → ElevenLabs TTS → Runway Image-to-Video → Ken Burns (Fallback) → دمج → موسيقى → رفع
+ * videoRouter.ts v4.0 — محرك الفيديو الاحترافي
+ * يتبع منهج الإخراج v4.0:
+ * سيناريو → صور (متوازية) → ElevenLabs TTS → Runway → Ken Burns (Fallback) → دمج → موسيقى → رفع
+ * الـ jobs تُحفظ في DB حتى تعمل بعد إغلاق المتصفح
  */
 import { z } from "zod";
 import { publicProcedure, router } from "./_core/trpc";
@@ -11,6 +12,9 @@ import {
   type VideoScript,
   type VideoJob,
 } from "./videoProducer";
+import { getDb } from "./db";
+import { videoJobs as videoJobsTable } from "../drizzle/schema";
+import { eq } from "drizzle-orm";
 
 // ═══════════════════════════════════════════════════════════
 // Zod schemas للمدخلات
@@ -69,28 +73,53 @@ const productionOptionsSchema = z.object({
 });
 
 // ═══════════════════════════════════════════════════════════
-// تخزين حالة المهام في الذاكرة
+// helpers للـ DB
 // ═══════════════════════════════════════════════════════════
 
-interface JobRecord {
-  status: "pending" | "processing" | "done" | "failed";
-  progress: number;
-  currentStep: string;
-  videoUrl?: string;
-  error?: string;
-  createdAt: number;
-  metrics?: VideoJob["metrics"];
+async function createJobInDB(jobId: string, description?: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(videoJobsTable).values({
+    id: jobId,
+    status: "pending",
+    progress: 0,
+    currentStep: "جاري التحضير...",
+    description: description ?? null,
+  });
 }
 
-const videoJobs = new Map<string, JobRecord>();
+async function updateJobInDB(jobId: string, update: {
+  status?: "pending" | "processing" | "done" | "failed";
+  progress?: number;
+  currentStep?: string;
+  videoUrl?: string;
+  error?: string;
+  metrics?: any;
+}) {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    await db.update(videoJobsTable)
+      .set({
+        ...(update.status !== undefined && { status: update.status }),
+        ...(update.progress !== undefined && { progress: update.progress }),
+        ...(update.currentStep !== undefined && { currentStep: update.currentStep }),
+        ...(update.videoUrl !== undefined && { videoUrl: update.videoUrl }),
+        ...(update.error !== undefined && { error: update.error }),
+        ...(update.metrics !== undefined && { metrics: update.metrics }),
+      })
+      .where(eq(videoJobsTable.id, jobId));
+  } catch (e) {
+    console.error("[videoRouter] updateJobInDB error:", e);
+  }
+}
 
-// تنظيف المهام القديمة (أكثر من ساعة)
-setInterval(() => {
-  const now = Date.now();
-  Array.from(videoJobs.entries()).forEach(([id, job]) => {
-    if (now - job.createdAt > 3600000) videoJobs.delete(id);
-  });
-}, 300000);
+async function getJobFromDB(jobId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const rows = await db.select().from(videoJobsTable).where(eq(videoJobsTable.id, jobId)).limit(1);
+  return rows[0] ?? null;
+}
 
 // ═══════════════════════════════════════════════════════════
 // الـ Router
@@ -119,7 +148,7 @@ export const videoRouter = router({
     }),
 
   // ──────────────────────────────────────────────────────────
-  // بدء إنتاج الفيديو (يعيد jobId فوراً)
+  // بدء إنتاج الفيديو (يعيد jobId فوراً، يعمل في الخلفية)
   // ──────────────────────────────────────────────────────────
   startProduction: publicProcedure
     .input(z.object({
@@ -133,22 +162,12 @@ export const videoRouter = router({
     .mutation(async ({ input }) => {
       const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-      videoJobs.set(jobId, {
-        status: "pending",
-        progress: 0,
-        currentStep: "جاري التحضير...",
-        createdAt: Date.now(),
-      });
+      await createJobInDB(jobId, input.description);
 
-      // تشغيل الإنتاج في الخلفية
+      // تشغيل الإنتاج في الخلفية — يستمر حتى لو أغلق المتصفح
       (async () => {
         try {
-          videoJobs.set(jobId, {
-            ...videoJobs.get(jobId)!,
-            status: "processing",
-            currentStep: "توليد السيناريو...",
-            progress: 2,
-          });
+          await updateJobInDB(jobId, { status: "processing", currentStep: "توليد السيناريو...", progress: 2 });
 
           let script: VideoScript | undefined = input.script as VideoScript | undefined;
           if (!script) {
@@ -171,33 +190,22 @@ export const videoRouter = router({
               useRunway: input.options?.useRunway ?? true,
               useElevenLabs: input.options?.useElevenLabs ?? true,
             },
-            (update: Partial<VideoJob>) => {
-              const current = videoJobs.get(jobId);
-              if (current) {
-                videoJobs.set(jobId, {
-                  ...current,
-                  status: (update.status as JobRecord["status"]) ?? current.status,
-                  progress: update.progress ?? current.progress,
-                  currentStep: update.currentStep ?? current.currentStep,
-                  videoUrl: update.videoUrl ?? current.videoUrl,
-                  error: update.error ?? current.error,
-                  metrics: update.metrics ?? current.metrics,
-                });
-              }
+            async (update: Partial<VideoJob>) => {
+              await updateJobInDB(jobId, {
+                status: update.status as any,
+                progress: update.progress,
+                currentStep: update.currentStep,
+                videoUrl: update.videoUrl,
+                error: update.error,
+                metrics: update.metrics,
+              });
             }
           );
 
-          videoJobs.set(jobId, {
-            ...videoJobs.get(jobId)!,
-            status: "done",
-            progress: 100,
-            currentStep: "اكتمل الإنتاج!",
-            videoUrl,
-          });
+          await updateJobInDB(jobId, { status: "done", progress: 100, currentStep: "اكتمل الإنتاج!", videoUrl });
 
         } catch (err) {
-          videoJobs.set(jobId, {
-            ...videoJobs.get(jobId)!,
+          await updateJobInDB(jobId, {
             status: "failed",
             progress: 0,
             currentStep: "فشل الإنتاج",
@@ -210,12 +218,12 @@ export const videoRouter = router({
     }),
 
   // ──────────────────────────────────────────────────────────
-  // فحص حالة مهمة الإنتاج
+  // فحص حالة مهمة الإنتاج (من DB)
   // ──────────────────────────────────────────────────────────
   getJobStatus: publicProcedure
     .input(z.object({ jobId: z.string() }))
-    .query(({ input }) => {
-      const job = videoJobs.get(input.jobId);
+    .query(async ({ input }) => {
+      const job = await getJobFromDB(input.jobId);
       if (!job) {
         return {
           status: "not_found" as const,
@@ -229,10 +237,10 @@ export const videoRouter = router({
       return {
         status: job.status,
         progress: job.progress,
-        currentStep: job.currentStep,
-        videoUrl: job.videoUrl,
-        error: job.error,
-        metrics: job.metrics,
+        currentStep: job.currentStep ?? "",
+        videoUrl: job.videoUrl ?? undefined,
+        error: job.error ?? undefined,
+        metrics: job.metrics as VideoJob["metrics"] | undefined,
       };
     }),
 
@@ -250,21 +258,12 @@ export const videoRouter = router({
     .mutation(async ({ input }) => {
       const jobId = `quick_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-      videoJobs.set(jobId, {
-        status: "pending",
-        progress: 0,
-        currentStep: "جاري التحضير...",
-        createdAt: Date.now(),
-      });
+      await createJobInDB(jobId, input.description);
 
+      // يعمل في الخلفية — يستمر حتى لو أغلق المتصفح
       (async () => {
         try {
-          videoJobs.set(jobId, {
-            ...videoJobs.get(jobId)!,
-            status: "processing",
-            currentStep: "تحليل المحتوى وكتابة السيناريو...",
-            progress: 3,
-          });
+          await updateJobInDB(jobId, { status: "processing", currentStep: "تحليل المحتوى وكتابة السيناريو...", progress: 3 });
 
           const script = await generateVideoScript(
             input.description,
@@ -273,11 +272,7 @@ export const videoRouter = router({
             input.sceneCount
           );
 
-          videoJobs.set(jobId, {
-            ...videoJobs.get(jobId)!,
-            currentStep: `السيناريو جاهز: "${script.title}"`,
-            progress: 8,
-          });
+          await updateJobInDB(jobId, { currentStep: `السيناريو جاهز: "${script.title}"`, progress: 8 });
 
           const producer = new VideoProducer();
           const videoUrl = await producer.produce(
@@ -289,33 +284,22 @@ export const videoRouter = router({
               useRunway: input.options?.useRunway ?? true,
               useElevenLabs: input.options?.useElevenLabs ?? true,
             },
-            (update: Partial<VideoJob>) => {
-              const current = videoJobs.get(jobId);
-              if (current) {
-                videoJobs.set(jobId, {
-                  ...current,
-                  status: (update.status as JobRecord["status"]) ?? current.status,
-                  progress: update.progress ?? current.progress,
-                  currentStep: update.currentStep ?? current.currentStep,
-                  videoUrl: update.videoUrl ?? current.videoUrl,
-                  error: update.error ?? current.error,
-                  metrics: update.metrics ?? current.metrics,
-                });
-              }
+            async (update: Partial<VideoJob>) => {
+              await updateJobInDB(jobId, {
+                status: update.status as any,
+                progress: update.progress,
+                currentStep: update.currentStep,
+                videoUrl: update.videoUrl,
+                error: update.error,
+                metrics: update.metrics,
+              });
             }
           );
 
-          videoJobs.set(jobId, {
-            ...videoJobs.get(jobId)!,
-            status: "done",
-            progress: 100,
-            currentStep: "اكتمل الإنتاج!",
-            videoUrl,
-          });
+          await updateJobInDB(jobId, { status: "done", progress: 100, currentStep: "اكتمل الإنتاج!", videoUrl });
 
         } catch (err) {
-          videoJobs.set(jobId, {
-            ...videoJobs.get(jobId)!,
+          await updateJobInDB(jobId, {
             status: "failed",
             progress: 0,
             currentStep: "فشل الإنتاج",
@@ -325,5 +309,28 @@ export const videoRouter = router({
       })();
 
       return { jobId };
+    }),
+
+  // ──────────────────────────────────────────────────────────
+  // جلب آخر job للمستخدم (للعودة بعد إغلاق المتصفح)
+  // ──────────────────────────────────────────────────────────
+  getMyLatestJob: publicProcedure
+    .query(async () => {
+      const db = await getDb();
+      if (!db) return null;
+      // نجلب آخر job قيد المعالجة
+      const rows = await db.select()
+        .from(videoJobsTable)
+        .where(eq(videoJobsTable.status, "processing"))
+        .limit(1);
+      // إذا لم يوجد processing، نجلب آخر done
+      if (rows.length === 0) {
+        const doneRows = await db.select()
+          .from(videoJobsTable)
+          .where(eq(videoJobsTable.status, "done"))
+          .limit(1);
+        return doneRows[0] ?? null;
+      }
+      return rows[0];
     }),
 });

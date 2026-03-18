@@ -101,3 +101,21 @@ export const geoKnowledge = mysqlTable("geo_knowledge", {
 
 export type GeoKnowledge = typeof geoKnowledge.$inferSelect;
 export type InsertGeoKnowledge = typeof geoKnowledge.$inferInsert;
+
+// جدول مهام إنتاج الفيديو — يُحفظ في DB حتى لا يضيع عند إغلاق المتصفح
+export const videoJobs = mysqlTable("video_jobs", {
+  id: varchar("id", { length: 64 }).primaryKey(), // job_timestamp_random
+  userId: int("userId"),
+  status: mysqlEnum("status", ["pending", "processing", "done", "failed"]).default("pending").notNull(),
+  progress: int("progress").default(0).notNull(),
+  currentStep: varchar("currentStep", { length: 512 }),
+  description: text("description"),
+  videoUrl: text("videoUrl"),
+  error: text("error"),
+  metrics: json("metrics"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type VideoJobRecord = typeof videoJobs.$inferSelect;
+export type InsertVideoJob = typeof videoJobs.$inferInsert;

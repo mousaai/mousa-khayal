@@ -96,7 +96,51 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
   const [isChatLoading, setIsChatLoading] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
+  const trpcUtils = trpc.useUtils();
   const chatMutation = trpc.chat.chatWithContext.useMutation();
+  const exportMutation = trpc.export.export.useMutation();
+
+  // ── تصدير احترافي عبر السيرفر ──
+  const exportProfessional = async (format: "pdf" | "pptx" | "docx") => {
+    setIsDownloading(format);
+    setShowDownloadMenu(false);
+    const toastId = toast.loading(`جارٍ إنشاء ${format.toUpperCase()} الاحترافي...`);
+    try {
+      const res = await exportMutation.mutateAsync({
+        title: result.title || "خيال — مشروع سينمائي",
+        titleEn: result.titleEn,
+        synopsis: result.synopsis,
+        synopsisEn: result.synopsisEn,
+        description: result.description,
+        domain: result.domain,
+        filmTone: result.filmTone,
+        cinematicStyle: result.cinematicStyle,
+        atmosphere: result.atmosphere,
+        mainElements: result.mainElements,
+        scenes: scenes.map(s => ({
+          label: s.label,
+          imageUrl: s.imageUrl,
+          arabicCaption: s.arabicCaption,
+          prompt: s.prompt,
+        })),
+        format,
+      });
+      // تحميل الملف
+      const a = document.createElement("a");
+      a.href = res.url;
+      a.download = res.filename;
+      a.target = "_blank";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      toast.success(`تم إنشاء ${format.toUpperCase()} بنجاح! اضغط هنا للتحميل`, { id: toastId, action: { label: "تحميل", onClick: () => window.open(res.url, "_blank") } });
+    } catch (err) {
+      console.error(err);
+      toast.error(`فشل إنشاء ${format.toUpperCase()}`, { id: toastId });
+    } finally {
+      setIsDownloading(null);
+    }
+  };
 
   const handleChatSend = async () => {
     const text = chatInput.trim();
@@ -991,59 +1035,88 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
               </button>
 
               {showDownloadMenu && (
-                <div className="absolute bottom-10 left-0 rounded-xl overflow-hidden z-50 shadow-2xl"
-                  style={{ background: "rgba(5,7,15,0.97)", border: "1px solid rgba(52,211,153,0.2)", minWidth: 200 }}>
+                 <div className="absolute bottom-10 left-0 rounded-2xl overflow-hidden z-50 shadow-2xl"
+                   style={{ background: "rgba(5,7,15,0.98)", border: "1px solid rgba(167,139,250,0.2)", minWidth: 240, backdropFilter: "blur(24px)" }}>
 
-                  <button onClick={() => { downloadSingleImage(currentScene, currentIndex); setShowDownloadMenu(false); }}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-all hover:bg-white/5 text-left"
-                    style={{ color: "rgba(255,255,255,0.8)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                    <span className="text-lg">🖼</span>
-                    <div>
-                      <div className="font-semibold">صورة المشهد الحالي</div>
-                      <div className="text-xs text-white/30">JPG عالي الدقة</div>
-                    </div>
-                  </button>
+                   {/* قسم: الصور */}
+                   <div className="px-4 py-2" style={{ borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                     <p className="text-xs font-bold" style={{ color: "rgba(167,139,250,0.5)" }}>صور</p>
+                   </div>
 
-                  <button onClick={downloadAllImagesZip} disabled={!!isDownloading}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
-                    style={{ color: "rgba(255,255,255,0.8)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                    <span className="text-lg">📦</span>
-                    <div>
-                      <div className="font-semibold">كل الصور (ZIP)</div>
-                      <div className="text-xs text-white/30">{scenes.length} صور مضغوطة</div>
-                    </div>
-                  </button>
+                   <button onClick={() => { downloadSingleImage(currentScene, currentIndex); setShowDownloadMenu(false); }}
+                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all hover:bg-white/5 text-left"
+                     style={{ color: "rgba(255,255,255,0.8)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                     <span className="text-base w-6 text-center">🖼️</span>
+                     <div>
+                       <div className="font-semibold text-xs">صورة المشهد الحالي</div>
+                       <div className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>JPG عالي الدقة</div>
+                     </div>
+                   </button>
 
-                  <button onClick={downloadVideoMP4} disabled={!!isDownloading}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
-                    style={{ color: "rgba(255,255,255,0.8)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                    <span className="text-lg">🎬</span>
-                    <div>
-                      <div className="font-semibold">فيديو سينمائي</div>
-                      <div className="text-xs text-white/30">WebM مع Ken Burns</div>
-                    </div>
-                  </button>
+                   <button onClick={downloadAllImagesZip} disabled={!!isDownloading}
+                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
+                     style={{ color: "rgba(255,255,255,0.8)" }}>
+                     <span className="text-base w-6 text-center">📦</span>
+                     <div>
+                       <div className="font-semibold text-xs">كل الصور (ZIP)</div>
+                       <div className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>{scenes.length} صورة مضغوطة</div>
+                     </div>
+                   </button>
 
-                  <button onClick={downloadPDF} disabled={!!isDownloading}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
-                    style={{ color: "rgba(255,255,255,0.8)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
-                    <span className="text-lg">📄</span>
-                    <div>
-                      <div className="font-semibold">عرض تقديمي PDF</div>
-                      <div className="text-xs text-white/30">A4 أفقي مع النصوص</div>
-                    </div>
-                  </button>
+                   {/* قسم: وثائق احترافية */}
+                   <div className="px-4 py-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                     <p className="text-xs font-bold" style={{ color: "rgba(167,139,250,0.5)" }}>وثائق احترافية</p>
+                   </div>
 
-                  <button onClick={downloadGIF} disabled={!!isDownloading}
-                    className="w-full flex items-center gap-3 px-4 py-3 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
-                    style={{ color: "rgba(255,255,255,0.8)" }}>
-                    <span className="text-lg">✨</span>
-                    <div>
-                      <div className="font-semibold">GIF متحرك</div>
-                      <div className="text-xs text-white/30">للمشاركة السريعة</div>
-                    </div>
-                  </button>
-                </div>
+                   <button onClick={() => exportProfessional("pdf")} disabled={!!isDownloading}
+                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
+                     style={{ color: "rgba(255,255,255,0.9)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                     <span className="text-base w-6 text-center" style={{ color: "#f87171" }}>📄</span>
+                     <div>
+                       <div className="font-semibold text-xs">PDF سينمائي احترافي</div>
+                       <div className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>غلاف + صور كاملة + شعار خيال</div>
+                     </div>
+                     {isDownloading === "pdf" && <span className="mr-auto text-xs animate-spin">⧗</span>}
+                   </button>
+
+                   <button onClick={() => exportProfessional("pptx")} disabled={!!isDownloading}
+                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
+                     style={{ color: "rgba(255,255,255,0.9)", borderBottom: "1px solid rgba(255,255,255,0.04)" }}>
+                     <span className="text-base w-6 text-center" style={{ color: "#fb923c" }}>📊</span>
+                     <div>
+                       <div className="font-semibold text-xs">PowerPoint PPTX</div>
+                       <div className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>شرائح جاهزة للعرض</div>
+                     </div>
+                     {isDownloading === "pptx" && <span className="mr-auto text-xs animate-spin">⧗</span>}
+                   </button>
+
+                   <button onClick={() => exportProfessional("docx")} disabled={!!isDownloading}
+                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
+                     style={{ color: "rgba(255,255,255,0.9)" }}>
+                     <span className="text-base w-6 text-center" style={{ color: "#60a5fa" }}>📝</span>
+                     <div>
+                       <div className="font-semibold text-xs">Word DOCX</div>
+                       <div className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>سيناريو + صور + أوصاف</div>
+                     </div>
+                     {isDownloading === "docx" && <span className="mr-auto text-xs animate-spin">⧗</span>}
+                   </button>
+
+                   {/* قسم: فيديو */}
+                   <div className="px-4 py-2" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+                     <p className="text-xs font-bold" style={{ color: "rgba(167,139,250,0.5)" }}>فيديو</p>
+                   </div>
+
+                   <button onClick={downloadVideoMP4} disabled={!!isDownloading}
+                     className="w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-all hover:bg-white/5 text-left disabled:opacity-40"
+                     style={{ color: "rgba(255,255,255,0.8)" }}>
+                     <span className="text-base w-6 text-center" style={{ color: "#a78bfa" }}>🎬</span>
+                     <div>
+                       <div className="font-semibold text-xs">فيديو سينمائي</div>
+                       <div className="text-xs" style={{ color: "rgba(255,255,255,0.3)" }}>MP4 مع حركة Ken Burns</div>
+                     </div>
+                     {isDownloading === "mp4" && <span className="mr-auto text-xs animate-spin">⧗</span>}
+                   </button>
+                 </div>
               )}
             </div>
 
