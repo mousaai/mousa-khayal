@@ -4,6 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, router } from "./_core/trpc";
 import { khayalRouter } from "./khayalRouter";
 import { videoRouter } from "./videoRouter";
+import { chatRouter } from "./chatRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -19,6 +20,7 @@ export const appRouter = router({
   }),
   khayal: khayalRouter,
   video: videoRouter,
+  chat: chatRouter,
 });
 
 export type AppRouter = typeof appRouter;

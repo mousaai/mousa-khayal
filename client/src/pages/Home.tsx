@@ -9,6 +9,7 @@ import DocumentUploader from "@/components/DocumentUploader";
 import FilmDirectorModal from "@/components/FilmDirectorModal";
 import type { GenerationResult, DocumentAnalysis } from "@/types/khayal";
 import VideoProductionPanel from "@/components/VideoProductionPanel";
+import KhayalChat from "@/components/KhayalChat";
 import { musicEngine, selectMusicMood, type MusicMood } from "@/lib/musicEngine";
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
@@ -563,23 +564,34 @@ export default function Home() {
     }
   };
 
-  // ── Show Video Producer ──
+  // ── Show Chat / Video Producer ──
   if (showVideoProducer) {
     return (
-      <div className="min-h-screen bg-[#020408] overflow-y-auto" dir="rtl">
-        <div className="relative z-10 flex flex-col items-center px-4 py-8">
-          <div className="w-full max-w-4xl">
-            <button
-              onClick={() => setShowVideoProducer(false)}
-              className="flex items-center gap-2 text-blue-400 hover:text-blue-200 text-sm mb-6 transition-colors"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M19 12H5M12 19l-7-7 7-7"/>
-              </svg>
-              <span>العودة إلى خيال</span>
-            </button>
-            <VideoProductionPanel />
-          </div>
+      <div
+        className="min-h-screen bg-[#020408] flex flex-col"
+        dir="rtl"
+        style={{ fontFamily: "'Tajawal', 'Cairo', sans-serif" }}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center gap-3 px-4 py-3 border-b border-white/10"
+          style={{ background: "rgba(8,9,20,0.95)", backdropFilter: "blur(12px)" }}
+        >
+          <button
+            onClick={() => setShowVideoProducer(false)}
+            className="flex items-center gap-2 text-blue-400 hover:text-blue-200 text-sm transition-colors"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M19 12H5M12 19l-7-7 7-7"/>
+            </svg>
+            <span>خيال</span>
+          </button>
+          <span className="text-white/20">/</span>
+          <span className="text-purple-300 text-sm font-bold">المساعد الذكي</span>
+        </div>
+        {/* Chat — يأخذ كل المساحة المتبقية */}
+        <div className="flex-1 overflow-hidden">
+          <KhayalChat />
         </div>
       </div>
     );
