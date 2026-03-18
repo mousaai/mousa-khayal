@@ -152,21 +152,22 @@ const CONFIG = {
  */
 const MOTION_EFFECTS: Record<MotionEffect, (d: number, w: number, h: number, fps: number) => string> = {
   // zoom_in: تكبير من الخارج للداخل — crop يبدأ من الحواف ويتحرك للمركز
-  zoom_in:   (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'(iw-${w})/2*(1-t/10)':'(ih-${h})/2*(1-t/10)'`,
+  // format=yuv420p في النهاية (بعد crop) لتجنب "Error reinitializing filters!"
+  zoom_in:   (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,crop=${w}:${h}:'(iw-${w})/2*(1-t/10)':'(ih-${h})/2*(1-t/10)',format=yuv420p`,
   // zoom_out: تكبير من الداخل للخارج — crop يبدأ من المركز ويتحرك للحواف
-  zoom_out:  (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'(iw-${w})/2*min(1,t/8)':'(ih-${h})/2*min(1,t/8)'`,
+  zoom_out:  (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,crop=${w}:${h}:'(iw-${w})/2*min(1,t/8)':'(ih-${h})/2*min(1,t/8)',format=yuv420p`,
   // pan_left: تحريك من اليمين لليسار
-  pan_left:  (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'min(iw-${w},(iw-${w})*min(1,t/8))':'(ih-${h})/2'`,
+  pan_left:  (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,crop=${w}:${h}:'min(iw-${w},(iw-${w})*min(1,t/8))':'(ih-${h})/2',format=yuv420p`,
   // pan_right: تحريك من اليسار لليمين
-  pan_right: (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'max(0,(iw-${w})*(1-min(1,t/8)))':'(ih-${h})/2'`,
+  pan_right: (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,crop=${w}:${h}:'max(0,(iw-${w})*(1-min(1,t/8)))':'(ih-${h})/2',format=yuv420p`,
   // shake: اهتزاز خفيف
-  shake:     (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'(iw-${w})/2+sin(t*8)*4':'(ih-${h})/2+cos(t*8)*4'`,
+  shake:     (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,crop=${w}:${h}:'(iw-${w})/2+sin(t*8)*4':'(ih-${h})/2+cos(t*8)*4',format=yuv420p`,
   // rotate: حركة دائرية ناعمة
-  rotate:    (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'(iw-${w})/2+sin(t*0.5)*6':'(ih-${h})/2+cos(t*0.5)*6'`,
+  rotate:    (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,crop=${w}:${h}:'(iw-${w})/2+sin(t*0.5)*6':'(ih-${h})/2+cos(t*0.5)*6',format=yuv420p`,
   // bounce: ارتداد عمودي
-  bounce:    (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'(iw-${w})/2':'(ih-${h})/2+abs(sin(t*1.5))*6'`,
+  bounce:    (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,crop=${w}:${h}:'(iw-${w})/2':'(ih-${h})/2+abs(sin(t*1.5))*6',format=yuv420p`,
   // spiral: حركة لولبية
-  spiral:    (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'(iw-${w})/2+sin(t*0.8)*8':'(ih-${h})/2+cos(t*0.8)*8'`,
+  spiral:    (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,crop=${w}:${h}:'(iw-${w})/2+sin(t*0.8)*8':'(ih-${h})/2+cos(t*0.8)*8',format=yuv420p`,
 };
 
 /** الانتقالات — 8 انتقالات */

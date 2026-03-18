@@ -15,9 +15,9 @@ import {
 import { getDb } from "./db";
 import { videoJobs as videoJobsTable } from "../drizzle/schema";
 import { eq } from "drizzle-orm";
-
+import { notifyOwner } from "./_core/notification";
 // ═══════════════════════════════════════════════════════════
-// Zod schemas للمدخلات
+// Zod schemas للمدخلاتت
 // ═══════════════════════════════════════════════════════════
 
 const motionEffectEnum = z.enum([
@@ -204,6 +204,14 @@ export const videoRouter = router({
 
           await updateJobInDB(jobId, { status: "done", progress: 100, currentStep: "اكتمل الإنتاج!", videoUrl });
 
+          // ── إشعار المنصة عند اكتمال الإنتاج ──
+          try {
+            await notifyOwner({
+              title: "✨ خيال — اكتمل الإنتاج!",
+              content: `فيديوك جاهز للمشاهدة والتحميل.\nرابط الفيديو: ${videoUrl}`,
+            });
+          } catch { /* الإشعار اختياري */ }
+
         } catch (err) {
           await updateJobInDB(jobId, {
             status: "failed",
@@ -297,6 +305,14 @@ export const videoRouter = router({
           );
 
           await updateJobInDB(jobId, { status: "done", progress: 100, currentStep: "اكتمل الإنتاج!", videoUrl });
+
+          // ── إشعار المنصة عند اكتمال الإنتاج ──
+          try {
+            await notifyOwner({
+              title: "✨ خيال — اكتمل الإنتاج!",
+              content: `فيديوك جاهز للمشاهدة والتحميل.\nرابط الفيديو: ${videoUrl}`,
+            });
+          } catch { /* الإشعار اختياري */ }
 
         } catch (err) {
           await updateJobInDB(jobId, {

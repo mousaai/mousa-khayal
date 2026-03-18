@@ -101,8 +101,20 @@ export default function Home() {
   const [urlInput, setUrlInput] = useState("");
   const [showAttachMenu, setShowAttachMenu] = useState(false);
 
-  // ── فيديو ──
-  const [videoJob, setVideoJob] = useState<VideoJobState | null>(null);
+  // ── فيديو ── (مع localStorage persistence)
+  const [videoJob, setVideoJob] = useState<VideoJobState | null>(() => {
+    try {
+      const saved = localStorage.getItem("khayal_video_job");
+      if (saved) {
+        const parsed: VideoJobState = JSON.parse(saved);
+        // استئناف فقط إذا كان الـ job لا يزال يعمل (ليس done أو failed)
+        if (parsed.status === "pending" || parsed.status === "processing") {
+          return parsed;
+        }
+      }
+    } catch { /* ignore */ }
+    return null;
+  });
   const [scriptResult, setScriptResult] = useState<string | null>(null);
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
 
@@ -239,11 +251,23 @@ export default function Home() {
     }
   };
 
+  // ── حفظ videoJob في localStorage عند كل تغيير ──
+  useEffect(() => {
+    if (videoJob) {
+      try { localStorage.setItem("khayal_video_job", JSON.stringify(videoJob)); } catch { /* ignore */ }
+    } else {
+      try { localStorage.removeItem("khayal_video_job"); } catch { /* ignore */ }
+    }
+  }, [videoJob]);
+
   // ── مزامنة حالة الوظيفة ──
   useEffect(() => {
     if (!jobStatusQuery.data || !videoJob) return;
     const d = jobStatusQuery.data;
     if (d.status === "not_found") return;
+    const wasProcessing = videoJob.status === "pending" || videoJob.status === "processing";
+    const nowDone = d.status === "done";
+    const nowFailed = d.status === "failed";
     setVideoJob(prev => prev ? {
       ...prev,
       status: d.status as VideoJobState["status"],
@@ -252,6 +276,27 @@ export default function Home() {
       videoUrl: d.videoUrl,
       error: d.error,
     } : null);
+    // ── منبّه عند اكتمال الإنتاج ──
+    if (wasProcessing && nowDone) {
+      // إشعار المتصفح (إذا كان مدعوماً)
+      if ("Notification" in window && Notification.permission === "granted") {
+        new Notification("✨ خيال — اكتمل الإنتاج!", {
+          body: "فيديوك جاهز للمشاهدة والتحميل",
+          icon: "/favicon.ico",
+        });
+      }
+      // محادثة خيال
+      setChatMessages(prev => [
+        ...prev,
+        { role: "assistant" as const, content: "✨ اكتمل الإنتاج! فيديوك جاهز. اضغط على زر التحميل لحفظ الفيديو أو تصديره بصيغة PDF أو PPT.", timestamp: Date.now() },
+      ]);
+      setShowChat(true);
+    } else if (wasProcessing && nowFailed) {
+      setChatMessages(prev => [
+        ...prev,
+        { role: "assistant" as const, content: "❌ حدث خطأ في الإنتاج. هل تريد إعادة المحاولة؟", timestamp: Date.now() },
+      ]);
+    }
   }, [jobStatusQuery.data]);
 
   // ── تنظيف ──
@@ -510,6 +555,10 @@ export default function Home() {
       const intent = detectedIntent || "image";
 
       if (intent === "video") {
+        // ── طلب إذن الإشعارات عند بدء الإنتاج ──
+        if ("Notification" in window && Notification.permission === "default") {
+          Notification.requestPermission();
+        }
         try {
           const result = await quickProduceMutation.mutateAsync({
             description: finalDesc,
