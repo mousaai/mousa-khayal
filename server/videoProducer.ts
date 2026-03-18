@@ -131,16 +131,17 @@ export interface VideoProductionOptions {
 // ═══════════════════════════════════════════════════════════
 
 const ASPECT_CONFIGS: Record<AspectRatio, { width: number; height: number; runwayRatio: string }> = {
-  "16:9": { width: 1920, height: 1080, runwayRatio: "1280:720" },
-  "9:16": { width: 1080, height: 1920, runwayRatio: "720:1280" },
+  // تقليل الدقة من 1920x1080 إلى 1280x720 لتسريع FFmpeg بمقدار 3-4x
+  "16:9": { width: 1280, height: 720, runwayRatio: "1280:720" },
+  "9:16": { width: 720, height: 1280, runwayRatio: "720:1280" },
   "1:1":  { width: 1080, height: 1080, runwayRatio: "1104:832" },
-  "4:3":  { width: 1440, height: 1080, runwayRatio: "1104:832" },
+  "4:3":  { width: 1024, height: 768, runwayRatio: "1104:832" },
 };
 
 const CONFIG = {
-  width: 1920,
-  height: 1080,
-  fps: 25,
+  width: 1280,
+  height: 720,
+  fps: 24,
   arabicFont: "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Regular.ttf",
   latinFont: "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
   boldArabicFont: "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf",
@@ -466,9 +467,11 @@ export class VideoProducer {
       const scene = scenes[i];
       const outputPath = path.join(this.workDir, `scene_${i + 1}_final.mp4`);
 
+      // تحديث التقدم بشكل أدق: كل مشهد يأخذ ~6% من 72 إلى 78
+      const sceneProgress = 72 + Math.round((i / scenes.length) * 6);
       onProgress?.(
-        `تجميع مشهد ${i + 1}/${scenes.length}...`,
-        72 + Math.round((i / scenes.length) * 6)
+        `تجميع مشهد ${i + 1}/${scenes.length} (${Math.round((i / scenes.length) * 100)}%)...`,
+        sceneProgress
       );
 
       // رسم الترجمة على الصورة
@@ -546,7 +549,7 @@ export class VideoProducer {
           `drawtext=fontfile=${fontFile}:text='${escapedSubtitle}':fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${dims.height - 80}:shadowcolor=black@0.7:shadowx=2:shadowy=2`,
         ])
         .videoCodec("libx264")
-        .outputOptions(["-preset fast", "-crf 20", "-pix_fmt yuv420p"])
+        .outputOptions(["-preset ultrafast", "-crf 20", "-pix_fmt yuv420p"])
         .output(outputPath)
         .on("end", () => {
           fs.unlink(tmpPath).catch(() => {});
@@ -578,9 +581,11 @@ export class VideoProducer {
       const imgPath = imagePaths[i];
       const outputPath = path.join(this.workDir, `scene_${i + 1}_final.mp4`);
 
+      // تحديث دقيق لكل مشهد: 55% إلى 75%
+      const sceneProgress = 55 + Math.round((i / scenes.length) * 20);
       onProgress?.(
-        `بناء مشهد ${i + 1}/${scenes.length}...`,
-        55 + Math.round((i / scenes.length) * 20)
+        `بناء مشهد ${i + 1}/${scenes.length}... (${Math.round(((i + 1) / scenes.length) * 100)}%)`,
+        sceneProgress
       );
 
       const imgWithSub = path.join(this.workDir, `scene_${i + 1}_sub.png`);
@@ -659,7 +664,7 @@ export class VideoProducer {
         .input(tmpPath)
         .duration(duration)
         .videoCodec("libx264")
-        .outputOptions(["-preset fast", "-crf 20", "-pix_fmt yuv420p"])
+        .outputOptions(["-preset ultrafast", "-crf 20", "-pix_fmt yuv420p"])
         .output(outputPath)
         .on("end", () => {
           fs.unlink(tmpPath).catch(() => {});
@@ -745,8 +750,8 @@ export class VideoProducer {
         .videoFilter(fullFilter)
         .duration(duration)
         .fps(CONFIG.fps)
-        .videoCodec("libx264")
-        .outputOptions(["-preset fast", "-crf 20", "-pix_fmt yuv420p"])
+         .videoCodec("libx264")
+        .outputOptions(["-preset ultrafast", "-crf 23", "-pix_fmt yuv420p"])
         .output(outputPath)
         .on("end", () => resolve())
         .on("error", (err: Error) => {
@@ -756,7 +761,6 @@ export class VideoProducer {
         .run();
     });
   }
-
   // ─────────────────────────────────────────────────────────
   // الخطوة 4: دمج المشاهد
   // ─────────────────────────────────────────────────────────
@@ -769,11 +773,11 @@ export class VideoProducer {
       const concatContent = scenePaths.map(p => `file '${p}'`).join("\n");
       await fs.writeFile(concatFile, concatContent);
 
+      // استخدام copy codec لتجنب إعادة الترميز وتسريع الدمج بشكل كبير
       ffmpeg()
         .input(concatFile)
         .inputOptions(["-f concat", "-safe 0"])
-        .videoCodec("libx264")
-        .outputOptions(["-preset fast", "-crf 20", "-pix_fmt yuv420p"])
+        .videoCodec("copy")
         .output(mergedPath)
         .on("end", () => resolve(mergedPath))
         .on("error", (err: Error) => reject(err))

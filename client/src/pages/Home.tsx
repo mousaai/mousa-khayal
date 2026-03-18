@@ -241,10 +241,13 @@ export default function Home() {
         setPrompt(res.action.description as string);
         setVideoJob(null);
       }
-    } catch {
+    } catch (err: any) {
+      const errMsg = err?.message?.includes('timeout') || err?.message?.includes('network')
+        ? "انقطع الاتصال مؤقتاً. يمكنك إعادة المحاولة."
+        : "عذراً، حدث خطأ في الاتصال. حاول مرة أخرى."
       setChatMessages(prev => [
         ...prev.filter(m => !m.isThinking),
-        { role: "assistant", content: "عذراً، حدث خطأ. حاول مرة أخرى.", timestamp: Date.now() },
+        { role: "assistant", content: errMsg, timestamp: Date.now() },
       ]);
     } finally {
       setIsChatSending(false);
