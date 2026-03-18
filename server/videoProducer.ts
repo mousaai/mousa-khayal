@@ -18,8 +18,11 @@ import ffmpeg from "fluent-ffmpeg";
 import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import sharp from "sharp";
 import fs from "fs/promises";
+import fsSync from "fs";
 import path from "path";
 import os from "os";
+import https from "https";
+import http from "http";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
 import { ElevenLabsEngine, selectVoiceForDomain, type ElevenLabsVoiceId } from "./elevenLabsEngine";
@@ -143,16 +146,27 @@ const CONFIG = {
   boldArabicFont: "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf",
 };
 
-/** تأثيرات الحركة — 8 تأثيرات Ken Burns (Fallback) */
+/** تأثيرات الحركة — 8 تأثيرات Ken Burns (Fallback)
+ * يستخدم scale+crop بدلاً من zoompan لضمان التوافق مع جميع أبعاد الصور وصيغ الألوان
+ * الصورة تُكبَّر 30% ثم يُطبَّق crop متحرك لإنتاج تأثير الحركة
+ */
 const MOTION_EFFECTS: Record<MotionEffect, (d: number, w: number, h: number, fps: number) => string> = {
-  zoom_in:   (d, w, h, fps) => `zoompan=z='if(lte(zoom,1.0),1.05,zoom-0.0008)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${d * fps}:s=${w}x${h}:fps=${fps}`,
-  zoom_out:  (d, w, h, fps) => `zoompan=z='if(gte(zoom,1.15),1.15,zoom+0.0008)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${d * fps}:s=${w}x${h}:fps=${fps}`,
-  pan_left:  (d, w, h, fps) => `zoompan=z='1.1':x='iw/2-(iw/zoom/2)+t*2':y='ih/2-(ih/zoom/2)':d=${d * fps}:s=${w}x${h}:fps=${fps}`,
-  pan_right: (d, w, h, fps) => `zoompan=z='1.1':x='iw/2-(iw/zoom/2)-t*2':y='ih/2-(ih/zoom/2)':d=${d * fps}:s=${w}x${h}:fps=${fps}`,
-  shake:     (d, w, h, fps) => `zoompan=z='1.05':x='iw/2-(iw/zoom/2)+sin(t*10)*3':y='ih/2-(ih/zoom/2)+cos(t*10)*3':d=${d * fps}:s=${w}x${h}:fps=${fps}`,
-  rotate:    (d, w, h, fps) => `zoompan=z='1.1':x='iw/2-(iw/zoom/2)+sin(t*0.5)*5':y='ih/2-(ih/zoom/2)+cos(t*0.5)*5':d=${d * fps}:s=${w}x${h}:fps=${fps}`,
-  bounce:    (d, w, h, fps) => `zoompan=z='1.0+abs(sin(t*1.5))*0.08':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${d * fps}:s=${w}x${h}:fps=${fps}`,
-  spiral:    (d, w, h, fps) => `zoompan=z='1.05+sin(t*0.8)*0.05':x='iw/2-(iw/zoom/2)+sin(t*0.8)*8':y='ih/2-(ih/zoom/2)+cos(t*0.8)*8':d=${d * fps}:s=${w}x${h}:fps=${fps}`,
+  // zoom_in: تكبير من الخارج للداخل — crop يبدأ من الحواف ويتحرك للمركز
+  zoom_in:   (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'(iw-${w})/2*(1-t/10)':'(ih-${h})/2*(1-t/10)'`,
+  // zoom_out: تكبير من الداخل للخارج — crop يبدأ من المركز ويتحرك للحواف
+  zoom_out:  (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'(iw-${w})/2*min(1,t/8)':'(ih-${h})/2*min(1,t/8)'`,
+  // pan_left: تحريك من اليمين لليسار
+  pan_left:  (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'min(iw-${w},(iw-${w})*min(1,t/8))':'(ih-${h})/2'`,
+  // pan_right: تحريك من اليسار لليمين
+  pan_right: (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'max(0,(iw-${w})*(1-min(1,t/8)))':'(ih-${h})/2'`,
+  // shake: اهتزاز خفيف
+  shake:     (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'(iw-${w})/2+sin(t*8)*4':'(ih-${h})/2+cos(t*8)*4'`,
+  // rotate: حركة دائرية ناعمة
+  rotate:    (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'(iw-${w})/2+sin(t*0.5)*6':'(ih-${h})/2+cos(t*0.5)*6'`,
+  // bounce: ارتداد عمودي
+  bounce:    (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'(iw-${w})/2':'(ih-${h})/2+abs(sin(t*1.5))*6'`,
+  // spiral: حركة لولبية
+  spiral:    (_d, w, h) => `scale=${Math.round(w*1.3)}:${Math.round(h*1.3)}:flags=lanczos,format=rgb24,crop=${w}:${h}:'(iw-${w})/2+sin(t*0.8)*8':'(ih-${h})/2+cos(t*0.8)*8'`,
 };
 
 /** الانتقالات — 8 انتقالات */
@@ -462,8 +476,24 @@ export class VideoProducer {
 
       if (runwayVideos[i]) {
         // استخدام فيديو Runway + إضافة الترجمة عليه
-        await this.addSubtitleToVideo(runwayVideos[i]!, scene.subtitle, scene.duration, dims, outputPath);
-        console.log(`  ✓ مشهد ${i + 1} (Runway + ترجمة)`);
+        try {
+          await this.addSubtitleToVideo(runwayVideos[i]!, scene.subtitle, scene.duration, dims, outputPath);
+          console.log(`  ✓ مشهد ${i + 1} (Runway + ترجمة)`);
+        } catch (subtitleErr: any) {
+          // إذا فشلت إضافة الترجمة، نستخدم فيديو Runway مباشرة بدون ترجمة
+          console.warn(`  ⚠ مشهد ${i + 1}: فشل إضافة الترجمة — استخدام Runway بدون ترجمة`);
+          try {
+            // تحميل فيديو Runway مباشرة وإعادة ترميزه
+            await this.downloadAndReencodeVideo(runwayVideos[i]!, scene.duration, dims, outputPath);
+            console.log(`  ✓ مشهد ${i + 1} (Runway بدون ترجمة)`);
+          } catch (reencodeErr: any) {
+            // Fallback نهائي: Ken Burns
+            console.warn(`  ⚠ مشهد ${i + 1}: فشل إعادة الترميز — Ken Burns Fallback`);
+            const motion = scene.zoom ?? "zoom_in";
+            await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath);
+            console.log(`  ✓ مشهد ${i + 1} (Ken Burns Fallback)`);
+          }
+        }
       } else {
         // Fallback: Ken Burns
         const motion = scene.zoom ?? "zoom_in";
@@ -481,13 +511,22 @@ export class VideoProducer {
   // إضافة ترجمة على فيديو Runway
   // ─────────────────────────────────────────────────────────
 
-  private addSubtitleToVideo(
+  private async addSubtitleToVideo(
     videoUrl: string,
     subtitle: string,
     duration: number,
     dims: { width: number; height: number },
     outputPath: string
   ): Promise<void> {
+    // تحميل الفيديو كملف محلي أولاً لتجنب SIGSEGV عند قراءة URL مباشرة
+    const tmpPath = outputPath + ".sub_tmp.mp4";
+    try {
+      await this.downloadFile(videoUrl, tmpPath);
+    } catch (dlErr: any) {
+      console.warn(`[VideoProducer] addSubtitleToVideo downloadFile error: ${dlErr.message}`);
+      throw dlErr;
+    }
+
     return new Promise((resolve, reject) => {
       const isArabic = /[\u0600-\u06ff]/.test(subtitle);
       const fontFile = isArabic ? CONFIG.arabicFont : CONFIG.latinFont;
@@ -495,7 +534,7 @@ export class VideoProducer {
       const escapedSubtitle = subtitle.replace(/'/g, "\\'").replace(/:/g, "\\:");
 
       ffmpeg()
-        .input(videoUrl)
+        .input(tmpPath)
         .duration(duration)
         .videoFilter([
           // خلفية شبه شفافة
@@ -508,8 +547,12 @@ export class VideoProducer {
         .videoCodec("libx264")
         .outputOptions(["-preset fast", "-crf 20", "-pix_fmt yuv420p"])
         .output(outputPath)
-        .on("end", () => resolve())
+        .on("end", () => {
+          fs.unlink(tmpPath).catch(() => {});
+          resolve();
+        })
         .on("error", (err: Error) => {
+          fs.unlink(tmpPath).catch(() => {});
           console.warn(`[VideoProducer] addSubtitleToVideo error: ${err.message} — using Ken Burns fallback`);
           reject(err);
         })
@@ -597,6 +640,87 @@ export class VideoProducer {
   }
 
   // ─────────────────────────────────────────────────────────
+  // تحميل فيديو Runway وإعادة ترميزه بدون ترجمة
+  // ─────────────────────────────────────────────────────────
+
+  private async downloadAndReencodeVideo(
+    videoUrl: string,
+    duration: number,
+    dims: { width: number; height: number },
+    outputPath: string
+  ): Promise<void> {
+    // تحميل الفيديو كملف محلي أولاً لتجنب SIGSEGV عند قراءة URL مباشرة
+    const tmpPath = outputPath + ".tmp.mp4";
+    await this.downloadFile(videoUrl, tmpPath);
+
+    return new Promise((resolve, reject) => {
+      ffmpeg()
+        .input(tmpPath)
+        .duration(duration)
+        .videoCodec("libx264")
+        .outputOptions(["-preset fast", "-crf 20", "-pix_fmt yuv420p"])
+        .output(outputPath)
+        .on("end", () => {
+          fs.unlink(tmpPath).catch(() => {});
+          resolve();
+        })
+        .on("error", (err: Error) => {
+          fs.unlink(tmpPath).catch(() => {});
+          console.warn(`[VideoProducer] downloadAndReencodeVideo error: ${err.message}`);
+          reject(err);
+        })
+        .run();
+    });
+  }
+
+  private downloadFile(url: string, destPath: string, timeoutMs = 30_000): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const proto = url.startsWith("https") ? https : http;
+      const file = fsSync.createWriteStream(destPath);
+      let settled = false;
+
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        file.close();
+        fs.unlink(destPath).catch(() => {});
+        reject(new Error(`downloadFile timeout after ${timeoutMs}ms: ${url.slice(0, 80)}`));
+      }, timeoutMs);
+
+      const done = (err?: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        if (err) {
+          file.close();
+          fs.unlink(destPath).catch(() => {});
+          reject(err);
+        } else {
+          file.close(() => resolve());
+        }
+      };
+
+      proto.get(url, (res: any) => {
+        if (res.statusCode === 301 || res.statusCode === 302) {
+          clearTimeout(timer);
+          settled = true;
+          file.close();
+          this.downloadFile(res.headers.location, destPath, timeoutMs).then(resolve).catch(reject);
+          return;
+        }
+        if (res.statusCode && res.statusCode >= 400) {
+          done(new Error(`HTTP ${res.statusCode} downloading video`));
+          return;
+        }
+        res.pipe(file);
+        file.on("finish", () => done());
+        file.on("error", (err: Error) => done(err));
+        res.on("error", (err: Error) => done(err));
+      }).on("error", (err: Error) => done(err));
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────
   // بناء مقطع فيديو مشهد واحد (8 تأثيرات Ken Burns)
   // ─────────────────────────────────────────────────────────
 
@@ -609,19 +733,25 @@ export class VideoProducer {
   ): Promise<void> {
     return new Promise((resolve, reject) => {
       const motionFn = MOTION_EFFECTS[motion] ?? MOTION_EFFECTS["zoom_in"];
-      const zoomFilter = motionFn(duration, dims.width, dims.height, CONFIG.fps);
+      // MOTION_EFFECTS تتضمن scale+format+crop بشكل كامل
+      const fullFilter = motionFn(duration, dims.width, dims.height, CONFIG.fps);
+
+      console.log(`[buildSceneVideo] imgPath=${imgPath} dims=${dims.width}x${dims.height} motion=${motion}`);
 
       ffmpeg()
         .input(imgPath)
         .inputOptions(["-loop 1"])
-        .videoFilter(zoomFilter)
+        .videoFilter(fullFilter)
         .duration(duration)
         .fps(CONFIG.fps)
         .videoCodec("libx264")
         .outputOptions(["-preset fast", "-crf 20", "-pix_fmt yuv420p"])
         .output(outputPath)
         .on("end", () => resolve())
-        .on("error", reject)
+        .on("error", (err: Error) => {
+          console.error(`[buildSceneVideo] ffmpeg error: ${err.message}`);
+          reject(err);
+        })
         .run();
     });
   }

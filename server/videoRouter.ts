@@ -126,7 +126,7 @@ export const videoRouter = router({
       description: z.string().min(2).max(2000).optional(),
       script: scriptSchema.optional(),
       language: z.enum(["ar", "en"]).default("ar"),
-      voice: z.enum(["ar_male", "ar_female", "en_male", "en_female"]).default("ar_male"),
+      voice: voiceEnum.default("ar_male"),
       sceneCount: z.number().min(3).max(10).default(6),
       options: productionOptionsSchema.optional(),
     }))
@@ -243,7 +243,7 @@ export const videoRouter = router({
     .input(z.object({
       description: z.string().min(2).max(2000),
       language: z.enum(["ar", "en"]).default("ar"),
-      voice: z.enum(["ar_male", "ar_female", "en_male", "en_female"]).default("ar_male"),
+      voice: voiceEnum.default("ar_male"),
       sceneCount: z.number().min(3).max(8).default(5),
       options: productionOptionsSchema.optional(),
     }))
