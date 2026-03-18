@@ -40,10 +40,20 @@ const sceneSchema = z.object({
   sceneType: sceneTypeEnum.optional(),
 });
 
+// كل أصوات ElevenLabs الـ 11
+const voiceEnum = z.enum([
+  "ar_male", "ar_female", "en_male", "en_female",
+  "ar_male_formal", "ar_male_energetic", "ar_male_calm",
+  "ar_female_formal", "ar_female_emotional", "ar_female_marketing",
+  "en_male_formal", "en_male_energetic",
+  "en_female_formal", "en_female_emotional",
+  "documentary_narrator",
+]);
+
 const scriptSchema = z.object({
   title: z.string(),
   language: z.enum(["ar", "en"]),
-  voice: z.enum(["ar_male", "ar_female", "en_male", "en_female"]),
+  voice: voiceEnum,
   narration: z.string(),
   domain: z.string().optional(),
   musicMood: z.string().optional(),
@@ -95,7 +105,7 @@ export const videoRouter = router({
     .input(z.object({
       description: z.string().min(2).max(2000),
       language: z.enum(["ar", "en"]).default("ar"),
-      voice: z.enum(["ar_male", "ar_female", "en_male", "en_female"]).default("ar_male"),
+      voice: voiceEnum.default("ar_male"),
       sceneCount: z.number().min(3).max(10).default(6),
     }))
     .mutation(async ({ input }) => {

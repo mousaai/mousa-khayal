@@ -1,14 +1,13 @@
 /**
- * Home.tsx — منصة خيال الرئيسية
- * ميكروفون تفاعلي حي + دعم المستندات + فيلم إخراجي + دعم متعدد اللغات
+ * Home.tsx — منصة خيال الرئيسية v4.0
+ * واجهة موحدة: وصف واحد → خيارات أسفله → إنتاج في نفس الصفحة
+ * لا انتقالات، لا صفحات منفصلة
  */
 import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import KhayalCinematicViewer from "@/components/KhayalCinematicViewer";
 import DocumentUploader from "@/components/DocumentUploader";
 import type { GenerationResult, DocumentAnalysis } from "@/types/khayal";
-import VideoProductionPanel from "@/components/VideoProductionPanel";
-import KhayalChat from "@/components/KhayalChat";
 import { musicEngine, selectMusicMood, type MusicMood } from "@/lib/musicEngine";
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
@@ -20,23 +19,54 @@ const PORTAL_SCENES = [
 ];
 const SPACE_BG = "https://d2xsxph8kpxj0f.cloudfront.net/310519663315855165/BXEkPAJgGiqWs3v7muUPfr/khayal_portal_bg-oHnxyxTZx3h9RPmBuw3ZWw.webp";
 
-// ── أمثلة بعدة لغات ──────────────────────────────────────────────────────────
+// ── أنواع الفيلم الـ 12 ──────────────────────────────────────────────────────
+const FILM_GENRES = [
+  { id: "cinematic",    icon: "🎬", label: "سينمائي",    labelEn: "Cinematic",    color: "#a78bfa" },
+  { id: "documentary",  icon: "📽️", label: "وثائقي",     labelEn: "Documentary",  color: "#60a5fa" },
+  { id: "marketing",    icon: "📣", label: "تسويقي",     labelEn: "Marketing",    color: "#f472b6" },
+  { id: "educational",  icon: "🎓", label: "تعليمي",     labelEn: "Educational",  color: "#34d399" },
+  { id: "horror",       icon: "👻", label: "رعب",        labelEn: "Horror",       color: "#ef4444" },
+  { id: "comedy",       icon: "😄", label: "كوميدي",     labelEn: "Comedy",       color: "#fbbf24" },
+  { id: "romantic",     icon: "💖", label: "رومانسي",    labelEn: "Romantic",     color: "#fb7185" },
+  { id: "scifi",        icon: "🚀", label: "خيال علمي",  labelEn: "Sci-Fi",       color: "#38bdf8" },
+  { id: "nature",       icon: "🌿", label: "طبيعة",      labelEn: "Nature",       color: "#4ade80" },
+  { id: "historical",   icon: "🏛️", label: "تاريخي",     labelEn: "Historical",   color: "#d97706" },
+  { id: "action",       icon: "⚡", label: "أكشن",       labelEn: "Action",       color: "#f97316" },
+  { id: "spiritual",    icon: "✨", label: "روحاني",     labelEn: "Spiritual",    color: "#c084fc" },
+];
+
+// ── أصوات ElevenLabs الـ 11 ──────────────────────────────────────────────────
+const ELEVEN_VOICES_LIST = [
+  { id: "ar_male_formal",      label: "عربي ذكر رسمي",      icon: "🎙️", lang: "ar" },
+  { id: "ar_male_energetic",   label: "عربي ذكر حماسي",     icon: "🔥", lang: "ar" },
+  { id: "ar_male_calm",        label: "عربي ذكر هادئ",      icon: "🌊", lang: "ar" },
+  { id: "ar_female_formal",    label: "عربي أنثى رسمي",     icon: "👩‍💼", lang: "ar" },
+  { id: "ar_female_emotional", label: "عربي أنثى عاطفي",    icon: "💫", lang: "ar" },
+  { id: "ar_female_marketing", label: "عربي أنثى تسويقي",   icon: "📢", lang: "ar" },
+  { id: "en_male_formal",      label: "English Male Formal", icon: "🎙️", lang: "en" },
+  { id: "en_male_energetic",   label: "English Male Energetic", icon: "🔥", lang: "en" },
+  { id: "en_female_formal",    label: "English Female Formal", icon: "👩‍💼", lang: "en" },
+  { id: "en_female_emotional", label: "English Female Emotional", icon: "💫", lang: "en" },
+  { id: "documentary_narrator", label: "راوٍ وثائقي",        icon: "📽️", lang: "en" },
+];
+
+// ── أمثلة ────────────────────────────────────────────────────────────────────
 const EXAMPLE_PROMPTS = [
   { text: "مسجد عثماني فاخر في إسطنبول، قباب ذهبية تحت ضوء الغروب", lang: "AR" },
   { text: "A futuristic skyscraper in Dubai with hanging gardens and neon lights", lang: "EN" },
   { text: "京都の静かな竹林に囲まれた古い日本の神社", lang: "JA" },
   { text: "Une villa méditerranéenne sur les falaises d'Amalfi au coucher du soleil", lang: "FR" },
   { text: "مدينة خيال علمي طائرة فوق السحاب بتقنية Avatar", lang: "AR" },
-  { text: "Un palazzo rinascimentale italiano con giardini segreti e fontane", lang: "IT" },
   { text: "A decaying Soviet-era brutalist complex reclaimed by nature", lang: "EN" },
   { text: "上海外滩的未来主义摩天大楼群，霓虹灯倒映在黄浦江上", lang: "ZH" },
+  { text: "جبل وكهف فيه سرير نوم مريح وكلب على باب الكهف", lang: "AR" },
 ];
 
-// ── نصوص الواجهة متعددة اللغات ───────────────────────────────────────────────
+// ── نصوص الواجهة ─────────────────────────────────────────────────────────────
 const UI_LANGS: Record<string, {
   placeholder: string; btn: string; listening: string; processing: string;
-  examples: string; tagline: string; sub: string; filmBtn: string;
-  docBtn: string; filmProgress: string;
+  examples: string; tagline: string; sub: string; docBtn: string;
+  filmProgress: string; modeImage: string; modeVideo: string; modeScript: string;
 }> = {
   AR: {
     placeholder: "صِف ما تتخيله... مبنى، حديقة، مدينة، مشهد طبيعي، عالم خيالي...",
@@ -46,9 +76,11 @@ const UI_LANGS: Record<string, {
     examples: "أمثلة للإلهام",
     tagline: "خيال",
     sub: "حوّل أي وصف إلى مشهد سينمائي",
-    filmBtn: "فيلم إخراجي",
     docBtn: "مستند / مخطط",
     filmProgress: "جاري تصوير الفيلم...",
+    modeImage: "صورة",
+    modeVideo: "فيديو",
+    modeScript: "سيناريو",
   },
   EN: {
     placeholder: "Describe what you imagine... a building, garden, city, sci-fi world...",
@@ -58,99 +90,111 @@ const UI_LANGS: Record<string, {
     examples: "Inspiration examples",
     tagline: "Khayal",
     sub: "Transform any description into a cinematic scene",
-    filmBtn: "Director's Film",
     docBtn: "Document / Plan",
     filmProgress: "Filming in progress...",
+    modeImage: "Image",
+    modeVideo: "Video",
+    modeScript: "Script",
   },
   JA: {
-    placeholder: "想像するものを説明してください... 建物、庭園、都市、SF世界...",
+    placeholder: "想像するものを説明してください...",
     btn: "可視化",
     listening: "聴いています...",
     processing: "分析中...",
     examples: "インスピレーション例",
     tagline: "خيال",
     sub: "あらゆる説明を映画的シーンに変換",
-    filmBtn: "映画制作",
     docBtn: "ドキュメント",
     filmProgress: "撮影中...",
+    modeImage: "画像",
+    modeVideo: "動画",
+    modeScript: "脚本",
   },
   FR: {
-    placeholder: "Décrivez ce que vous imaginez... un bâtiment, jardin, ville, monde SF...",
+    placeholder: "Décrivez ce que vous imaginez...",
     btn: "Visualiser",
     listening: "Écoute...",
     processing: "Analyse...",
     examples: "Exemples d'inspiration",
     tagline: "خيال",
     sub: "Transformez toute description en scène cinématographique",
-    filmBtn: "Film de réalisateur",
     docBtn: "Document / Plan",
     filmProgress: "Tournage en cours...",
+    modeImage: "Image",
+    modeVideo: "Vidéo",
+    modeScript: "Scénario",
   },
   ZH: {
-    placeholder: "描述您想象的内容... 建筑、花园、城市、科幻世界...",
+    placeholder: "描述您想象的内容...",
     btn: "可视化",
     listening: "聆听中...",
     processing: "分析中...",
     examples: "灵感示例",
     tagline: "خيال",
     sub: "将任何描述转化为电影场景",
-    filmBtn: "导演电影",
     docBtn: "文档 / 图纸",
     filmProgress: "拍摄中...",
+    modeImage: "图像",
+    modeVideo: "视频",
+    modeScript: "剧本",
   },
   IT: {
-    placeholder: "Descrivi cosa immagini... un edificio, giardino, città, mondo fantascientifico...",
+    placeholder: "Descrivi cosa immagini...",
     btn: "Visualizza",
     listening: "Ascolta...",
     processing: "Analizza...",
     examples: "Esempi di ispirazione",
     tagline: "خيال",
     sub: "Trasforma qualsiasi descrizione in una scena cinematografica",
-    filmBtn: "Film del regista",
     docBtn: "Documento / Pianta",
     filmProgress: "Riprese in corso...",
+    modeImage: "Immagine",
+    modeVideo: "Video",
+    modeScript: "Sceneggiatura",
   },
   ES: {
-    placeholder: "Describe lo que imaginas... un edificio, jardín, ciudad, mundo de ciencia ficción...",
+    placeholder: "Describe lo que imaginas...",
     btn: "Visualizar",
     listening: "Escuchando...",
     processing: "Analizando...",
     examples: "Ejemplos de inspiración",
     tagline: "خيال",
     sub: "Transforma cualquier descripción en una escena cinematográfica",
-    filmBtn: "Película del director",
     docBtn: "Documento / Plano",
     filmProgress: "Rodando...",
+    modeImage: "Imagen",
+    modeVideo: "Video",
+    modeScript: "Guión",
   },
   HI: {
-    placeholder: "वर्णन करें जो आप कल्पना करते हैं... एक इमारत, बगीचा, शहर, काल्पनिक दुनिया...",
+    placeholder: "वर्णन करें जो आप कल्पना करते हैं...",
     btn: "कल्पना करें",
     listening: "सुन रहा है...",
     processing: "विश्लेषण...",
     examples: "प्रेरणा के उदाहरण",
     tagline: "خيال",
     sub: "किसी भी विवरण को सिनेमाई दृश्य में बदलें",
-    filmBtn: "निर्देशक की फिल्म",
     docBtn: "दस्तावेज़ / योजना",
     filmProgress: "फिल्मांकन जारी है...",
+    modeImage: "छवि",
+    modeVideo: "वीडियो",
+    modeScript: "पटकथा",
   },
 };
 
 const LANG_KEYS = Object.keys(UI_LANGS);
 
-// ── Film progress state ────────────────────────────────────────────────────────────────────────────
-interface FilmProgress {
-  isActive: boolean;
-  totalScenes: number;
-  completedScenes: number;
-  currentBatch: number;
-  totalBatches: number;
-  durationSeconds: number;
-  durationLabel: string;
-  accumulatedScenes: GenerationResult["scenes"];
-  projectId?: number | null;
-  isComplete: boolean;
-  musicMood?: MusicMood;
+// ── نوع الإنتاج ───────────────────────────────────────────────────────────────
+type ProductionMode = "image" | "video" | "script";
+
+// ── حالة إنتاج الفيديو ────────────────────────────────────────────────────────
+interface VideoJobState {
+  jobId: string;
+  status: "pending" | "processing" | "done" | "failed";
+  progress: number;
+  currentStep: string;
+  videoUrl?: string;
+  error?: string;
 }
 
 export default function Home() {
@@ -158,33 +202,38 @@ export default function Home() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<GenerationResult | null>(null);
 
-  // Mic state
+  // ── وضع الإنتاج المختار ──
+  const [selectedMode, setSelectedMode] = useState<ProductionMode | null>(null);
+  const [showModeOptions, setShowModeOptions] = useState(false);
+
+  // ── خيارات الفيديو ──
+  const [selectedGenre, setSelectedGenre] = useState<string>("cinematic");
+  const [selectedVoice, setSelectedVoice] = useState<string>("ar_male_formal");
+  const [showGenrePanel, setShowGenrePanel] = useState(false);
+  const [showVoicePanel, setShowVoicePanel] = useState(false);
+  const [videoJob, setVideoJob] = useState<VideoJobState | null>(null);
+  const [videoSceneCount, setVideoSceneCount] = useState(5);
+
+  // ── سيناريو نصي ──
+  const [scriptResult, setScriptResult] = useState<string | null>(null);
+  const [isGeneratingScript, setIsGeneratingScript] = useState(false);
+
+  // ── Mic state ──
   const [isRecording, setIsRecording] = useState(false);
   const [micState, setMicState] = useState<"idle" | "listening" | "processing">("idle");
   const [volume, setVolume] = useState(0);
   const [waveData, setWaveData] = useState<number[]>(Array(28).fill(0.5));
 
-  // File / URL
+  // ── File / URL ──
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInput, setUrlInput] = useState("");
 
-  // Document analysis
+  // ── Document analysis ──
   const [documentAnalysis, setDocumentAnalysis] = useState<DocumentAnalysis | null>(null);
   const [showDocUploader, setShowDocUploader] = useState(false);
 
-  // Film director
-  const [showFilmModal, setShowFilmModal] = useState(false);
-  const [showVideoProducer, setShowVideoProducer] = useState(false);
-  // ── حالة تصدير الفيديو ──
-  const [videoExportProgress, setVideoExportProgress] = useState<{
-    isActive: boolean;
-    currentScene: number;
-    totalScenes: number;
-    phase: "loading" | "recording" | "encoding" | "done";
-    durationSeconds: number;
-  } | null>(null);
-
+  // ── Film progress ──
   const [filmProgress, setFilmProgress] = useState<{
     isActive: boolean;
     totalScenes: number;
@@ -198,7 +247,7 @@ export default function Home() {
     isComplete: boolean;
   } | null>(null);
 
-  // UI
+  // ── UI ──
   const [bgIdx, setBgIdx] = useState(0);
   const [portalIdx, setPortalIdx] = useState(0);
   const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; size: number; speed: number; opacity: number }>>([]);
@@ -206,7 +255,7 @@ export default function Home() {
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [portalGlow, setPortalGlow] = useState(false);
 
-  // Refs
+  // ── Refs ──
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -214,18 +263,45 @@ export default function Home() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const waveAnimRef = useRef<number>(0);
+  const videoPollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const lang = UI_LANGS[activeLang] || UI_LANGS.AR;
-  // لغات RTL: عربي + فارسي + أردي + عبري
   const isRTL = ["AR", "FA", "UR", "HE"].includes(activeLang);
 
   const generateMutation = trpc.khayal.generateScene.useMutation();
   const generateFilmMutation = trpc.khayal.generateFilm.useMutation();
   const checkContentMutation = trpc.khayal.checkContent.useMutation();
+  const quickProduceMutation = trpc.video.quickProduce.useMutation();
+  const generateScriptMutation = trpc.video.generateScript.useMutation();
+  const jobStatusQuery = trpc.video.getJobStatus.useQuery(
+    { jobId: videoJob?.jobId ?? "" },
+    {
+      enabled: !!videoJob?.jobId && videoJob.status !== "done" && videoJob.status !== "failed",
+      refetchInterval: 2000,
+    }
+  );
+
+  // ── مزامنة حالة الوظيفة ──
+  useEffect(() => {
+    if (!jobStatusQuery.data || !videoJob) return;
+    const d = jobStatusQuery.data;
+    if (d.status === "not_found") return;
+    setVideoJob(prev => prev ? {
+      ...prev,
+      status: d.status as VideoJobState["status"],
+      progress: d.progress,
+      currentStep: d.currentStep,
+      videoUrl: d.videoUrl,
+      error: d.error,
+    } : null);
+  }, [jobStatusQuery.data]);
 
   // ── تنظيف الموسيقى عند الخروج ──
   useEffect(() => {
-    return () => { musicEngine.stop(); };
+    return () => {
+      musicEngine.stop();
+      if (videoPollingRef.current) clearInterval(videoPollingRef.current);
+    };
   }, []);
 
   // ── Particles ──
@@ -252,26 +328,34 @@ export default function Home() {
     return () => cancelAnimationFrame(f);
   }, []);
 
-  // ── Scene rotation ──
   useEffect(() => {
     const t = setInterval(() => setPortalIdx(i => (i + 1) % PORTAL_SCENES.length), 4000);
     return () => clearInterval(t);
   }, []);
+
   useEffect(() => {
     const t = setInterval(() => setBgIdx(i => (i + 1) % PORTAL_SCENES.length), 8000);
     return () => clearInterval(t);
   }, []);
 
-  // ── Portal glow on typing ──
   useEffect(() => { setPortalGlow(prompt.length > 0 || !!documentAnalysis); }, [prompt, documentAnalysis]);
 
-  // ── Auto-resize textarea ──
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       textareaRef.current.style.height = Math.min(textareaRef.current.scrollHeight, 180) + "px";
     }
   }, [prompt]);
+
+  // ── إظهار الخيارات عند الكتابة ──
+  useEffect(() => {
+    if (prompt.length > 2 || documentAnalysis) {
+      setShowModeOptions(true);
+    } else {
+      setShowModeOptions(false);
+      setSelectedMode(null);
+    }
+  }, [prompt, documentAnalysis]);
 
   // ── Live waveform animation ──
   const startWaveAnimation = useCallback(() => {
@@ -281,7 +365,6 @@ export default function Home() {
       const bufferLength = analyser.frequencyBinCount;
       const dataArray = new Uint8Array(bufferLength);
       analyser.getByteTimeDomainData(dataArray);
-
       let sum = 0;
       for (let i = 0; i < bufferLength; i++) {
         const v = (dataArray[i] - 128) / 128;
@@ -289,7 +372,6 @@ export default function Home() {
       }
       const rms = Math.sqrt(sum / bufferLength);
       setVolume(rms);
-
       const barCount = 28;
       const step = Math.floor(bufferLength / barCount);
       const bars = Array.from({ length: barCount }, (_, i) => {
@@ -317,7 +399,6 @@ export default function Home() {
       stopWaveAnimation();
       return;
     }
-
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const audioCtx = new AudioContext();
@@ -328,7 +409,6 @@ export default function Home() {
       analyser.smoothingTimeConstant = 0.75;
       source.connect(analyser);
       analyserRef.current = analyser;
-
       const mr = new MediaRecorder(stream);
       audioChunksRef.current = [];
       mr.ondataavailable = e => audioChunksRef.current.push(e.data);
@@ -336,40 +416,30 @@ export default function Home() {
         stream.getTracks().forEach(t => t.stop());
         audioCtxRef.current?.close();
         analyserRef.current = null;
-
         const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         const fd = new FormData();
         fd.append("audio", blob, "voice.webm");
-        // لا نُرسل language — الخادم يكشفها تلقائياً
         try {
           const res = await fetch("/api/transcribe", { method: "POST", body: fd });
           const data = await res.json();
           if (data.text) {
             setPrompt(prev => prev ? prev + " " + data.text : data.text);
-            // ── كشف اللغة تلقائياً وتحديث الواجهة فوراً ──
             if (data.language) {
               const detectedLang = data.language.toUpperCase().slice(0, 2);
-              // خريطة رموز ISO → مفاتيح UI_LANGS
               const ISO_MAP: Record<string, string> = {
                 AR: "AR", EN: "EN", JA: "JA", FR: "FR",
                 ZH: "ZH", IT: "IT", ES: "ES", HI: "HI",
-                // لغات إضافية تُعيَّن للأقرب
                 DE: "EN", PT: "ES", RU: "EN", KO: "JA",
                 TR: "EN", FA: "AR", UR: "HI", BN: "HI",
               };
               const mappedLang = ISO_MAP[detectedLang] || "EN";
-              if (mappedLang in UI_LANGS) {
-                setActiveLang(mappedLang);
-              }
+              if (mappedLang in UI_LANGS) setActiveLang(mappedLang);
             }
           }
-        } catch {
-          // silently ignore
-        } finally {
+        } catch { /* ignore */ } finally {
           setMicState("idle");
         }
       };
-
       mr.start();
       mediaRecorderRef.current = mr;
       setIsRecording(true);
@@ -380,20 +450,17 @@ export default function Home() {
     }
   }, [isRecording, startWaveAnimation, stopWaveAnimation]);
 
-  // ── Image upload (for reference image, not documents) ──
+  // ── Image upload ──
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
-
     const fd = new FormData();
     fd.append("file", file);
     try {
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const data = await res.json();
       if (data.url) setUploadedImageUrl(data.url);
-    } catch {
-      // ignore
-    }
+    } catch { /* ignore */ }
   };
 
   // ── فحص المحتوى الأخلاقي ──
@@ -405,208 +472,148 @@ export default function Home() {
         alert(filterResult.message || "❗ محتوى غير لائق");
         return;
       }
-    } catch {
-      // إذا فشل الفحص نسمح بالمرور
-    }
+    } catch { /* allow on error */ }
     onPass();
   };
 
-  // ── Generate (standard — 5-8 scenes) ──
-  const handleGenerate = async () => {
+  // ── توليد صورة ──
+  const handleGenerateImage = async () => {
     const desc = prompt.trim() || documentAnalysis?.mainDescription || "";
     if (!desc && !uploadedImageUrl && !urlInput) return;
-
-    // فحص أخلاقي أولاً
     await checkAndGenerate(desc, async () => {
-    setIsGenerating(true);
-    setPortalGlow(true);
-
-    try {
-      const res = await generateMutation.mutateAsync({
-        description: desc || "خيال حر",
-        referenceImageUrl: uploadedImageUrl || urlInput || undefined,
-        title: (desc || "خيال").slice(0, 60),
-        sceneCount: 5,
-        documentAnalysis: documentAnalysis ? {
-          extractedText: documentAnalysis.extractedText,
-          projectTitle: documentAnalysis.projectTitle,
-          projectType: documentAnalysis.projectType,
-          dimensions: documentAnalysis.dimensions,
-          architecturalElements: documentAnalysis.architecturalElements,
-          geometricMass: documentAnalysis.geometricMass,
-          mainDescription: documentAnalysis.mainDescription,
-          culturalContext: documentAnalysis.culturalContext,
-          language: documentAnalysis.language,
-          confidence: documentAnalysis.confidence,
-        } : undefined,
-      });
-
-      setResult(res as GenerationResult);
-      // تشغيل الموسيقى حسب السيناريو
-      const mood = selectMusicMood(
-        (res as GenerationResult).scenarioType || "imagine",
-        (res as GenerationResult).atmosphere
-      );
-      musicEngine.play(mood, 0.12);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setIsGenerating(false);
-    }
-    }); // end checkAndGenerate
+      setIsGenerating(true);
+      setPortalGlow(true);
+      try {
+        const res = await generateMutation.mutateAsync({
+          description: desc || "خيال حر",
+          referenceImageUrl: uploadedImageUrl || urlInput || undefined,
+          title: (desc || "خيال").slice(0, 60),
+          sceneCount: 5,
+          documentAnalysis: documentAnalysis ? {
+            extractedText: documentAnalysis.extractedText,
+            projectTitle: documentAnalysis.projectTitle,
+            projectType: documentAnalysis.projectType,
+            dimensions: documentAnalysis.dimensions,
+            architecturalElements: documentAnalysis.architecturalElements,
+            geometricMass: documentAnalysis.geometricMass,
+            mainDescription: documentAnalysis.mainDescription,
+            culturalContext: documentAnalysis.culturalContext,
+            language: documentAnalysis.language,
+            confidence: documentAnalysis.confidence,
+          } : undefined,
+        });
+        setResult(res as GenerationResult);
+        const mood = selectMusicMood(
+          (res as GenerationResult).scenarioType || "imagine",
+          (res as GenerationResult).atmosphere
+        );
+        musicEngine.play(mood, 0.12);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsGenerating(false);
+      }
+    });
   };
 
-  // ── Generate Film (batched) ──
-  const handleFilmConfirm = async (durationSeconds: number) => {
-    setShowFilmModal(false);
-    const desc = prompt.trim() || documentAnalysis?.mainDescription || "خيال حر";
-
-    // فحص أخلاقي أولاً
+  // ── توليد فيديو ──
+  const handleGenerateVideo = async () => {
+    const desc = prompt.trim() || documentAnalysis?.mainDescription || "";
+    if (!desc) return;
     await checkAndGenerate(desc, async () => {
-
-    // حساب عدد المشاهد بنفس معادلة الخادم
-    const isUnlimited = durationSeconds >= 99999;
-    const effectiveSec = isUnlimited ? 3600 : Math.max(5, durationSeconds);
-    const SCENE_SCREEN_TIME = effectiveSec < 60 ? 5 : 8;
-    const totalScenes = isUnlimited ? 999 : Math.max(1, Math.ceil(effectiveSec / SCENE_SCREEN_TIME));
-    const BATCH_SIZE = 8;
-    const totalBatches = isUnlimited ? 999 : Math.ceil(totalScenes / BATCH_SIZE);
-    const mins = Math.floor(effectiveSec / 60);
-    const secs = effectiveSec % 60;
-    const durationLabel = isUnlimited ? "∞ بلا حد" : mins > 0 ? `${mins}م ${secs}ث` : `${secs} ثانية`;
-
-    setFilmProgress({
-      isActive: true,
-      totalScenes,
-      completedScenes: 0,
-      currentBatch: 0,
-      totalBatches,
-      durationSeconds: effectiveSec,
-      durationLabel,
-      accumulatedScenes: [],
-      projectId: null,
-      isComplete: false,
-    });
-
-    // لا موسيقى أثناء التوليد — صمت كامل حتى تكتمل المشاهد
-    musicEngine.stop();
-
-    let currentProjectId: number | null = null;
-    let allScenes: GenerationResult["scenes"] = [];
-    let lastResult: any = null;
-
-    for (let batchIdx = 0; batchIdx < totalBatches; batchIdx++) {
+      const genre = FILM_GENRES.find(g => g.id === selectedGenre);
+      const fullDesc = genre ? `[${genre.label}] ${desc}` : desc;
+      const langCode = ["AR", "FA", "UR", "HE"].includes(activeLang) ? "ar" : "en";
       try {
-        const batchResult = await generateFilmMutation.mutateAsync({
-          description: desc,
-          durationMinutes: Math.ceil(effectiveSec / 60),
-          referenceImageUrl: uploadedImageUrl || urlInput || undefined,
-          documentAnalysis: documentAnalysis || undefined,
-          batchIndex: batchIdx,
-          projectId: currentProjectId || undefined,
+        const result = await quickProduceMutation.mutateAsync({
+          description: fullDesc,
+          language: langCode,
+          voice: selectedVoice as any,
+          sceneCount: videoSceneCount,
+          options: {
+            aspectRatio: "16:9",
+            mode: "production",
+            musicVolume: 0.12,
+            useRunway: true,
+            useElevenLabs: true,
+          },
         });
-
-        currentProjectId = batchResult.projectId || currentProjectId;
-        allScenes = [...allScenes, ...batchResult.scenes];
-        lastResult = batchResult;
-
-        setFilmProgress(prev => prev ? {
-          ...prev,
-          completedScenes: allScenes.length,
-          currentBatch: batchIdx + 1,
-          accumulatedScenes: allScenes,
-          projectId: currentProjectId,
-          isComplete: batchResult.isComplete,
-        } : null);
-
-        if (batchResult.isComplete) break;
-        // إذا وصلنا للحد الأعلى في وضع بلا حد نتوقف بعد 500 مشهد
-        if (isUnlimited && allScenes.length >= 500) break;
+        setVideoJob({
+          jobId: result.jobId,
+          status: "pending",
+          progress: 0,
+          currentStep: "جاري التحضير...",
+        });
       } catch (err) {
-        console.error(`[Film] Batch ${batchIdx} failed:`, err);
+        console.error(err);
       }
-    }
+    });
+  };
 
-    musicEngine.stop();
+  // ── توليد سيناريو ──
+  const handleGenerateScript = async () => {
+    const desc = prompt.trim() || documentAnalysis?.mainDescription || "";
+    if (!desc) return;
+    await checkAndGenerate(desc, async () => {
+      setIsGeneratingScript(true);
+      try {
+        const langCode = ["AR", "FA", "UR", "HE"].includes(activeLang) ? "ar" : "en";
+        const genre = FILM_GENRES.find(g => g.id === selectedGenre);
+        const fullDesc = genre ? `[${genre.label}] ${desc}` : desc;
+        const result = await generateScriptMutation.mutateAsync({
+          description: fullDesc,
+          language: langCode,
+          voice: selectedVoice as any,
+          sceneCount: videoSceneCount,
+        });
+        // تحويل السيناريو إلى نص قابل للقراءة
+        const s = result.script;
+        const scriptText = [
+          `# ${s.title}`,
+          ``,
+          `**الراوي:** ${s.narration}`,
+          ``,
+          `---`,
+          ``,
+          ...s.scenes.map((scene: any, i: number) => [
+            `## المشهد ${i + 1}`,
+            `**الصورة:** ${scene.imagePrompt}`,
+            `**الترجمة:** ${scene.subtitle}`,
+            scene.narration ? `**التعليق:** ${scene.narration}` : "",
+            `**المدة:** ${scene.duration} ثانية`,
+          ].filter(Boolean).join("\n")),
+        ].join("\n");
+        setScriptResult(scriptText);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsGeneratingScript(false);
+      }
+    });
+  };
 
-    // عرض النتيجة
-    if (allScenes.length > 0 && lastResult) {
-      const mood = selectMusicMood(lastResult.scenarioType || "imagine", lastResult.atmosphere);
-      musicEngine.play(mood, 0.12);
-      setFilmProgress(null);
-      setResult({
-        projectId: currentProjectId,
-        description: desc,
-        scenarioType: lastResult.scenarioType || "imagine",
-        scenes: allScenes,
-        title: lastResult.title,
-        culturalContext: lastResult.culturalContext,
-        atmosphere: lastResult.atmosphere,
-        cinematicStyle: lastResult.cinematicStyle,
-        mainElements: lastResult.mainElements,
-        detectedLanguage: lastResult.detectedLanguage,
-        unifiedConcept: lastResult.unifiedConcept,
-        filmRequirements: lastResult.filmRequirements,
-        totalScenes: lastResult.totalScenes,
-        isComplete: true,
-      });
-    } else {
-      setFilmProgress(null);
+  // ── الزر الرئيسي ──
+  const handleMainAction = () => {
+    if (!selectedMode) {
+      // إذا لم يختر وضعاً → صورة افتراضياً
+      handleGenerateImage();
+    } else if (selectedMode === "image") {
+      handleGenerateImage();
+    } else if (selectedMode === "video") {
+      handleGenerateVideo();
+    } else if (selectedMode === "script") {
+      handleGenerateScript();
     }
-    }); // end checkAndGenerate
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleGenerate();
+      handleMainAction();
     }
   };
 
-  // ── Show Chat / Video Producer ──
-  if (showVideoProducer) {
-    return (
-      <div
-        className="min-h-screen flex flex-col relative overflow-hidden"
-        dir="rtl"
-        style={{ fontFamily: "'Tajawal', 'Cairo', sans-serif", background: "#020408" }}
-      >
-        {/* ── نفس خلفية الصفحة الرئيسية ── */}
-        <div className="absolute inset-0 z-0 pointer-events-none">
-          <div className="absolute inset-0" style={{ backgroundImage: `url(${SPACE_BG})`, backgroundSize: "cover", backgroundPosition: "center", opacity: 0.35 }} />
-          {PORTAL_SCENES.map((src, i) => (
-            <div key={i} className="absolute inset-0" style={{ backgroundImage: `url(${src})`, backgroundSize: "cover", backgroundPosition: "center", opacity: i === bgIdx ? 0.08 : 0, transition: "opacity 2s ease" }} />
-          ))}
-          <div className="absolute inset-0 bg-gradient-to-b from-[#020408] via-transparent to-[#020408] opacity-80" />
-          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 35%, rgba(120,60,220,0.12) 0%, transparent 70%)" }} />
-        </div>
-
-        {/* Header */}
-        <div
-          className="relative z-10 flex items-center gap-3 px-4 py-3 border-b border-purple-500/15"
-          style={{ background: "rgba(2,4,8,0.85)", backdropFilter: "blur(16px)" }}
-        >
-          <button
-            onClick={() => setShowVideoProducer(false)}
-            className="flex items-center gap-2 text-purple-400 hover:text-purple-200 text-sm transition-colors"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M19 12H5M12 19l-7-7 7-7"/>
-            </svg>
-            <span style={{ fontFamily: "'Tajawal', sans-serif" }}>خيال</span>
-          </button>
-          <span className="text-white/15">/</span>
-          <span className="text-sm font-bold" style={{ color: "#a78bfa" }}>المساعد الذكي</span>
-        </div>
-        {/* Chat — يأخذ كل المساحة المتبقية */}
-        <div className="relative z-10 flex-1 overflow-hidden">
-          <KhayalChat />
-        </div>
-      </div>
-    );
-  }
-
-  // ── Show result viewer ──
+  // ── عرض نتيجة الصورة ──
   if (result) {
     return (
       <KhayalCinematicViewer
@@ -620,70 +627,31 @@ export default function Home() {
     );
   }
 
-  // ── Show film progress ──
+  // ── عرض تقدم الفيلم ──
   if (filmProgress?.isActive) {
     const progressPct = filmProgress.totalScenes > 0
       ? Math.round((filmProgress.completedScenes / filmProgress.totalScenes) * 100)
       : 0;
-
     return (
-      <div
-        className="min-h-screen bg-[#020408] flex flex-col items-center justify-center px-4"
-        dir={isRTL ? "rtl" : "ltr"}
-      >
-        {/* Background */}
+      <div className="min-h-screen bg-[#020408] flex flex-col items-center justify-center px-4" dir={isRTL ? "rtl" : "ltr"}>
         <div className="absolute inset-0 z-0">
           <div className="absolute inset-0" style={{ backgroundImage: `url(${SPACE_BG})`, backgroundSize: "cover", opacity: 0.3 }} />
           <div className="absolute inset-0 bg-gradient-to-b from-[#020408] via-transparent to-[#020408] opacity-90" />
         </div>
-
         <div className="relative z-10 w-full max-w-lg text-center">
-          {/* Film reel icon */}
-          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center mx-auto mb-6 shadow-2xl" style={{ boxShadow: "0 0 60px rgba(139,92,246,0.4)" }}>
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-purple-600 to-pink-600 flex items-center justify-center mx-auto mb-6 shadow-2xl">
             <span className="text-3xl">🎬</span>
           </div>
-
           <h2 className="text-2xl font-bold text-white mb-2">{lang.filmProgress}</h2>
-          <p className="text-purple-300 text-sm mb-8">
-            {filmProgress.durationLabel} · {filmProgress.totalScenes >= 999 ? "∞" : filmProgress.totalScenes} {activeLang === "AR" ? "مشهد" : "scenes"}
-          </p>
-
-          {/* Progress bar */}
+          <p className="text-purple-300 text-sm mb-8">{filmProgress.durationLabel}</p>
           <div className="w-full bg-white/10 rounded-full h-3 mb-4 overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${progressPct}%`,
-                background: "linear-gradient(90deg, #7c3aed, #ec4899, #0ea5e9)",
-                boxShadow: "0 0 12px rgba(124,58,237,0.6)",
-              }}
-            />
+            <div className="h-full rounded-full transition-all duration-500"
+              style={{ width: `${progressPct}%`, background: "linear-gradient(90deg, #7c3aed, #ec4899, #0ea5e9)" }} />
           </div>
-
           <div className="flex justify-between text-xs text-gray-400 mb-8">
-            <span>{filmProgress.completedScenes} / {filmProgress.totalScenes} {activeLang === "AR" ? "مشهد" : "scenes"}</span>
+            <span>{filmProgress.completedScenes} / {filmProgress.totalScenes}</span>
             <span>{progressPct}%</span>
           </div>
-
-          {/* Batch indicator */}
-          <div className="flex justify-center gap-2 mb-6">
-            {Array.from({ length: filmProgress.totalBatches }, (_, i) => (
-              <div
-                key={i}
-                className="w-2 h-2 rounded-full transition-all duration-300"
-                style={{
-                  background: i < filmProgress.currentBatch
-                    ? "#a78bfa"
-                    : i === filmProgress.currentBatch
-                    ? "#ec4899"
-                    : "rgba(255,255,255,0.15)",
-                  transform: i === filmProgress.currentBatch ? "scale(1.5)" : "scale(1)",
-                }}
-              />
-            ))}
-          </div>
-
-          {/* Live scenes preview */}
           {filmProgress.accumulatedScenes.length > 0 && (
             <div className="grid grid-cols-4 gap-2">
               {filmProgress.accumulatedScenes.slice(-8).map((scene, i) => (
@@ -699,6 +667,8 @@ export default function Home() {
   }
 
   const glowIntensity = Math.min(volume * 8, 1);
+  const currentGenre = FILM_GENRES.find(g => g.id === selectedGenre) || FILM_GENRES[0];
+  const currentVoice = ELEVEN_VOICES_LIST.find(v => v.id === selectedVoice) || ELEVEN_VOICES_LIST[0];
 
   return (
     <div
@@ -706,9 +676,7 @@ export default function Home() {
       dir={isRTL ? "rtl" : "ltr"}
       style={{ fontFamily: "'Tajawal', 'Cairo', sans-serif" }}
     >
-      {/* ═══════════════════════════════════════════════════════════
-          COSMIC BACKGROUND
-      ═══════════════════════════════════════════════════════════ */}
+      {/* ═══ COSMIC BACKGROUND ═══ */}
       <div className="absolute inset-0 z-0">
         <div className="absolute inset-0" style={{ backgroundImage: `url(${SPACE_BG})`, backgroundSize: "cover", backgroundPosition: "center", opacity: 0.4 }} />
         {PORTAL_SCENES.map((src, i) => (
@@ -719,9 +687,7 @@ export default function Home() {
         <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 35%, rgba(120,60,220,0.15) 0%, transparent 70%)" }} />
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════
-          FLOATING PARTICLES
-      ═══════════════════════════════════════════════════════════ */}
+      {/* ═══ FLOATING PARTICLES ═══ */}
       <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
         {particles.map(p => (
           <div key={p.id} className="absolute rounded-full" style={{
@@ -734,9 +700,7 @@ export default function Home() {
         ))}
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════
-          LANGUAGE SELECTOR (top corner)
-      ═══════════════════════════════════════════════════════════ */}
+      {/* ═══ LANGUAGE SELECTOR ═══ */}
       <div className="absolute top-4 left-4 z-30">
         <div className="relative">
           <button
@@ -762,7 +726,7 @@ export default function Home() {
                   style={{ color: lk === activeLang ? "#a78bfa" : "rgba(255,255,255,0.6)" }}
                 >
                   <span className="font-bold w-6">{lk}</span>
-                  <span>{{AR:"العربية",EN:"English",JA:"日本語",FR:"Français",ZH:"中文",IT:"Italiano",ES:"Español",HI:"हिन्दी"}[lk]}</span>
+                  <span>{{ AR:"العربية", EN:"English", JA:"日本語", FR:"Français", ZH:"中文", IT:"Italiano", ES:"Español", HI:"हिन्दी" }[lk]}</span>
                 </button>
               ))}
             </div>
@@ -770,16 +734,13 @@ export default function Home() {
         </div>
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════
-          MAIN CONTENT
-      ═══════════════════════════════════════════════════════════ */}
+      {/* ═══ MAIN CONTENT ═══ */}
       <div className="relative z-10 flex flex-col items-center min-h-screen px-4 py-8">
 
         {/* ── COSMIC PORTAL ── */}
         <div className="relative flex items-center justify-center mb-6 mt-8" style={{ width: 260, height: 260 }}>
           <div className="absolute rounded-full border border-purple-500/15" style={{ width: 260, height: 260, animation: "spin 22s linear infinite" }} />
           <div className="absolute rounded-full border border-blue-500/10" style={{ width: 230, height: 230, animation: "spin 16s linear infinite reverse" }} />
-
           {portalGlow && (
             <div className="absolute rounded-full pointer-events-none" style={{
               width: 280, height: 280,
@@ -787,7 +748,6 @@ export default function Home() {
               animation: "portalPulse 2s ease-in-out infinite",
             }} />
           )}
-
           <div className="absolute rounded-full overflow-hidden" style={{
             width: 200, height: 200,
             border: `2px solid ${portalGlow ? "rgba(139,92,246,0.6)" : "rgba(139,92,246,0.25)"}`,
@@ -802,7 +762,6 @@ export default function Home() {
             ))}
             <div className="absolute inset-0" style={{ background: "radial-gradient(circle at center, rgba(139,92,246,0.2) 0%, rgba(2,4,8,0.5) 100%)" }} />
           </div>
-
           {[0, 1, 2].map(i => (
             <div key={i} className="absolute w-2.5 h-2.5 rounded-full" style={{
               background: ["#a78bfa", "#60a5fa", "#34d399"][i],
@@ -827,9 +786,7 @@ export default function Home() {
           </p>
         </div>
 
-        {/* ══════════════════════════════════════════════════════════
-            DOCUMENT UPLOADER (collapsible)
-        ══════════════════════════════════════════════════════════ */}
+        {/* ── DOCUMENT UPLOADER ── */}
         <div className="w-full max-w-3xl mb-3">
           <button
             onClick={() => setShowDocUploader(v => !v)}
@@ -850,7 +807,6 @@ export default function Home() {
               </span>
             )}
           </button>
-
           {showDocUploader && (
             <div className="mb-3">
               <DocumentUploader
@@ -858,16 +814,10 @@ export default function Home() {
                 onAnalysisComplete={(analysis, imageUrl) => {
                   setDocumentAnalysis(analysis);
                   if (imageUrl && imageUrl.startsWith("http")) setUploadedImageUrl(imageUrl);
-                  // Auto-fill prompt if empty
-                  if (!prompt.trim()) {
-                    setPrompt(analysis.mainDescription.slice(0, 200));
-                  }
+                  if (!prompt.trim()) setPrompt(analysis.mainDescription.slice(0, 200));
                   setShowDocUploader(false);
                 }}
-                onClear={() => {
-                  setDocumentAnalysis(null);
-                  setUploadedImageUrl(null);
-                }}
+                onClear={() => { setDocumentAnalysis(null); setUploadedImageUrl(null); }}
               />
             </div>
           )}
@@ -895,7 +845,6 @@ export default function Home() {
               onChange={e => {
                 const val = e.target.value;
                 setPrompt(val);
-                // ── كشف اللغة من النص تلقائياً ──
                 if (val.length > 8) {
                   const arabicRx = /[\u0600-\u06FF]/;
                   const japaneseRx = /[\u3040-\u30FF\u4E00-\u9FFF]/;
@@ -946,17 +895,13 @@ export default function Home() {
 
             {/* ── BOTTOM BAR ── */}
             <div className="flex items-center justify-between px-4 pb-3 pt-1 gap-3">
-
-              {/* Left: mic + upload + url + film */}
               <div className="flex items-center gap-2">
 
-                {/* ── MICROPHONE with live waveform ── */}
+                {/* Microphone */}
                 <div className="flex items-center gap-1.5">
-                  <div
-                    className="flex items-center gap-[2px] overflow-hidden rounded-lg transition-all duration-300"
+                  <div className="flex items-center gap-[2px] overflow-hidden rounded-lg transition-all duration-300"
                     style={{
-                      width: isRecording ? 90 : 0,
-                      height: 28,
+                      width: isRecording ? 90 : 0, height: 28,
                       opacity: isRecording ? 1 : 0,
                       background: "rgba(139,92,246,0.08)",
                       border: isRecording ? "1px solid rgba(167,139,250,0.25)" : "none",
@@ -965,35 +910,22 @@ export default function Home() {
                     }}
                   >
                     {waveData.map((h, i) => (
-                      <div
-                        key={i}
-                        className="rounded-full flex-shrink-0"
-                        style={{
-                          width: 2,
-                          height: `${Math.max(4, h * 24)}px`,
-                          background: `hsl(${260 + i * 3 + volume * 40}, ${70 + volume * 30}%, ${55 + volume * 20}%)`,
-                          boxShadow: volume > 0.1 ? `0 0 4px hsl(${260 + i * 3}, 80%, 70%)` : "none",
-                          transition: "height 0.05s ease",
-                        }}
-                      />
+                      <div key={i} className="rounded-full flex-shrink-0" style={{
+                        width: 2, height: `${Math.max(4, h * 24)}px`,
+                        background: `hsl(${260 + i * 3 + volume * 40}, ${70 + volume * 30}%, ${55 + volume * 20}%)`,
+                        boxShadow: volume > 0.1 ? `0 0 4px hsl(${260 + i * 3}, 80%, 70%)` : "none",
+                        transition: "height 0.05s ease",
+                      }} />
                     ))}
                   </div>
-
                   <button
                     onClick={handleVoiceRecord}
                     className="relative flex items-center justify-center rounded-xl transition-all duration-200 hover:scale-110 active:scale-95 flex-shrink-0"
                     style={{
                       width: 34, height: 34,
-                      background: isRecording
-                        ? `rgba(239,68,68,${0.15 + glowIntensity * 0.25})`
-                        : "rgba(167,139,250,0.1)",
-                      border: `1px solid ${isRecording
-                        ? `rgba(239,68,68,${0.5 + glowIntensity * 0.5})`
-                        : "rgba(167,139,250,0.25)"}`,
+                      background: isRecording ? `rgba(239,68,68,${0.15 + glowIntensity * 0.25})` : "rgba(167,139,250,0.1)",
+                      border: `1px solid ${isRecording ? `rgba(239,68,68,${0.5 + glowIntensity * 0.5})` : "rgba(167,139,250,0.25)"}`,
                       color: isRecording ? "#ef4444" : "#a78bfa",
-                      boxShadow: isRecording
-                        ? `0 0 ${8 + glowIntensity * 20}px rgba(239,68,68,${0.3 + glowIntensity * 0.5})`
-                        : "none",
                     }}
                     title={isRecording ? "إيقاف التسجيل" : "تسجيل صوتي"}
                   >
@@ -1012,7 +944,6 @@ export default function Home() {
                       </svg>
                     )}
                   </button>
-
                   {micState !== "idle" && (
                     <span className="text-xs" style={{ color: micState === "listening" ? "#ef4444" : "#a78bfa", animation: "fadeIn 0.3s ease" }}>
                       {micState === "listening" ? lang.listening : lang.processing}
@@ -1049,68 +980,349 @@ export default function Home() {
                   </svg>
                 </button>
 
-                {/* Video Producer button */}
-                <button
-                  onClick={() => setShowVideoProducer(true)}
-                  className="flex items-center gap-1.5 px-3 h-[34px] rounded-xl text-xs font-bold transition-all hover:scale-105"
-                  style={{
-                    background: "rgba(59,130,246,0.12)",
-                    border: "1px solid rgba(59,130,246,0.35)",
-                    color: "#60a5fa",
-                  }}
-                  title="إنتاج فيديو احترافي"
-                >
-                  <span>🎥</span>
-                  <span className="hidden sm:inline">فيديو</span>
-                </button>
-
               </div>
 
               {/* Right: generate button */}
               <button
-                onClick={handleGenerate}
-                disabled={isGenerating || (!prompt.trim() && !documentAnalysis && !uploadedImageUrl && !urlInput)}
+                onClick={handleMainAction}
+                disabled={isGenerating || isGeneratingScript || (!prompt.trim() && !documentAnalysis && !uploadedImageUrl && !urlInput)}
                 className="flex items-center gap-2 px-5 py-2 rounded-xl font-bold text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 flex-shrink-0"
                 style={{
                   fontFamily: "'Tajawal', sans-serif",
-                  background: isGenerating
+                  background: (isGenerating || isGeneratingScript)
                     ? "rgba(139,92,246,0.3)"
+                    : selectedMode === "video"
+                    ? "linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 100%)"
+                    : selectedMode === "script"
+                    ? "linear-gradient(135deg, #065f46 0%, #10b981 100%)"
                     : "linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #0ea5e9 100%)",
                   color: "white",
-                  boxShadow: isGenerating ? "none" : "0 0 20px rgba(124,58,237,0.4)",
+                  boxShadow: (isGenerating || isGeneratingScript) ? "none" : "0 0 20px rgba(124,58,237,0.4)",
                   minWidth: 110,
                 }}
               >
-                {isGenerating ? (
+                {(isGenerating || isGeneratingScript) ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>يُشكّل...</span>
                   </>
                 ) : (
                   <>
-                    <span style={{ fontSize: 15 }}>✦</span>
-                    <span>{lang.btn}</span>
+                    <span style={{ fontSize: 15 }}>
+                      {selectedMode === "video" ? "🎬" : selectedMode === "script" ? "📄" : "✦"}
+                    </span>
+                    <span>
+                      {selectedMode === "video" ? lang.modeVideo
+                        : selectedMode === "script" ? lang.modeScript
+                        : lang.btn}
+                    </span>
                   </>
                 )}
               </button>
             </div>
           </div>
+
+          {/* ══════════════════════════════════════════════════════════
+              خيارات الإنتاج — تظهر أسفل البوكس عند الكتابة
+          ══════════════════════════════════════════════════════════ */}
+          {showModeOptions && (
+            <div
+              className="mt-3 rounded-2xl overflow-hidden transition-all duration-500"
+              style={{
+                background: "rgba(8,9,20,0.92)",
+                border: "1px solid rgba(139,92,246,0.2)",
+                backdropFilter: "blur(20px)",
+                animation: "fadeIn 0.3s ease",
+              }}
+            >
+              {/* أزرار الوضع */}
+              <div className="flex gap-0 border-b border-white/5">
+                {[
+                  { mode: "image" as ProductionMode,  icon: "🎨", label: lang.modeImage,  color: "#a78bfa" },
+                  { mode: "video" as ProductionMode,  icon: "🎬", label: lang.modeVideo,  color: "#60a5fa" },
+                  { mode: "script" as ProductionMode, icon: "📄", label: lang.modeScript, color: "#34d399" },
+                ].map(({ mode, icon, label, color }) => (
+                  <button
+                    key={mode}
+                    onClick={() => setSelectedMode(prev => prev === mode ? null : mode)}
+                    className="flex-1 flex items-center justify-center gap-2 py-3 text-sm font-bold transition-all"
+                    style={{
+                      color: selectedMode === mode ? color : "rgba(255,255,255,0.4)",
+                      background: selectedMode === mode ? `${color}18` : "transparent",
+                      borderBottom: selectedMode === mode ? `2px solid ${color}` : "2px solid transparent",
+                    }}
+                  >
+                    <span>{icon}</span>
+                    <span style={{ fontFamily: "'Tajawal', sans-serif" }}>{label}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* خيارات الفيديو */}
+              {selectedMode === "video" && (
+                <div className="p-4 space-y-4" style={{ animation: "fadeIn 0.2s ease" }}>
+
+                  {/* نوع الفيلم */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold" style={{ color: "rgba(196,181,253,0.7)" }}>نوع الفيلم</span>
+                      <button
+                        onClick={() => setShowGenrePanel(v => !v)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all"
+                        style={{
+                          background: "rgba(167,139,250,0.12)",
+                          border: "1px solid rgba(167,139,250,0.25)",
+                          color: currentGenre.color,
+                        }}
+                      >
+                        <span>{currentGenre.icon}</span>
+                        <span>{currentGenre.label}</span>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d={showGenrePanel ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"}/>
+                        </svg>
+                      </button>
+                    </div>
+                    {showGenrePanel && (
+                      <div className="grid grid-cols-4 gap-1.5" style={{ animation: "fadeIn 0.2s ease" }}>
+                        {FILM_GENRES.map(genre => (
+                          <button
+                            key={genre.id}
+                            onClick={() => { setSelectedGenre(genre.id); setShowGenrePanel(false); }}
+                            className="flex flex-col items-center gap-1 py-2 px-1 rounded-xl text-xs transition-all hover:scale-105"
+                            style={{
+                              background: selectedGenre === genre.id ? `${genre.color}20` : "rgba(255,255,255,0.04)",
+                              border: `1px solid ${selectedGenre === genre.id ? genre.color + "60" : "rgba(255,255,255,0.08)"}`,
+                              color: selectedGenre === genre.id ? genre.color : "rgba(255,255,255,0.5)",
+                            }}
+                          >
+                            <span style={{ fontSize: 16 }}>{genre.icon}</span>
+                            <span style={{ fontFamily: "'Tajawal', sans-serif", fontSize: 10 }}>{genre.label}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* اختيار الصوت */}
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-bold" style={{ color: "rgba(196,181,253,0.7)" }}>الصوت</span>
+                      <button
+                        onClick={() => setShowVoicePanel(v => !v)}
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs transition-all"
+                        style={{
+                          background: "rgba(96,165,250,0.12)",
+                          border: "1px solid rgba(96,165,250,0.25)",
+                          color: "#60a5fa",
+                        }}
+                      >
+                        <span>{currentVoice.icon}</span>
+                        <span>{currentVoice.label}</span>
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                          <path d={showVoicePanel ? "M18 15l-6-6-6 6" : "M6 9l6 6 6-6"}/>
+                        </svg>
+                      </button>
+                    </div>
+                    {showVoicePanel && (
+                      <div className="grid grid-cols-1 gap-1" style={{ animation: "fadeIn 0.2s ease" }}>
+                        {ELEVEN_VOICES_LIST.map(voice => (
+                          <button
+                            key={voice.id}
+                            onClick={() => { setSelectedVoice(voice.id); setShowVoicePanel(false); }}
+                            className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs transition-all hover:bg-white/5"
+                            style={{
+                              background: selectedVoice === voice.id ? "rgba(96,165,250,0.12)" : "transparent",
+                              border: `1px solid ${selectedVoice === voice.id ? "rgba(96,165,250,0.4)" : "rgba(255,255,255,0.06)"}`,
+                              color: selectedVoice === voice.id ? "#60a5fa" : "rgba(255,255,255,0.55)",
+                            }}
+                          >
+                            <span style={{ fontSize: 14 }}>{voice.icon}</span>
+                            <span style={{ fontFamily: "'Tajawal', sans-serif" }}>{voice.label}</span>
+                            {selectedVoice === voice.id && (
+                              <span className="mr-auto text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "rgba(96,165,250,0.2)", color: "#60a5fa" }}>✓</span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* عدد المشاهد */}
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold" style={{ color: "rgba(196,181,253,0.7)" }}>عدد المشاهد</span>
+                    <div className="flex items-center gap-2">
+                      {[3, 5, 7, 10].map(n => (
+                        <button
+                          key={n}
+                          onClick={() => setVideoSceneCount(n)}
+                          className="w-8 h-8 rounded-lg text-xs font-bold transition-all hover:scale-110"
+                          style={{
+                            background: videoSceneCount === n ? "rgba(167,139,250,0.25)" : "rgba(255,255,255,0.05)",
+                            border: `1px solid ${videoSceneCount === n ? "rgba(167,139,250,0.5)" : "rgba(255,255,255,0.1)"}`,
+                            color: videoSceneCount === n ? "#a78bfa" : "rgba(255,255,255,0.4)",
+                          }}
+                        >{n}</button>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              )}
+
+              {/* خيارات الصورة */}
+              {selectedMode === "image" && (
+                <div className="px-4 py-3" style={{ animation: "fadeIn 0.2s ease" }}>
+                  <p className="text-xs" style={{ color: "rgba(196,181,253,0.5)" }}>
+                    🎨 سيُولَّد 5 مشاهد سينمائية بتأثيرات Ken Burns وموسيقى تلقائية
+                  </p>
+                </div>
+              )}
+
+              {/* خيارات السيناريو */}
+              {selectedMode === "script" && (
+                <div className="px-4 py-3" style={{ animation: "fadeIn 0.2s ease" }}>
+                  <p className="text-xs" style={{ color: "rgba(196,181,253,0.5)" }}>
+                    📄 سيُكتب سيناريو احترافي مع وصف المشاهد والحوارات والتعليقات الصوتية
+                  </p>
+                </div>
+              )}
+
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════
+              حالة إنتاج الفيديو — تظهر في نفس الصفحة
+          ══════════════════════════════════════════════════════════ */}
+          {videoJob && (
+            <div
+              className="mt-4 rounded-2xl p-4 transition-all"
+              style={{
+                background: "rgba(8,9,20,0.92)",
+                border: `1px solid ${videoJob.status === "done" ? "rgba(52,211,153,0.4)" : videoJob.status === "failed" ? "rgba(239,68,68,0.4)" : "rgba(96,165,250,0.3)"}`,
+                backdropFilter: "blur(20px)",
+                animation: "fadeIn 0.3s ease",
+              }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full" style={{
+                    background: videoJob.status === "done" ? "#34d399" : videoJob.status === "failed" ? "#ef4444" : "#60a5fa",
+                    animation: videoJob.status === "processing" ? "micPulse 1.5s ease-out infinite" : "none",
+                  }} />
+                  <span className="text-sm font-bold" style={{ color: "rgba(255,255,255,0.8)", fontFamily: "'Tajawal', sans-serif" }}>
+                    {videoJob.status === "done" ? "✅ اكتمل الإنتاج!" : videoJob.status === "failed" ? "❌ فشل الإنتاج" : "🎬 جاري إنتاج الفيديو..."}
+                  </span>
+                </div>
+                <button
+                  onClick={() => setVideoJob(null)}
+                  className="text-white/30 hover:text-white/70 text-xs transition-colors"
+                >✕</button>
+              </div>
+
+              {videoJob.status !== "done" && videoJob.status !== "failed" && (
+                <>
+                  <div className="w-full bg-white/10 rounded-full h-2 mb-2 overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-500"
+                      style={{ width: `${videoJob.progress}%`, background: "linear-gradient(90deg, #3b82f6, #0ea5e9)" }} />
+                  </div>
+                  <p className="text-xs" style={{ color: "rgba(148,163,184,0.6)", fontFamily: "'Tajawal', sans-serif" }}>
+                    {videoJob.currentStep} — {videoJob.progress}%
+                  </p>
+                </>
+              )}
+
+              {videoJob.status === "done" && videoJob.videoUrl && (
+                <div className="mt-2">
+                  <video
+                    src={videoJob.videoUrl}
+                    controls
+                    className="w-full rounded-xl"
+                    style={{ maxHeight: 280, background: "#000" }}
+                  />
+                  <a
+                    href={videoJob.videoUrl}
+                    download="khayal-video.mp4"
+                    className="mt-2 flex items-center justify-center gap-2 w-full py-2 rounded-xl text-sm font-bold transition-all hover:scale-105"
+                    style={{ background: "rgba(52,211,153,0.15)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399", fontFamily: "'Tajawal', sans-serif" }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
+                    </svg>
+                    تحميل الفيديو
+                  </a>
+                </div>
+              )}
+
+              {videoJob.status === "failed" && (
+                <p className="text-xs mt-1" style={{ color: "rgba(239,68,68,0.8)", fontFamily: "'Tajawal', sans-serif" }}>
+                  {videoJob.error || "حدث خطأ أثناء الإنتاج"}
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════════════════════
+              نتيجة السيناريو — تظهر في نفس الصفحة
+          ══════════════════════════════════════════════════════════ */}
+          {scriptResult && (
+            <div
+              className="mt-4 rounded-2xl p-4 transition-all"
+              style={{
+                background: "rgba(8,9,20,0.92)",
+                border: "1px solid rgba(52,211,153,0.3)",
+                backdropFilter: "blur(20px)",
+                animation: "fadeIn 0.3s ease",
+              }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-sm font-bold" style={{ color: "#34d399", fontFamily: "'Tajawal', sans-serif" }}>📄 السيناريو</span>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const blob = new Blob([scriptResult], { type: "text/plain;charset=utf-8" });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement("a");
+                      a.href = url;
+                      a.download = "khayal-script.txt";
+                      a.click();
+                      URL.revokeObjectURL(url);
+                    }}
+                    className="text-xs px-2 py-1 rounded-lg transition-all hover:scale-105"
+                    style={{ background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.25)", color: "#34d399" }}
+                  >
+                    تحميل
+                  </button>
+                  <button onClick={() => setScriptResult(null)} className="text-white/30 hover:text-white/70 text-xs">✕</button>
+                </div>
+              </div>
+              <div
+                className="text-xs leading-relaxed overflow-y-auto max-h-80 whitespace-pre-wrap"
+                style={{ color: "rgba(255,255,255,0.7)", fontFamily: "'Tajawal', sans-serif" }}
+                dir="rtl"
+              >
+                {scriptResult}
+              </div>
+            </div>
+          )}
+
         </div>
 
         {/* ── GENERATING ANIMATION ── */}
-        {isGenerating && (
+        {(isGenerating || isGeneratingScript) && (
           <div className="mt-8 text-center">
             <div className="flex items-center justify-center gap-2 mb-3">
               {[0,1,2,3,4].map(i => (
                 <div key={i} className="rounded-full" style={{
                   width: 7, height: 7, background: "#a78bfa",
-                  animation: `bounce 1.2s ease-in-out infinite`,
+                  animation: "bounce 1.2s ease-in-out infinite",
                   animationDelay: `${i * 0.15}s`,
                 }} />
               ))}
             </div>
             <p style={{ color: "rgba(196,181,253,0.7)", fontSize: 14 }}>
-              {documentAnalysis
+              {isGeneratingScript
+                ? "يكتب السيناريو الاحترافي..."
+                : documentAnalysis
                 ? `يُحلّل ${documentAnalysis.projectTitle} ويُشكّل المشاهد...`
                 : "يُحلّل الخيال ويُشكّل المشاهد السينمائية..."
               }
@@ -1119,7 +1331,7 @@ export default function Home() {
         )}
 
         {/* ── EXAMPLE PROMPTS ── */}
-        {!isGenerating && (
+        {!isGenerating && !isGeneratingScript && !videoJob && !scriptResult && (
           <div className="mt-8 w-full max-w-3xl">
             <p className="text-center text-xs mb-3" style={{ color: "rgba(148,163,184,0.45)" }}>
               {lang.examples}
@@ -1167,9 +1379,7 @@ export default function Home() {
 
       </div>
 
-      {/* ═══════════════════════════════════════════════════════════
-          CSS ANIMATIONS
-      ═══════════════════════════════════════════════════════════ */}
+      {/* ═══ CSS ANIMATIONS ═══ */}
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;900&family=Cairo:wght@300;400;600;700;900&display=swap');
 

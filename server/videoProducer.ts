@@ -78,10 +78,19 @@ export interface VideoScene {
   sceneType?: SceneType;
 }
 
+/** كل أصوات ElevenLabs المدعومة */
+export type VoiceId =
+  | "ar_male" | "ar_female" | "en_male" | "en_female"
+  | "ar_male_formal" | "ar_male_energetic" | "ar_male_calm"
+  | "ar_female_formal" | "ar_female_emotional" | "ar_female_marketing"
+  | "en_male_formal" | "en_male_energetic"
+  | "en_female_formal" | "en_female_emotional"
+  | "documentary_narrator";
+
 export interface VideoScript {
   title: string;
   language: "ar" | "en";
-  voice: "ar_male" | "ar_female" | "en_male" | "en_female";
+  voice: VoiceId;
   narration: string;
   scenes: VideoScene[];
   domain?: string;
@@ -737,7 +746,7 @@ export class VideoProducer {
 export async function generateVideoScript(
   userInput: string,
   language: "ar" | "en" = "ar",
-  voice: VideoScript["voice"] = "ar_male",
+  voice: VoiceId = "ar_male",
   sceneCount: number = 6
 ): Promise<VideoScript> {
   const systemPrompt = `أنت مخرج سينمائي محترف ومتخصص في إنتاج الأفلام التعليمية والوثائقية والتسويقية.
