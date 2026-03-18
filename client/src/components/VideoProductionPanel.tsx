@@ -1,6 +1,6 @@
 /**
- * VideoProductionPanel v2.0 — واجهة إنتاج الفيديو الاحترافي
- * Pipeline v2.0: وصف → سيناريو → صور → صوت → Ken Burns (8 تأثيرات) → دمج (8 انتقالات) → موسيقى → فيديو MP4
+ * VideoProductionPanel v3.0 — واجهة إنتاج الفيديو الاحترافي
+ * Pipeline v3.0: وصف → سيناريو → صور → ElevenLabs TTS → Runway Gen-4 → Ken Burns (Fallback) → دمج → موسيقى → MP4
  */
 
 import { useState, useEffect } from "react";
@@ -17,7 +17,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-// ─── الأنواع v2.0 ─────────────────────────────────────────────
+// ─── الأنواع v3.0 ─────────────────────────────────────────────
 
 type MotionEffect =
   | "zoom_in" | "zoom_out" | "pan_left" | "pan_right"
@@ -57,6 +57,8 @@ interface ProductionMetrics {
   fileSizeMB?: number;
   sceneCount?: number;
   costEstimate?: number;
+  usedElevenLabs?: boolean;
+  usedRunway?: boolean;
 }
 
 type ProductionStep =
@@ -103,6 +105,17 @@ const EXAMPLES = [
   "قصة الأسد والفأر — حكاية عن الوفاء والصداقة للأطفال",
 ];
 
+// ─── مراحل Pipeline v3.0 ──────────────────────────────────────
+
+const PIPELINE_STAGES = [
+  { label: "توليد الصور", icon: "🖼️", threshold: 5 },
+  { label: "ElevenLabs TTS", icon: "🎙️", threshold: 35 },
+  { label: "Runway Gen-4", icon: "🎞️", threshold: 50 },
+  { label: "تجميع المشاهد", icon: "🎥", threshold: 72 },
+  { label: "دمج المشاهد", icon: "🔗", threshold: 80 },
+  { label: "رفع الفيديو", icon: "☁️", threshold: 95 },
+];
+
 // ─── المكوّن الرئيسي ──────────────────────────────────────────
 
 export default function VideoProductionPanel() {
@@ -112,6 +125,8 @@ export default function VideoProductionPanel() {
   const [sceneCount, setSceneCount] = useState(6);
   const [aspectRatio, setAspectRatio] = useState<AspectRatio>("16:9");
   const [mode, setMode] = useState<ProductionMode>("production");
+  const [useRunway, setUseRunway] = useState(true);
+  const [useElevenLabs, setUseElevenLabs] = useState(true);
 
   const [step, setStep] = useState<ProductionStep>("idle");
   const [script, setScript] = useState<VideoScript | null>(null);
@@ -122,7 +137,6 @@ export default function VideoProductionPanel() {
   const [error, setError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<ProductionMetrics | null>(null);
   const [notFoundCount, setNotFoundCount] = useState(0);
-  const jobStartTime = useState<number | null>(null)[0];
 
   // ── Mutations ──
   const generateScriptMutation = trpc.video.generateScript.useMutation();
@@ -141,11 +155,9 @@ export default function VideoProductionPanel() {
   useEffect(() => {
     if (!jobStatus) return;
 
-    // معالجة حالة not_found — قد تكون المهمة لم تُسجَّل بعد أو انتهت صلاحيتها
     if (jobStatus.status === "not_found") {
       setNotFoundCount(prev => {
         const next = prev + 1;
-        // نتحمّل حتى 5 محاولات (10 ثوانٍ) قبل إعلان الفشل
         if (next >= 5) {
           setError("انتهت صلاحية الجلسة أو أُعيد تشغيل الخادم. يرجى إعادة المحاولة.");
           setStep("failed");
@@ -155,7 +167,6 @@ export default function VideoProductionPanel() {
       return;
     }
 
-    // إعادة تعيين عداد not_found عند أي استجابة صحيحة
     setNotFoundCount(0);
     setProgress(jobStatus.progress);
     setCurrentStep(jobStatus.currentStep);
@@ -197,7 +208,7 @@ export default function VideoProductionPanel() {
     try {
       const result = await startProductionMutation.mutateAsync({
         script: script as Parameters<typeof startProductionMutation.mutateAsync>[0]["script"],
-        options: { aspectRatio, mode },
+        options: { aspectRatio, mode, useRunway, useElevenLabs },
       });
       setJobId(result.jobId);
     } catch (err) {
@@ -217,7 +228,7 @@ export default function VideoProductionPanel() {
     try {
       const result = await quickProduceMutation.mutateAsync({
         description, language, voice, sceneCount,
-        options: { aspectRatio, mode },
+        options: { aspectRatio, mode, useRunway, useElevenLabs },
       });
       setJobId(result.jobId);
     } catch (err) {
@@ -247,13 +258,27 @@ export default function VideoProductionPanel() {
       <div className="text-center">
         <h2 className="text-2xl font-bold text-white mb-1">🎬 إنتاج الفيديو الاحترافي</h2>
         <p className="text-blue-300/70 text-sm">
-          أي محتوى → سيناريو → صور → صوت → Ken Burns (8 تأثيرات) → دمج (8 انتقالات) → موسيقى → MP4
+          وصف → سيناريو → صور → ElevenLabs TTS → Runway Gen-4 → دمج → موسيقى → MP4
         </p>
-        {/* شارات الإمكانيات */}
+        {/* شارات الإمكانيات v3.0 */}
         <div className="flex flex-wrap justify-center gap-2 mt-2">
-          {["8 تأثيرات حركة", "8 انتقالات", "موسيقى خلفية", "4 نسب أبعاد", "وضع مسودة/إنتاج", "مقاييس الأداء"].map(cap => (
-            <span key={cap} className="text-xs bg-blue-900/30 border border-blue-500/20 text-blue-300 px-2 py-0.5 rounded-full">
-              {cap}
+          {[
+            { label: "🎙️ ElevenLabs TTS", color: "purple" },
+            { label: "🎞️ Runway Gen-4", color: "blue" },
+            { label: "8 تأثيرات حركة", color: "blue" },
+            { label: "8 انتقالات", color: "blue" },
+            { label: "موسيقى خلفية", color: "blue" },
+            { label: "4 نسب أبعاد", color: "blue" },
+          ].map(cap => (
+            <span
+              key={cap.label}
+              className={`text-xs border px-2 py-0.5 rounded-full ${
+                cap.color === "purple"
+                  ? "bg-purple-900/30 border-purple-500/20 text-purple-300"
+                  : "bg-blue-900/30 border-blue-500/20 text-blue-300"
+              }`}
+            >
+              {cap.label}
             </span>
           ))}
         </div>
@@ -313,10 +338,10 @@ export default function VideoProductionPanel() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="ar_male">ذكر عربي</SelectItem>
-                    <SelectItem value="ar_female">أنثى عربية</SelectItem>
-                    <SelectItem value="en_male">Male EN</SelectItem>
-                    <SelectItem value="en_female">Female EN</SelectItem>
+                    <SelectItem value="ar_male">🎙️ ذكر عربي</SelectItem>
+                    <SelectItem value="ar_female">🎙️ أنثى عربية</SelectItem>
+                    <SelectItem value="en_male">🎙️ Male EN</SelectItem>
+                    <SelectItem value="en_female">🎙️ Female EN</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -351,23 +376,69 @@ export default function VideoProductionPanel() {
               </div>
             </div>
 
-            {/* وضع الإنتاج */}
-            <div className="flex gap-3 items-center">
-              <label className="text-blue-300/70 text-xs">وضع الإنتاج:</label>
-              <div className="flex gap-2">
-                {(["draft", "production"] as ProductionMode[]).map(m => (
+            {/* وضع الإنتاج + خيارات AI */}
+            <div className="flex flex-col gap-3">
+              {/* وضع الإنتاج */}
+              <div className="flex gap-3 items-center flex-wrap">
+                <label className="text-blue-300/70 text-xs">وضع الإنتاج:</label>
+                <div className="flex gap-2">
+                  {(["draft", "production"] as ProductionMode[]).map(m => (
+                    <button
+                      key={m}
+                      onClick={() => setMode(m)}
+                      className={`px-3 py-1 rounded-full text-xs border transition-all ${
+                        mode === m
+                          ? "bg-blue-600 border-blue-400 text-white"
+                          : "bg-transparent border-blue-500/30 text-blue-300/60 hover:border-blue-500/60"
+                      }`}
+                    >
+                      {m === "draft" ? "🔧 مسودة (سريع)" : "🎬 إنتاج (احترافي)"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* خيارات AI v3.0 */}
+              <div className="flex gap-3 items-center flex-wrap">
+                <label className="text-blue-300/70 text-xs">محركات AI:</label>
+                <div className="flex gap-2 flex-wrap">
+                  {/* ElevenLabs Toggle */}
                   <button
-                    key={m}
-                    onClick={() => setMode(m)}
-                    className={`px-3 py-1 rounded-full text-xs border transition-all ${
-                      mode === m
-                        ? "bg-blue-600 border-blue-400 text-white"
-                        : "bg-transparent border-blue-500/30 text-blue-300/60 hover:border-blue-500/60"
+                    onClick={() => setUseElevenLabs(!useElevenLabs)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border transition-all ${
+                      useElevenLabs
+                        ? "bg-purple-700 border-purple-400 text-white"
+                        : "bg-transparent border-purple-500/30 text-purple-300/50 hover:border-purple-500/60"
                     }`}
                   >
-                    {m === "draft" ? "🔧 مسودة (سريع)" : "🎬 إنتاج (احترافي)"}
+                    <span>🎙️</span>
+                    <span>ElevenLabs TTS</span>
+                    <span className={`text-xs ${useElevenLabs ? "text-purple-200" : "text-purple-400/40"}`}>
+                      {useElevenLabs ? "✓" : "✗"}
+                    </span>
                   </button>
-                ))}
+
+                  {/* Runway Toggle */}
+                  <button
+                    onClick={() => setUseRunway(!useRunway)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs border transition-all ${
+                      useRunway
+                        ? "bg-blue-700 border-blue-400 text-white"
+                        : "bg-transparent border-blue-500/30 text-blue-300/50 hover:border-blue-500/60"
+                    }`}
+                  >
+                    <span>🎞️</span>
+                    <span>Runway Gen-4</span>
+                    <span className={`text-xs ${useRunway ? "text-blue-200" : "text-blue-400/40"}`}>
+                      {useRunway ? "✓" : "✗"}
+                    </span>
+                  </button>
+                </div>
+                {!useRunway && (
+                  <span className="text-yellow-400/70 text-xs">
+                    ← Ken Burns Fallback
+                  </span>
+                )}
               </div>
             </div>
 
@@ -482,6 +553,17 @@ export default function VideoProductionPanel() {
               ))}
             </div>
 
+            {/* شارات المحركات المفعّلة */}
+            <div className="flex gap-2 flex-wrap">
+              <span className="text-blue-300/50 text-xs self-center">محركات الإنتاج:</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full border ${useElevenLabs ? "bg-purple-900/40 border-purple-500/30 text-purple-300" : "bg-gray-900/40 border-gray-500/20 text-gray-500"}`}>
+                🎙️ ElevenLabs {useElevenLabs ? "✓" : "✗"}
+              </span>
+              <span className={`text-xs px-2 py-0.5 rounded-full border ${useRunway ? "bg-blue-900/40 border-blue-500/30 text-blue-300" : "bg-gray-900/40 border-gray-500/20 text-gray-500"}`}>
+                🎞️ Runway {useRunway ? "✓" : "✗"}
+              </span>
+            </div>
+
             {/* أزرار */}
             <div className="flex gap-3">
               <Button
@@ -525,37 +607,52 @@ export default function VideoProductionPanel() {
               </div>
               <div className="w-full bg-[#08090f] rounded-full h-3 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-600 to-blue-400 transition-all duration-500 rounded-full"
+                  className="h-full bg-gradient-to-r from-purple-600 via-blue-600 to-blue-400 transition-all duration-500 rounded-full"
                   style={{ width: `${progress}%` }}
                 />
               </div>
             </div>
 
-            {/* مراحل Pipeline */}
+            {/* مراحل Pipeline v3.0 */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {[
-                { label: "توليد الصور", icon: "🖼️", threshold: 5 },
-                { label: "توليد الصوت", icon: "🎙️", threshold: 40 },
-                { label: "Ken Burns (8 تأثيرات)", icon: "🎥", threshold: 55 },
-                { label: "دمج المشاهد", icon: "🔗", threshold: 80 },
-                { label: "إضافة الصوت", icon: "🔊", threshold: 88 },
-                { label: "رفع الفيديو", icon: "☁️", threshold: 95 },
-              ].map((stage) => (
-                <div
-                  key={stage.label}
-                  className={`flex items-center gap-2 p-2 rounded-lg text-sm transition-all ${
-                    progress >= stage.threshold
-                      ? "bg-blue-900/30 text-blue-200 border border-blue-500/30"
-                      : "bg-[#08090f] text-blue-300/30 border border-transparent"
-                  }`}
-                >
-                  <span>{stage.icon}</span>
-                  <span className="text-xs">{stage.label}</span>
-                  {progress >= stage.threshold && (
-                    <span className="mr-auto text-green-400">✓</span>
-                  )}
-                </div>
-              ))}
+              {PIPELINE_STAGES.map((stage) => {
+                // إخفاء Runway إذا كان معطلاً
+                if (stage.label === "Runway Gen-4" && !useRunway) {
+                  return (
+                    <div key={stage.label} className="flex items-center gap-2 p-2 rounded-lg text-sm bg-[#08090f] text-blue-300/20 border border-transparent">
+                      <span>{stage.icon}</span>
+                      <span className="text-xs line-through">{stage.label}</span>
+                      <span className="mr-auto text-xs">Ken Burns</span>
+                    </div>
+                  );
+                }
+                // إخفاء ElevenLabs إذا كان معطلاً
+                if (stage.label === "ElevenLabs TTS" && !useElevenLabs) {
+                  return (
+                    <div key={stage.label} className="flex items-center gap-2 p-2 rounded-lg text-sm bg-[#08090f] text-blue-300/20 border border-transparent">
+                      <span>{stage.icon}</span>
+                      <span className="text-xs line-through">{stage.label}</span>
+                      <span className="mr-auto text-xs">بدون صوت</span>
+                    </div>
+                  );
+                }
+                return (
+                  <div
+                    key={stage.label}
+                    className={`flex items-center gap-2 p-2 rounded-lg text-sm transition-all ${
+                      progress >= stage.threshold
+                        ? "bg-blue-900/30 text-blue-200 border border-blue-500/30"
+                        : "bg-[#08090f] text-blue-300/30 border border-transparent"
+                    }`}
+                  >
+                    <span>{stage.icon}</span>
+                    <span className="text-xs">{stage.label}</span>
+                    {progress >= stage.threshold && (
+                      <span className="mr-auto text-green-400">✓</span>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </CardContent>
         </Card>
@@ -578,18 +675,27 @@ export default function VideoProductionPanel() {
               />
             </div>
 
-            {/* مقاييس الأداء */}
+            {/* مقاييس الأداء v3.0 */}
             {metrics && (
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 {[
                   { label: "وقت الإنتاج", value: metrics.durationMs ? `${Math.round(metrics.durationMs / 1000)}ث` : "—", icon: "⏱️" },
                   { label: "حجم الملف", value: metrics.fileSizeMB ? `${metrics.fileSizeMB} MB` : "—", icon: "📦" },
                   { label: "عدد المشاهد", value: metrics.sceneCount ? `${metrics.sceneCount} مشهد` : "—", icon: "🎬" },
                   { label: "التكلفة التقديرية", value: metrics.costEstimate ? `$${metrics.costEstimate}` : "—", icon: "💰" },
+                  { label: "ElevenLabs TTS", value: metrics.usedElevenLabs ? "✓ مُفعّل" : "✗ Fallback", icon: "🎙️", highlight: metrics.usedElevenLabs },
+                  { label: "Runway Gen-4", value: metrics.usedRunway ? "✓ مُفعّل" : "✗ Ken Burns", icon: "🎞️", highlight: metrics.usedRunway },
                 ].map(m => (
-                  <div key={m.label} className="bg-[#08090f] rounded-lg p-3 text-center border border-blue-500/10">
+                  <div
+                    key={m.label}
+                    className={`rounded-lg p-3 text-center border ${
+                      (m as any).highlight
+                        ? "bg-blue-900/20 border-blue-500/30"
+                        : "bg-[#08090f] border-blue-500/10"
+                    }`}
+                  >
                     <div className="text-2xl mb-1">{m.icon}</div>
-                    <div className="text-white font-bold text-sm">{m.value}</div>
+                    <div className={`font-bold text-sm ${(m as any).highlight ? "text-blue-300" : "text-white"}`}>{m.value}</div>
                     <div className="text-blue-300/50 text-xs">{m.label}</div>
                   </div>
                 ))}

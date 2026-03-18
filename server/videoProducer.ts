@@ -1,14 +1,15 @@
 /**
- * VideoProducer v2.0 — منتج الفيديو الاحترافي
- * النسخة 2.0 — مارس 2026
+ * VideoProducer v3.0 — منتج الفيديو الاحترافي
+ * النسخة 3.0 — مارس 2026
  *
- * Pipeline: صور → صوت TTS → Ken Burns (8 تأثيرات) → ترجمة → دمج (8 انتقالات) → موسيقى → S3
+ * Pipeline المحسّن:
+ * صور → ElevenLabs TTS → Runway Image-to-Video → Ken Burns (Fallback) → ترجمة → دمج → موسيقى → S3
  *
  * المبادئ:
  * 1. السيناريو أولاً — النص القوي قبل التقنية
  * 2. الصورة تخدم النص وتعززه
- * 3. الحركة تضيف الحياة (8 تأثيرات Ken Burns)
- * 4. الصوت يحمل العاطفة
+ * 3. Runway يحرّك الصور (Image-to-Video) — Ken Burns كـ Fallback
+ * 4. ElevenLabs يولّد الصوت الاحترافي — صمت كـ Fallback
  * 5. الانتقالات تربط المشاهد بسلاسة (8 انتقالات)
  * 6. الموسيقى تصنع المزاج
  */
@@ -21,15 +22,17 @@ import path from "path";
 import os from "os";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
+import { ElevenLabsEngine, selectVoiceForDomain, type ElevenLabsVoiceId } from "./elevenLabsEngine";
+import { RunwayEngine, selectMotionForDomain } from "./runwayEngine";
 
 // تعيين مسار ffmpeg
 ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 // ═══════════════════════════════════════════════════════════
-// الأنواع — النسخة 2.0
+// الأنواع — النسخة 3.0
 // ═══════════════════════════════════════════════════════════
 
-/** 8 تأثيرات حركة Ken Burns */
+/** 8 تأثيرات حركة Ken Burns (Fallback عند عدم توفر Runway) */
 export type MotionEffect =
   | "zoom_in"
   | "zoom_out"
@@ -53,11 +56,11 @@ export type TransitionEffect =
 
 /** 5 أنواع مشاهد */
 export type SceneType =
-  | "b_roll"        // لقطات تكميلية (الافتراضي)
-  | "talking_head"  // متحدث أمام كاميرا
-  | "animation"     // رسوم متحركة
-  | "screen_recording" // تسجيل شاشة
-  | "mixed";        // مزيج
+  | "b_roll"
+  | "talking_head"
+  | "animation"
+  | "screen_recording"
+  | "mixed";
 
 /** نسب الأبعاد المدعومة */
 export type AspectRatio = "16:9" | "9:16" | "1:1" | "4:3";
@@ -66,57 +69,60 @@ export type AspectRatio = "16:9" | "9:16" | "1:1" | "4:3";
 export type ProductionMode = "draft" | "production";
 
 export interface VideoScene {
-  imagePrompt: string;       // وصف الصورة بالإنجليزي
-  subtitle: string;          // الترجمة على الشاشة
-  narration?: string;        // نص التعليق الصوتي لهذا المشهد
-  duration: number;          // مدة المشهد بالثواني
-  zoom: MotionEffect;        // تأثير الحركة
-  transition?: TransitionEffect; // انتقال بعد هذا المشهد
-  sceneType?: SceneType;     // نوع المشهد
+  imagePrompt: string;
+  subtitle: string;
+  narration?: string;
+  duration: number;
+  zoom: MotionEffect;
+  transition?: TransitionEffect;
+  sceneType?: SceneType;
 }
 
 export interface VideoScript {
   title: string;
   language: "ar" | "en";
   voice: "ar_male" | "ar_female" | "en_male" | "en_female";
-  narration: string;         // النص الكامل للتعليق الصوتي
+  narration: string;
   scenes: VideoScene[];
-  domain?: string;           // المجال
-  musicMood?: string;        // مزاج الموسيقى (calm, epic, dramatic, playful)
+  domain?: string;
+  musicMood?: string;
 }
 
 export interface VideoJob {
   jobId: string;
   status: "pending" | "processing" | "done" | "failed";
-  progress: number;          // 0-100
+  progress: number;
   currentStep: string;
   videoUrl?: string;
   error?: string;
-  /** مقاييس الأداء */
   metrics?: {
-    durationMs?: number;     // وقت الإنتاج
-    fileSizeMB?: number;     // حجم الملف
-    sceneCount?: number;     // عدد المشاهد
-    costEstimate?: number;   // تقدير التكلفة بالدولار
+    durationMs?: number;
+    fileSizeMB?: number;
+    sceneCount?: number;
+    costEstimate?: number;
+    usedElevenLabs?: boolean;
+    usedRunway?: boolean;
   };
 }
 
 export interface VideoProductionOptions {
   aspectRatio?: AspectRatio;
   mode?: ProductionMode;
-  musicPath?: string;        // مسار ملف الموسيقى (اختياري)
-  musicVolume?: number;      // حجم الموسيقى (0.0 - 1.0)، الافتراضي 0.12
+  musicPath?: string;
+  musicVolume?: number;
+  useRunway?: boolean;   // تفعيل Runway Image-to-Video (افتراضي: true)
+  useElevenLabs?: boolean; // تفعيل ElevenLabs TTS (افتراضي: true)
 }
 
 // ═══════════════════════════════════════════════════════════
-// الإعدادات — النسخة 2.0
+// الإعدادات — النسخة 3.0
 // ═══════════════════════════════════════════════════════════
 
-const ASPECT_CONFIGS: Record<AspectRatio, { width: number; height: number }> = {
-  "16:9": { width: 1920, height: 1080 },
-  "9:16": { width: 1080, height: 1920 },
-  "1:1":  { width: 1080, height: 1080 },
-  "4:3":  { width: 1440, height: 1080 },
+const ASPECT_CONFIGS: Record<AspectRatio, { width: number; height: number; runwayRatio: string }> = {
+  "16:9": { width: 1920, height: 1080, runwayRatio: "1280:720" },
+  "9:16": { width: 1080, height: 1920, runwayRatio: "720:1280" },
+  "1:1":  { width: 1080, height: 1080, runwayRatio: "1104:832" },
+  "4:3":  { width: 1440, height: 1080, runwayRatio: "1104:832" },
 };
 
 const CONFIG = {
@@ -128,7 +134,7 @@ const CONFIG = {
   boldArabicFont: "/usr/share/fonts/truetype/noto/NotoNaskhArabic-Bold.ttf",
 };
 
-/** تأثيرات الحركة — 8 تأثيرات Ken Burns */
+/** تأثيرات الحركة — 8 تأثيرات Ken Burns (Fallback) */
 const MOTION_EFFECTS: Record<MotionEffect, (d: number, w: number, h: number, fps: number) => string> = {
   zoom_in:   (d, w, h, fps) => `zoompan=z='if(lte(zoom,1.0),1.05,zoom-0.0008)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${d * fps}:s=${w}x${h}:fps=${fps}`,
   zoom_out:  (d, w, h, fps) => `zoompan=z='if(gte(zoom,1.15),1.15,zoom+0.0008)':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=${d * fps}:s=${w}x${h}:fps=${fps}`,
@@ -144,7 +150,7 @@ const MOTION_EFFECTS: Record<MotionEffect, (d: number, w: number, h: number, fps
 const TRANSITIONS: Record<TransitionEffect, string> = {
   fade:        "fade=t=out:st=0:d=0.5",
   dissolve:    "fade=t=out:st=0:d=0.8:alpha=1",
-  wipe_left:   "fade=t=out:st=0:d=0.5",   // مبسّط — يُستبدل بـ xfade عند الدمج
+  wipe_left:   "fade=t=out:st=0:d=0.5",
   wipe_right:  "fade=t=out:st=0:d=0.5",
   zoom_fade:   "fade=t=out:st=0:d=0.6",
   blur_fade:   "fade=t=out:st=0:d=0.7",
@@ -152,26 +158,34 @@ const TRANSITIONS: Record<TransitionEffect, string> = {
   slide_right: "fade=t=out:st=0:d=0.5",
 };
 
-const VOICE_MAP = {
-  ar_male: "onyx",
-  ar_female: "nova",
-  en_male: "echo",
-  en_female: "shimmer",
-} as const;
+/** خريطة الصوت القديم → ElevenLabs */
+const LEGACY_VOICE_MAP: Record<string, ElevenLabsVoiceId> = {
+  ar_male:   "ar_male_formal",
+  ar_female: "ar_female_formal",
+  en_male:   "en_male_formal",
+  en_female: "en_female_formal",
+};
 
-/** وضع المسودة يستخدم نماذج أرخص */
+/** وضع المسودة يستخدم نماذج أسرع */
 const PRODUCTION_MODELS: Record<ProductionMode, { tts: string }> = {
-  draft:      { tts: "tts-1" },
-  production: { tts: "tts-1-hd" },
+  draft:      { tts: "eleven_turbo_v2_5" },
+  production: { tts: "eleven_multilingual_v2" },
 };
 
 // ═══════════════════════════════════════════════════════════
-// المنتج الرئيسي — النسخة 2.0
+// المنتج الرئيسي — النسخة 3.0
 // ═══════════════════════════════════════════════════════════
 
 export class VideoProducer {
   private workDir: string = "";
   private startTime: number = 0;
+  private elevenLabs: ElevenLabsEngine;
+  private runway: RunwayEngine;
+
+  constructor() {
+    this.elevenLabs = new ElevenLabsEngine();
+    this.runway = new RunwayEngine();
+  }
 
   async produce(
     script: VideoScript,
@@ -186,6 +200,8 @@ export class VideoProducer {
       mode = "production",
       musicPath,
       musicVolume = 0.12,
+      useRunway = true,
+      useElevenLabs = true,
     } = options;
 
     const dims = ASPECT_CONFIGS[aspectRatio];
@@ -195,30 +211,67 @@ export class VideoProducer {
       console.log(`[VideoProducer] ${progress}% — ${step}`);
     };
 
+    let usedElevenLabs = false;
+    let usedRunway = false;
+
     try {
+      // ── الخطوة 1: توليد الصور ──────────────────────────
       report("توليد الصور بالذكاء الاصطناعي...", 5);
       const imagePaths = await this.generateImages(script.scenes, dims, report);
 
-      report("توليد الصوت...", 40);
-      const audioPath = await this.generateAudio(script, mode);
+      // ── الخطوة 2: توليد الصوت (ElevenLabs) ─────────────
+      report("توليد الصوت الاحترافي (ElevenLabs)...", 35);
+      let audioPath: string | null = null;
+      if (useElevenLabs) {
+        audioPath = await this.generateAudioElevenLabs(script, mode);
+        if (audioPath) usedElevenLabs = true;
+      }
 
-      report("بناء المشاهد مع حركة Ken Burns...", 55);
-      const scenePaths = await this.buildScenes(script.scenes, imagePaths, dims, report);
+      // ── الخطوة 3: تحريك الصور (Runway) أو Ken Burns ────
+      let scenePaths: string[];
+      if (useRunway) {
+        report("تحريك الصور بـ Runway Gen-4...", 50);
+        const runwayResults = await this.generateRunwayVideos(
+          imagePaths,
+          script.scenes,
+          dims,
+          script.domain ?? "cinematic",
+          report
+        );
+        usedRunway = runwayResults.some((r) => r !== null);
 
+        // بناء المشاهد: Runway أو Ken Burns Fallback
+        report("تجميع المشاهد مع الترجمة...", 72);
+        scenePaths = await this.buildScenesWithRunway(
+          script.scenes,
+          imagePaths,
+          runwayResults,
+          dims,
+          report
+        );
+      } else {
+        // Ken Burns فقط
+        report("بناء المشاهد مع حركة Ken Burns...", 55);
+        scenePaths = await this.buildScenes(script.scenes, imagePaths, dims, report);
+      }
+
+      // ── الخطوة 4: دمج المشاهد ──────────────────────────
       report("دمج المشاهد...", 80);
       const mergedPath = await this.mergeScenes(scenePaths);
 
+      // ── الخطوة 5: إضافة الصوت ──────────────────────────
       report("إضافة الصوت...", 88);
       let finalPath = audioPath
         ? await this.assembleVideo(mergedPath, audioPath)
         : mergedPath;
 
-      // الخطوة 6: الموسيقى الخلفية (اختياري)
+      // ── الخطوة 6: الموسيقى الخلفية ─────────────────────
       if (musicPath) {
         report("إضافة الموسيقى الخلفية...", 92);
         finalPath = await this.addBackgroundMusic(finalPath, musicPath, musicVolume);
       }
 
+      // ── الخطوة 7: رفع الفيديو ──────────────────────────
       report("رفع الفيديو...", 95);
       const videoUrl = await this.uploadVideo(finalPath, script.title);
 
@@ -235,7 +288,9 @@ export class VideoProducer {
           durationMs,
           fileSizeMB: Math.round(fileSizeMB * 10) / 10,
           sceneCount: script.scenes.length,
-          costEstimate: this.estimateCost(script.scenes.length, mode),
+          costEstimate: this.estimateCost(script.scenes.length, mode, usedElevenLabs, usedRunway),
+          usedElevenLabs,
+          usedRunway,
         },
       });
 
@@ -264,7 +319,7 @@ export class VideoProducer {
 
       onProgress?.(
         `توليد صورة ${i + 1}/${scenes.length}...`,
-        5 + Math.round((i / scenes.length) * 30)
+        5 + Math.round((i / scenes.length) * 25)
       );
 
       const { generateImage } = await import("./_core/imageGeneration");
@@ -290,53 +345,171 @@ export class VideoProducer {
   }
 
   // ─────────────────────────────────────────────────────────
-  // الخطوة 2: توليد الصوت (مع دعم وضع المسودة)
+  // الخطوة 2: توليد الصوت (ElevenLabs)
   // ─────────────────────────────────────────────────────────
 
-  private async generateAudio(
+  private async generateAudioElevenLabs(
     script: VideoScript,
     mode: ProductionMode = "production"
   ): Promise<string | null> {
     const audioPath = path.join(this.workDir, "narration.mp3");
-    const voice = VOICE_MAP[script.voice] ?? "onyx";
-    const ttsModel = PRODUCTION_MODELS[mode].tts;
 
-    const { ENV } = await import("./_core/env");
-    const apiUrl = ENV.forgeApiUrl || "";
+    // اختيار الصوت المناسب
+    const domain = script.domain ?? "educational";
+    const gender = script.voice.includes("female") ? "female" : "male";
+    const elevenVoice = LEGACY_VOICE_MAP[script.voice] ??
+      selectVoiceForDomain(script.language, domain, gender);
+
+    const ttsModel = mode === "production"
+      ? "eleven_multilingual_v2"
+      : "eleven_turbo_v2_5";
 
     try {
-      const response = await fetch(`${apiUrl}/v1/audio/speech`, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${ENV.forgeApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: ttsModel,
-          voice,
-          input: script.narration,
-          speed: 0.95,
-        }),
+      const audioBuffer = await this.elevenLabs.generateSpeech({
+        voice: elevenVoice,
+        text: script.narration,
+        model: ttsModel as any,
       });
 
-      if (!response.ok) {
-        const err = await response.text();
-        console.warn(`[VideoProducer] TTS unavailable (${response.status}): ${err} — سيتم إنتاج الفيديو بدون صوت`);
+      if (!audioBuffer) {
+        console.warn("[VideoProducer] ElevenLabs TTS فشل — سيتم الإنتاج بدون صوت");
         return null;
       }
 
-      const buffer = Buffer.from(await response.arrayBuffer());
-      await fs.writeFile(audioPath, buffer);
-      console.log(`  ✓ صوت جاهز: ${audioPath}`);
+      await fs.writeFile(audioPath, audioBuffer);
+      console.log(`  ✓ صوت ElevenLabs جاهز: ${audioPath}`);
       return audioPath;
     } catch (e) {
-      console.warn(`[VideoProducer] TTS error: ${e} — سيتم إنتاج الفيديو بدون صوت`);
+      console.warn(`[VideoProducer] ElevenLabs error: ${e} — سيتم الإنتاج بدون صوت`);
       return null;
     }
   }
 
   // ─────────────────────────────────────────────────────────
-  // الخطوة 3: بناء المشاهد (8 تأثيرات Ken Burns + ترجمة)
+  // الخطوة 3: تحريك الصور بـ Runway
+  // ─────────────────────────────────────────────────────────
+
+  private async generateRunwayVideos(
+    imagePaths: string[],
+    scenes: VideoScene[],
+    dims: { width: number; height: number; runwayRatio: string },
+    domain: string,
+    onProgress?: (step: string, pct: number) => void
+  ): Promise<Array<string | null>> {
+    const results: Array<string | null> = [];
+
+    for (let i = 0; i < imagePaths.length; i++) {
+      onProgress?.(
+        `تحريك مشهد ${i + 1}/${imagePaths.length} بـ Runway...`,
+        50 + Math.round((i / imagePaths.length) * 20)
+      );
+
+      // رفع الصورة إلى S3 أولاً (Runway يحتاج URL عام)
+      const imgBuffer = await fs.readFile(imagePaths[i]);
+      const imgKey = `runway-input/scene_${i + 1}_${Date.now()}.png`;
+      const { url: imageUrl } = await storagePut(imgKey, imgBuffer, "image/png");
+
+      const motionPreset = selectMotionForDomain(domain, i);
+      const videoUrl = await this.runway.imageToVideo({
+        imageUrl,
+        motionPreset,
+        duration: 5,
+        ratio: dims.runwayRatio as any,
+        promptText: scenes[i].imagePrompt,
+      });
+
+      results.push(videoUrl);
+      console.log(`  [Runway] مشهد ${i + 1}: ${videoUrl ? "✓ متحرك" : "✗ Ken Burns Fallback"}`);
+    }
+
+    return results;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // بناء المشاهد مع Runway أو Ken Burns Fallback
+  // ─────────────────────────────────────────────────────────
+
+  private async buildScenesWithRunway(
+    scenes: VideoScene[],
+    imagePaths: string[],
+    runwayVideos: Array<string | null>,
+    dims: { width: number; height: number },
+    onProgress?: (step: string, pct: number) => void
+  ): Promise<string[]> {
+    const scenePaths: string[] = [];
+
+    for (let i = 0; i < scenes.length; i++) {
+      const scene = scenes[i];
+      const outputPath = path.join(this.workDir, `scene_${i + 1}_final.mp4`);
+
+      onProgress?.(
+        `تجميع مشهد ${i + 1}/${scenes.length}...`,
+        72 + Math.round((i / scenes.length) * 6)
+      );
+
+      // رسم الترجمة على الصورة
+      const imgWithSub = path.join(this.workDir, `scene_${i + 1}_sub.png`);
+      await this.drawSubtitle(imagePaths[i], scene.subtitle, imgWithSub, dims);
+
+      if (runwayVideos[i]) {
+        // استخدام فيديو Runway + إضافة الترجمة عليه
+        await this.addSubtitleToVideo(runwayVideos[i]!, scene.subtitle, scene.duration, dims, outputPath);
+        console.log(`  ✓ مشهد ${i + 1} (Runway + ترجمة)`);
+      } else {
+        // Fallback: Ken Burns
+        const motion = scene.zoom ?? "zoom_in";
+        await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath);
+        console.log(`  ✓ مشهد ${i + 1} (Ken Burns Fallback: ${motion})`);
+      }
+
+      scenePaths.push(outputPath);
+    }
+
+    return scenePaths;
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // إضافة ترجمة على فيديو Runway
+  // ─────────────────────────────────────────────────────────
+
+  private addSubtitleToVideo(
+    videoUrl: string,
+    subtitle: string,
+    duration: number,
+    dims: { width: number; height: number },
+    outputPath: string
+  ): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const isArabic = /[\u0600-\u06ff]/.test(subtitle);
+      const fontFile = isArabic ? CONFIG.arabicFont : CONFIG.latinFont;
+      const fontSize = isArabic ? 48 : 42;
+      const escapedSubtitle = subtitle.replace(/'/g, "\\'").replace(/:/g, "\\:");
+
+      ffmpeg()
+        .input(videoUrl)
+        .duration(duration)
+        .videoFilter([
+          // خلفية شبه شفافة
+          `drawbox=y=${dims.height - 130}:color=black@0.55:width=${dims.width}:height=110:t=fill`,
+          // خط أزرق
+          `drawbox=y=${dims.height - 130}:color=0x4488FF@0.8:width=${dims.width}:height=3:t=fill`,
+          // النص
+          `drawtext=fontfile=${fontFile}:text='${escapedSubtitle}':fontcolor=white:fontsize=${fontSize}:x=(w-text_w)/2:y=${dims.height - 80}:shadowcolor=black@0.7:shadowx=2:shadowy=2`,
+        ])
+        .videoCodec("libx264")
+        .outputOptions(["-preset fast", "-crf 20", "-pix_fmt yuv420p"])
+        .output(outputPath)
+        .on("end", () => resolve())
+        .on("error", (err: Error) => {
+          console.warn(`[VideoProducer] addSubtitleToVideo error: ${err.message} — using Ken Burns fallback`);
+          reject(err);
+        })
+        .run();
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // الخطوة 3 (Fallback): بناء المشاهد بـ Ken Burns
   // ─────────────────────────────────────────────────────────
 
   private async buildScenes(
@@ -357,16 +530,14 @@ export class VideoProducer {
         55 + Math.round((i / scenes.length) * 20)
       );
 
-      // رسم الترجمة على الصورة
       const imgWithSub = path.join(this.workDir, `scene_${i + 1}_sub.png`);
       await this.drawSubtitle(imgPath, scene.subtitle, imgWithSub, dims);
 
-      // بناء الفيديو مع تأثير الحركة
       const motion = scene.zoom ?? "zoom_in";
       await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath);
 
       scenePaths.push(outputPath);
-      console.log(`  ✓ مشهد ${i + 1} جاهز (${motion})`);
+      console.log(`  ✓ مشهد ${i + 1} جاهز (Ken Burns: ${motion})`);
     }
 
     return scenePaths;
@@ -394,40 +565,10 @@ export class VideoProducer {
       <feDropShadow dx="2" dy="2" stdDeviation="3" flood-color="rgba(0,0,0,0.8)"/>
     </filter>
   </defs>
-  <!-- خلفية شبه شفافة (RGBA 0,0,0,140) -->
-  <rect
-    x="0" y="${dims.height - 130}"
-    width="${dims.width}" height="110"
-    fill="rgba(0,0,0,0.55)"
-    rx="0"
-  />
-  <!-- خط مضيء أزرق -->
-  <rect
-    x="0" y="${dims.height - 130}"
-    width="${dims.width}" height="3"
-    fill="rgba(68,136,255,0.8)"
-  />
-  <!-- ظل النص -->
-  <text
-    x="${dims.width / 2 + 2}"
-    y="${dims.height - 57}"
-    text-anchor="middle"
-    font-family="${fontFamily}"
-    font-size="${fontSize}"
-    fill="rgba(0,0,0,0.7)"
-    direction="${textDirection}"
-  >${this.escapeXml(subtitle)}</text>
-  <!-- النص الرئيسي أبيض -->
-  <text
-    x="${dims.width / 2}"
-    y="${dims.height - 60}"
-    text-anchor="middle"
-    font-family="${fontFamily}"
-    font-size="${fontSize}"
-    fill="white"
-    direction="${textDirection}"
-    filter="url(#shadow)"
-  >${this.escapeXml(subtitle)}</text>
+  <rect x="0" y="${dims.height - 130}" width="${dims.width}" height="110" fill="rgba(0,0,0,0.55)" rx="0"/>
+  <rect x="0" y="${dims.height - 130}" width="${dims.width}" height="3" fill="rgba(68,136,255,0.8)"/>
+  <text x="${dims.width / 2 + 2}" y="${dims.height - 57}" text-anchor="middle" font-family="${fontFamily}" font-size="${fontSize}" fill="rgba(0,0,0,0.7)" direction="${textDirection}">${this.escapeXml(subtitle)}</text>
+  <text x="${dims.width / 2}" y="${dims.height - 60}" text-anchor="middle" font-family="${fontFamily}" font-size="${fontSize}" fill="white" direction="${textDirection}" filter="url(#shadow)">${this.escapeXml(subtitle)}</text>
 </svg>`;
 
     await sharp(imgPath)
@@ -527,7 +668,7 @@ export class VideoProducer {
   }
 
   // ─────────────────────────────────────────────────────────
-  // الخطوة 6: الموسيقى الخلفية (vol=0.12 افتراضياً)
+  // الخطوة 6: الموسيقى الخلفية
   // ─────────────────────────────────────────────────────────
 
   private addBackgroundMusic(
@@ -576,16 +717,21 @@ export class VideoProducer {
   // تقدير التكلفة
   // ─────────────────────────────────────────────────────────
 
-  private estimateCost(sceneCount: number, mode: ProductionMode): number {
-    // تقدير تقريبي: صورة DALL-E 3 = $0.04، TTS-HD = $0.015/1000 حرف
-    const imageCost = sceneCount * 0.04;
-    const ttsCost = mode === "production" ? 0.015 : 0.005;
-    return Math.round((imageCost + ttsCost) * 100) / 100;
+  private estimateCost(
+    sceneCount: number,
+    mode: ProductionMode,
+    usedElevenLabs: boolean,
+    usedRunway: boolean
+  ): number {
+    const imageCost = sceneCount * 0.04; // DALL-E 3
+    const ttsCost = usedElevenLabs ? (mode === "production" ? 0.03 : 0.01) : 0;
+    const runwayCost = usedRunway ? sceneCount * 0.05 : 0; // ~5 credits/scene
+    return Math.round((imageCost + ttsCost + runwayCost) * 100) / 100;
   }
 }
 
 // ═══════════════════════════════════════════════════════════
-// مولّد السيناريو الذكي v2.0
+// مولّد السيناريو الذكي v3.0
 // ═══════════════════════════════════════════════════════════
 
 export async function generateVideoScript(
@@ -617,6 +763,7 @@ export async function generateVideoScript(
 - تاريخي: أحداث، شخصيات، حضارات
 - علمي: فيزياء، كيمياء، رياضيات، طب
 - فضائي: كواكب، نجوم، مجرات
+- سينمائي: أفلام، مشاهد درامية، أكشن
 
 أعد JSON بالتنسيق التالي بدون أي نص إضافي:
 {

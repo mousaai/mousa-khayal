@@ -1,7 +1,7 @@
 /**
- * videoRouter.ts v2.0 — محرك الفيديو الاحترافي
- * يتبع منهج الإخراج v2.0:
- * سيناريو → صور → صوت → Ken Burns (8 تأثيرات) → دمج (8 انتقالات) → موسيقى → رفع
+ * videoRouter.ts v3.0 — محرك الفيديو الاحترافي
+ * يتبع منهج الإخراج v3.0:
+ * سيناريو → صور → ElevenLabs TTS → Runway Image-to-Video → Ken Burns (Fallback) → دمج → موسيقى → رفع
  */
 import { z } from "zod";
 import { publicProcedure, router } from "./_core/trpc";
@@ -54,6 +54,8 @@ const productionOptionsSchema = z.object({
   aspectRatio: z.enum(["16:9", "9:16", "1:1", "4:3"]).default("16:9"),
   mode: z.enum(["draft", "production"]).default("production"),
   musicVolume: z.number().min(0).max(1).default(0.12),
+  useRunway: z.boolean().default(true),
+  useElevenLabs: z.boolean().default(true),
 });
 
 // ═══════════════════════════════════════════════════════════
@@ -156,6 +158,8 @@ export const videoRouter = router({
               aspectRatio: input.options?.aspectRatio ?? "16:9",
               mode: input.options?.mode ?? "production",
               musicVolume: input.options?.musicVolume ?? 0.12,
+              useRunway: input.options?.useRunway ?? true,
+              useElevenLabs: input.options?.useElevenLabs ?? true,
             },
             (update: Partial<VideoJob>) => {
               const current = videoJobs.get(jobId);
@@ -272,6 +276,8 @@ export const videoRouter = router({
               aspectRatio: input.options?.aspectRatio ?? "16:9",
               mode: input.options?.mode ?? "production",
               musicVolume: input.options?.musicVolume ?? 0.12,
+              useRunway: input.options?.useRunway ?? true,
+              useElevenLabs: input.options?.useElevenLabs ?? true,
             },
             (update: Partial<VideoJob>) => {
               const current = videoJobs.get(jobId);
