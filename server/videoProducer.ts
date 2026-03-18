@@ -287,12 +287,13 @@ export class VideoProducer {
           imagePaths,
           runwayResults,
           dims,
-          report
+          report,
+          quality
         );
       } else {
         // Ken Burns فقط
         report("بناء المشاهد مع حركة Ken Burns...", 55);
-        scenePaths = await this.buildScenes(script.scenes, imagePaths, dims, report);
+        scenePaths = await this.buildScenes(script.scenes, imagePaths, dims, report, quality);
       }
 
             // ── الخطوة 4: دمج المشاهد ────────────────────
@@ -478,7 +479,8 @@ export class VideoProducer {
     imagePaths: string[],
     runwayVideos: Array<string | null>,
     dims: { width: number; height: number },
-    onProgress?: (step: string, pct: number) => void
+    onProgress?: (step: string, pct: number) => void,
+    quality: "fast" | "pro" = "fast"
   ): Promise<string[]> {
     const scenePaths: string[] = [];
 
@@ -513,14 +515,14 @@ export class VideoProducer {
             // Fallback نهائي: Ken Burns
             console.warn(`  ⚠ مشهد ${i + 1}: فشل إعادة الترميز — Ken Burns Fallback`);
             const motion = scene.zoom ?? "zoom_in";
-            await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath);
+            await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath, quality);
             console.log(`  ✓ مشهد ${i + 1} (Ken Burns Fallback)`);
           }
         }
       } else {
         // Fallback: Ken Burns
         const motion = scene.zoom ?? "zoom_in";
-        await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath);
+        await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath, quality);
         console.log(`  ✓ مشهد ${i + 1} (Ken Burns Fallback: ${motion})`);
       }
 
@@ -591,7 +593,8 @@ export class VideoProducer {
     scenes: VideoScene[],
     imagePaths: string[],
     dims: { width: number; height: number },
-    onProgress?: (step: string, pct: number) => void
+    onProgress?: (step: string, pct: number) => void,
+    quality: "fast" | "pro" = "fast"
   ): Promise<string[]> {
     const scenePaths: string[] = [];
 
@@ -611,7 +614,7 @@ export class VideoProducer {
       await this.drawSubtitle(imgPath, scene.subtitle, imgWithSub, dims);
 
       const motion = scene.zoom ?? "zoom_in";
-      await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath);
+      await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath, quality);
 
       scenePaths.push(outputPath);
       console.log(`  ✓ مشهد ${i + 1} جاهز (Ken Burns: ${motion})`);
