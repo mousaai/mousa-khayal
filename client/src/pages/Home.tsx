@@ -151,8 +151,9 @@ export default function Home() {
   const [volume, setVolume] = useState(0);
   const [waveData, setWaveData] = useState<number[]>(Array(24).fill(0.5));
 
-  // ── جودة الفيديو ──
-  const [videoQuality, setVideoQuality] = useState<"fast" | "pro">("fast");
+  // ── وضع الإخراج: صور / فيديو سريع / فيديو احترافي ──
+  const [outputMode, setOutputMode] = useState<"images" | "fast" | "pro">("fast");
+  const videoQuality: "fast" | "pro" = outputMode === "pro" ? "pro" : "fast";
 
   // ── UI ──
   const [bgIdx, setBgIdx] = useState(0);
@@ -585,7 +586,44 @@ export default function Home() {
     await checkAndGenerate(finalDesc, async () => {
       const intent = detectedIntent || "image";
 
-      if (intent === "video") {
+      // إذا اختار المستخدم وضع "صور" صراحةً → توليد صور فقط بغض النظر عن القصد المكتشف
+      if (outputMode === "images") {
+        setIsGenerating(true);
+        setPortalGlow(true);
+        try {
+          const res = await generateMutation.mutateAsync({
+            description: finalDesc || "خيال حر",
+            referenceImageUrl: uploadedImageUrl || urlInput || undefined,
+            title: (finalDesc || "خيال").slice(0, 60),
+            sceneCount: 5,
+            documentAnalysis: documentAnalysis ? {
+              extractedText: documentAnalysis.extractedText,
+              projectTitle: documentAnalysis.projectTitle,
+              projectType: documentAnalysis.projectType,
+              dimensions: documentAnalysis.dimensions,
+              architecturalElements: documentAnalysis.architecturalElements,
+              geometricMass: documentAnalysis.geometricMass,
+              mainDescription: documentAnalysis.mainDescription,
+              culturalContext: documentAnalysis.culturalContext,
+              language: documentAnalysis.language,
+              confidence: documentAnalysis.confidence,
+            } : undefined,
+          });
+          setResult(res as GenerationResult);
+          const mood = selectMusicMood(
+            (res as GenerationResult).scenarioType || "imagine",
+            (res as GenerationResult).atmosphere
+          );
+          musicEngine.play(mood, 0.12);
+        } catch (err) {
+          console.error(err);
+        } finally {
+          setIsGenerating(false);
+        }
+        return;
+      }
+
+      if (intent === "video" || outputMode === "fast" || outputMode === "pro") {
         // ── طلب إذن الإشعارات عند بدء الإنتاج ──
         if ("Notification" in window && Notification.permission === "default") {
           Notification.requestPermission();
@@ -1042,35 +1080,45 @@ export default function Home() {
                 <input ref={docInputRef} type="file" accept=".pdf,.doc,.docx,.txt,image/*" onChange={handleDocUpload} className="hidden" />
               </div>
 
-              {/* Quality toggle — يظهر فقط عند intent=video */}
-              {detectedIntent === "video" && (
-                <div className="flex items-center gap-1 rounded-xl overflow-hidden flex-shrink-0" style={{ border: "1px solid rgba(96,165,250,0.2)", background: "rgba(8,9,20,0.6)" }}>
-                  <button
-                    onClick={() => setVideoQuality("fast")}
-                    className="px-2.5 py-1.5 text-xs font-bold transition-all"
-                    style={{
-                      background: videoQuality === "fast" ? "rgba(96,165,250,0.2)" : "transparent",
-                      color: videoQuality === "fast" ? "#60a5fa" : "rgba(255,255,255,0.35)",
-                      fontFamily: "'Tajawal', sans-serif",
-                    }}
-                    title="720p — سريع (3-5 دقائق)"
-                  >
-                    ⚡ {activeLang === "AR" ? "سريع" : "Fast"}
-                  </button>
-                  <button
-                    onClick={() => setVideoQuality("pro")}
-                    className="px-2.5 py-1.5 text-xs font-bold transition-all"
-                    style={{
-                      background: videoQuality === "pro" ? "rgba(167,139,250,0.2)" : "transparent",
-                      color: videoQuality === "pro" ? "#a78bfa" : "rgba(255,255,255,0.35)",
-                      fontFamily: "'Tajawal', sans-serif",
-                    }}
-                    title="1080p + انتقالات سينمائية (8-12 دقيقة)"
-                  >
-                    ✨ {activeLang === "AR" ? "احترافي" : "Pro"}
-                  </button>
-                </div>
-              )}
+              {/* Output mode toggle — صور / سريع / احترافي */}
+              <div className="flex items-center gap-1 rounded-xl overflow-hidden flex-shrink-0" style={{ border: "1px solid rgba(96,165,250,0.2)", background: "rgba(8,9,20,0.6)" }}>
+                <button
+                  onClick={() => setOutputMode("images")}
+                  className="px-2.5 py-1.5 text-xs font-bold transition-all"
+                  style={{
+                    background: outputMode === "images" ? "rgba(52,211,153,0.2)" : "transparent",
+                    color: outputMode === "images" ? "#34d399" : "rgba(255,255,255,0.35)",
+                    fontFamily: "'Tajawal', sans-serif",
+                  }}
+                  title="صور فقط — بدون فيديو (30-60 ثانية)"
+                >
+                  🎨 {activeLang === "AR" ? "صور" : "Images"}
+                </button>
+                <button
+                  onClick={() => setOutputMode("fast")}
+                  className="px-2.5 py-1.5 text-xs font-bold transition-all"
+                  style={{
+                    background: outputMode === "fast" ? "rgba(96,165,250,0.2)" : "transparent",
+                    color: outputMode === "fast" ? "#60a5fa" : "rgba(255,255,255,0.35)",
+                    fontFamily: "'Tajawal', sans-serif",
+                  }}
+                  title="720p — سريع (3-5 دقائق)"
+                >
+                  ⚡ {activeLang === "AR" ? "سريع" : "Fast"}
+                </button>
+                <button
+                  onClick={() => setOutputMode("pro")}
+                  className="px-2.5 py-1.5 text-xs font-bold transition-all"
+                  style={{
+                    background: outputMode === "pro" ? "rgba(167,139,250,0.2)" : "transparent",
+                    color: outputMode === "pro" ? "#a78bfa" : "rgba(255,255,255,0.35)",
+                    fontFamily: "'Tajawal', sans-serif",
+                  }}
+                  title="1080p + انتقالات سينمائية (8-12 دقيقة)"
+                >
+                  ✨ {activeLang === "AR" ? "احترافي" : "Pro"}
+                </button>
+              </div>
 
               {/* Right: generate button */}
               <button
