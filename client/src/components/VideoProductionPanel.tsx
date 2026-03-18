@@ -121,6 +121,8 @@ export default function VideoProductionPanel() {
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [metrics, setMetrics] = useState<ProductionMetrics | null>(null);
+  const [notFoundCount, setNotFoundCount] = useState(0);
+  const jobStartTime = useState<number | null>(null)[0];
 
   // ── Mutations ──
   const generateScriptMutation = trpc.video.generateScript.useMutation();
@@ -138,6 +140,23 @@ export default function VideoProductionPanel() {
 
   useEffect(() => {
     if (!jobStatus) return;
+
+    // معالجة حالة not_found — قد تكون المهمة لم تُسجَّل بعد أو انتهت صلاحيتها
+    if (jobStatus.status === "not_found") {
+      setNotFoundCount(prev => {
+        const next = prev + 1;
+        // نتحمّل حتى 5 محاولات (10 ثوانٍ) قبل إعلان الفشل
+        if (next >= 5) {
+          setError("انتهت صلاحية الجلسة أو أُعيد تشغيل الخادم. يرجى إعادة المحاولة.");
+          setStep("failed");
+        }
+        return next;
+      });
+      return;
+    }
+
+    // إعادة تعيين عداد not_found عند أي استجابة صحيحة
+    setNotFoundCount(0);
     setProgress(jobStatus.progress);
     setCurrentStep(jobStatus.currentStep);
 
@@ -210,7 +229,7 @@ export default function VideoProductionPanel() {
   const handleReset = () => {
     setStep("idle"); setScript(null); setJobId(null);
     setProgress(0); setCurrentStep(""); setVideoUrl(null);
-    setError(null); setMetrics(null);
+    setError(null); setMetrics(null); setNotFoundCount(0);
   };
 
   const domainIcon = script?.domain
@@ -491,10 +510,17 @@ export default function VideoProductionPanel() {
             <CardTitle className="text-blue-300 text-lg">⚙️ جاري الإنتاج...</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
+            {/* رسالة تحذير عند not_found مؤقت */}
+            {notFoundCount > 0 && notFoundCount < 5 && (
+              <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-lg p-3 text-yellow-300 text-xs">
+                ⏳ جاري الاتصال بالخادم... ({notFoundCount}/5)
+              </div>
+            )}
+
             {/* شريط التقدم */}
             <div className="space-y-2">
               <div className="flex justify-between text-sm">
-                <span className="text-blue-300/70">{currentStep}</span>
+                <span className="text-blue-300/70">{currentStep || "جاري التحضير..."}</span>
                 <span className="text-blue-400 font-mono">{progress}%</span>
               </div>
               <div className="w-full bg-[#08090f] rounded-full h-3 overflow-hidden">
