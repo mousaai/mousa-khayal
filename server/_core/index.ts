@@ -28,9 +28,34 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
+// ── تنظيف الـ jobs العالقة عند بدء التشغيل ────────────────────────────────
+async function cleanupStuckJobs() {
+  try {
+    const { getDb } = await import("../db");
+    const { videoJobs } = await import("../../drizzle/schema");
+    const { inArray } = await import("drizzle-orm");
+    const db = await getDb();
+    if (!db) return;
+    // تحويل جميع الـ jobs بحالة pending/processing إلى failed
+    // لأن السيرفر أُعيد تشغيله وهذه الـ jobs لن تكتمل أبداً
+    const result = await db.update(videoJobs)
+      .set({
+        status: "failed",
+        currentStep: "انقطع الإنتاج بسبب إعادة تشغيل السيرفر",
+        error: "Server restarted during production",
+      })
+      .where(inArray(videoJobs.status, ["pending", "processing"]));
+    console.log(`[Startup] Cleaned up stuck jobs`);
+  } catch (e) {
+    console.warn("[Startup] cleanupStuckJobs error:", e);
+  }
+}
+
 async function startServer() {
   const app = express();
   const server = createServer(app);
+  // تنظيف الـ jobs العالقة من الجلسة السابقة
+  await cleanupStuckJobs();
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));

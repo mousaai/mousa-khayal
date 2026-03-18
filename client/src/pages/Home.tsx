@@ -1251,9 +1251,41 @@ export default function Home() {
               )}
 
               {videoJob.status === "failed" && (
-                <p className="text-xs mt-1" style={{ color: "rgba(239,68,68,0.8)", fontFamily: "'Tajawal', sans-serif" }}>
-                  {videoJob.error || "حدث خطأ أثناء الإنتاج"}
-                </p>
+                <div className="mt-2 space-y-2">
+                  <p className="text-xs" style={{ color: "rgba(239,68,68,0.8)", fontFamily: "'Tajawal', sans-serif" }}>
+                    {videoJob.error?.includes("Server restarted")
+                      ? "⚡ انقطع الإنتاج بسبب إعادة تشغيل السيرفر — يمكنك إعادة المحاولة الآن"
+                      : videoJob.error?.includes("Image generation")
+                      ? "🎨 فشل توليد الصور — يرجى إعادة المحاولة"
+                      : videoJob.error || "حدث خطأ أثناء الإنتاج"}
+                  </p>
+                  {/* زر إعادة المحاولة — يُعيد الإنتاج بنفس الوصف */}
+                  {prompt.trim() && (
+                    <button
+                      onClick={async () => {
+                        localStorage.removeItem("khayal_video_job");
+                        setVideoJob(null);
+                        // إعادة الإنتاج تلقائياً
+                        try {
+                          const langCode = ["AR", "FA", "UR", "HE"].includes(activeLang) ? "ar" : "en";
+                          const result = await quickProduceMutation.mutateAsync({
+                            description: prompt.trim(),
+                            language: langCode,
+                            voice: langCode === "ar" ? "ar_male_formal" : "en_male_formal",
+                            sceneCount: 5,
+                            options: { aspectRatio: "16:9", mode: "production", musicVolume: 0.12, useRunway: true, useElevenLabs: true, quality: videoQuality },
+                          });
+                          setVideoJob({ jobId: result.jobId, status: "pending", progress: 0, currentStep: "جاري التحضير..." });
+                        } catch (err) { console.error(err); }
+                      }}
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                      style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.35)", color: "#f87171", fontFamily: "'Tajawal', sans-serif" }}
+                    >
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M1 4v6h6M23 20v-6h-6"/><path d="M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15"/></svg>
+                      إعادة المحاولة
+                    </button>
+                  )}
+                </div>
               )}
               {/* زر إنتاج جديد — يظهر عند اكتمال الإنتاج أو فشله */}
               {(videoJob.status === "done" || videoJob.status === "failed") && (

@@ -1,0 +1,90 @@
+{
+  "query": "SELECT id, status, progress, currentStep, error, createdAt FROM video_jobs ORDER BY createdAt DESC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.59f06284f1f2 --database BXEkPAJgGiqWs3v7muUPfr --execute SELECT id, status, progress, currentStep, error, createdAt FROM video_jobs ORDER BY createdAt DESC LIMIT 10;",
+  "rows": [
+    {
+      "id": "quick_1773860360187_on0drm",
+      "status": "processing",
+      "progress": "72",
+      "currentStep": "تجميع مشهد 1/5 (0%)...",
+      "error": "NULL",
+      "createdAt": "2026-03-18 18:59:20"
+    },
+    {
+      "id": "quick_1773859869431_3kb4rf",
+      "status": "failed",
+      "progress": "0",
+      "currentStep": "فشل الإنتاج",
+      "error": "Image generation request failed (500 Internal Server Error): {\"code\":\"internal\",\"message\":\"failed to generate images: provider=nano_banana account_name=gcp_monica-dev-392609_global-gemini-2-5-flash-preview-09 model=gemini-2.5-flash-image: Error\\u003c[12007]GENERATE_ERROR\\u003e\"}",
+      "createdAt": "2026-03-18 18:51:09"
+    },
+    {
+      "id": "quick_1773859864910_ycik0c",
+      "status": "done",
+      "progress": "100",
+      "currentStep": "اكتمل الإنتاج!",
+      "error": "NULL",
+      "createdAt": "2026-03-18 18:51:04"
+    },
+    {
+      "id": "quick_1773857873358_idkimn",
+      "status": "processing",
+      "progress": "54",
+      "currentStep": "تحريك مشهد 2/5 بـ Runway...",
+      "error": "NULL",
+      "createdAt": "2026-03-18 18:17:53"
+    },
+    {
+      "id": "quick_1773857871482_p8gnn2",
+      "status": "processing",
+      "progress": "72",
+      "currentStep": "تجميع مشهد 1/5 (0%)...",
+      "error": "NULL",
+      "createdAt": "2026-03-18 18:17:51"
+    },
+    {
+      "id": "quick_1773857868937_sely4l",
+      "status": "processing",
+      "progress": "66",
+      "currentStep": "تحريك مشهد 5/5 بـ Runway...",
+      "error": "NULL",
+      "createdAt": "2026-03-18 18:17:48"
+    },
+    {
+      "id": "quick_1773856093485_l9zpvr",
+      "status": "processing",
+      "progress": "73",
+      "currentStep": "تجميع مشهد 2/5 (20%)...",
+      "error": "NULL",
+      "createdAt": "2026-03-18 17:48:13"
+    },
+    {
+      "id": "quick_1773848534878_r91e3l",
+      "status": "processing",
+      "progress": "72",
+      "currentStep": "تجميع مشهد 1/5...",
+      "error": "NULL",
+      "createdAt": "2026-03-18 15:42:14"
+    },
+    {
+      "id": "quick_1773845213530_wfqwec",
+      "status": "processing",
+      "progress": "3",
+      "currentStep": "تحليل المحتوى وكتابة السيناريو...",
+      "error": "NULL",
+      "createdAt": "2026-03-18 14:46:54"
+    },
+    {
+      "id": "job_1773845213303_x6xoig",
+      "status": "processing",
+      "progress": "5",
+      "currentStep": "توليد الصور بالذكاء الاصطناعي...",
+      "error": "NULL",
+      "createdAt": "2026-03-18 14:46:53"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tstatus\tprogress\tcurrentStep\terror\tcreatedAt\nquick_1773860360187_on0drm\tprocessing\t72\tتجميع مشهد 1/5 (0%)...\tNULL\t2026-03-18 18:59:20\nquick_1773859869431_3kb4rf\tfailed\t0\tفشل الإنتاج\tImage generation request failed (500 Internal Server Error): {\"code\":\"internal\",\"message\":\"failed to generate images: provider=nano_banana account_name=gcp_monica-dev-392609_global-gemini-2-5-flash-preview-09 model=gemini-2.5-flash-image: Error\\u003c[12007]GENERATE_ERROR\\u003e\"}\t2026-03-18 18:51:09\nquick_1773859864910_ycik0c\tdone\t100\tاكتمل الإنتاج!\tNULL\t2026-03-18 18:51:04\nquick_1773857873358_idkimn\tprocessing\t54\tتحريك مشهد 2/5 بـ Runway...\tNULL\t2026-03-18 18:17:53\nquick_1773857871482_p8gnn2\tprocessing\t72\tتجميع مشهد 1/5 (0%)...\tNULL\t2026-03-18 18:17:51\nquick_1773857868937_sely4l\tprocessing\t66\tتحريك مشهد 5/5 بـ Runway...\tNULL\t2026-03-18 18:17:48\nquick_1773856093485_l9zpvr\tprocessing\t73\tتجميع مشهد 2/5 (20%)...\tNULL\t2026-03-18 17:48:13\nquick_1773848534878_r91e3l\tprocessing\t72\tتجميع مشهد 1/5...\tNULL\t2026-03-18 15:42:14\nquick_1773845213530_wfqwec\tprocessing\t3\tتحليل المحتوى وكتابة السيناريو...\tNULL\t2026-03-18 14:46:54\njob_1773845213303_x6xoig\tprocessing\t5\tتوليد الصور بالذكاء الاصطناعي...\tNULL\t2026-03-18 14:46:53\n",
+  "stderr": "",
+  "execution_time_ms": 1806
+}

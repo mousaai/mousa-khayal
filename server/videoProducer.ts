@@ -368,13 +368,27 @@ export class VideoProducer {
       );
 
       const { generateImage } = await import("./_core/imageGeneration");
-      const { url: imageUrl } = await generateImage({
-        prompt: scene.imagePrompt + ", ultra photorealistic, 8K, cinematic lighting",
-      });
+      // retry تلقائي 3 محاولات عند فشل توليد الصورة
+      let imageUrl: string | undefined;
+      let lastErr: Error | null = null;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          const res = await generateImage({
+            prompt: scene.imagePrompt + ", ultra photorealistic, 8K, cinematic lighting",
+          });
+          imageUrl = res.url;
+          if (imageUrl) break;
+        } catch (e: any) {
+          lastErr = e;
+          console.warn(`[VideoProducer] generateImage attempt ${attempt}/3 failed: ${e.message}`);
+          if (attempt < 3) await new Promise(r => setTimeout(r, 2000 * attempt));
+        }
+      }
 
-      if (!imageUrl) throw new Error(`فشل توليد صورة المشهد ${i + 1}`);
+      if (!imageUrl) throw new Error(`فشل توليد صورة المشهد ${i + 1} بعد 3 محاولات: ${lastErr?.message ?? "unknown"}`);
+      const imageUrlStr = imageUrl;
 
-      const response = await fetch(imageUrl as string);
+      const response = await fetch(imageUrlStr);
       const buffer = Buffer.from(await response.arrayBuffer());
 
       await sharp(buffer)

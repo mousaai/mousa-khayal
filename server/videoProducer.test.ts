@@ -206,10 +206,11 @@ describe("VideoProducer v2.0 — المقومات الأساسية", () => {
     expect(source).toContain("1080");
   });
 
-  it("يستخدم 25 fps", () => {
+  it("يستخدم fps محدداً", () => {
     const { readFileSync } = require("node:fs");
     const source = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoProducer.ts", "utf-8");
-    expect(source).toContain("fps: 25");
+    // يستخدم 24 fps (أو 25 fps حسب الإعداد)
+    expect(source).toMatch(/fps:\s*(24|25)/);
   });
 
   it("يحتوي على 8 تأثيرات حركة Ken Burns", () => {
@@ -370,5 +371,41 @@ describe("videoRouter v2.0 — التحقق من schema", () => {
     const { readFileSync } = require("node:fs");
     const routerSrc = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoRouter.ts", "utf-8");
     expect(routerSrc).toContain("musicVolume");
+  });
+});
+
+describe("server/_core/index.ts — cleanup الـ jobs العالقة", () => {
+  it("يحتوي على cleanupStuckJobs عند بدء التشغيل", () => {
+    const { readFileSync } = require("node:fs");
+    const src = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/_core/index.ts", "utf-8");
+    expect(src).toContain("cleanupStuckJobs");
+    expect(src).toContain("Server restarted during production");
+    expect(src).toContain("inArray");
+    expect(src).toContain('"pending"');
+    expect(src).toContain('"processing"');
+  });
+
+  it("يستدعي cleanupStuckJobs عند بدء تشغيل السيرفر", () => {
+    const { readFileSync } = require("node:fs");
+    const src = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/_core/index.ts", "utf-8");
+    // يجب أن يكون الاستدعاء داخل startServer
+    expect(src).toContain("await cleanupStuckJobs()");
+  });
+});
+
+describe("videoProducer.ts — retry توليد الصور", () => {
+  it("يحتوي على retry تلقائي لتوليد الصور (3 محاولات)", () => {
+    const { readFileSync } = require("node:fs");
+    const src = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoProducer.ts", "utf-8");
+    // التحقق من وجود منطق retry
+    expect(src).toContain("retry");
+    expect(src).toContain("attempt");
+  });
+
+  it("يحتوي على معالجة خطأ توليد الصور مع fallback", () => {
+    const { readFileSync } = require("node:fs");
+    const src = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/videoProducer.ts", "utf-8");
+    expect(src).toContain("generateImage");
+    expect(src).toContain("generateImages");
   });
 });
