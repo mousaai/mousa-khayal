@@ -235,7 +235,7 @@ export class VideoProducer {
   async produce(
     script: VideoScript,
     options: VideoProductionOptions = {},
-    onProgress?: (job: Partial<VideoJob>) => void
+    onProgress?: (job: Partial<VideoJob>) => Promise<void> | void
   ): Promise<string> {
     this.workDir = await fs.mkdtemp(path.join(os.tmpdir(), "khayal-video-"));
     this.startTime = Date.now();
@@ -255,8 +255,8 @@ export class VideoProducer {
       ? ASPECT_CONFIGS_PRO[aspectRatio]
       : ASPECT_CONFIGS_FAST[aspectRatio];
 
-    const report = (step: string, progress: number) => {
-      onProgress?.({ status: "processing", currentStep: step, progress });
+    const report = async (step: string, progress: number) => {
+      await onProgress?.({ status: "processing", currentStep: step, progress });
       console.log(`[VideoProducer] ${progress}% — ${step}`);
     };
 
@@ -1250,7 +1250,7 @@ export class VideoProducer {
     newImagePrompt: string,
     existingSceneVideoUrls: Array<string | null>,
     options: VideoProductionOptions = {},
-    onProgress?: (job: Partial<VideoJob>) => void
+    onProgress?: (job: Partial<VideoJob>) => Promise<void> | void
   ): Promise<string> {
     this.workDir = await fs.mkdtemp(path.join(os.tmpdir(), "khayal-edit-"));
     this.startTime = Date.now();

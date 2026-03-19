@@ -249,11 +249,12 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
   }, [scenes.length]);
 
   useEffect(() => {
+    // تظهر الصورة فوراً تقريباً
     setTimeout(() => {
       setFadeOpacity(0);
       setKbActive(true);
-      setTimeout(() => setShowCaption(true), 1500);
-    }, 500);
+      setTimeout(() => setShowCaption(true), 800);
+    }, 100);
   }, []);
 
   useEffect(() => {

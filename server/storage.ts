@@ -165,28 +165,32 @@ async function manusStorageGet(relKey: string): Promise<{ key: string; url: stri
   return { key, url: (await response.json()).url };
 }
 
-// ─── الدوال العامة — R2 أولاً، Manus كـ fallback ─────────────────────────────
+// ─── الدوال العامة — Manus أولاً (روابط عامة مضمونة)، R2 كـ fallback ──────────
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
-  // استخدم R2 إذا كانت المفاتيح متاحة
-  if (ENV.cloudflareR2AccessKeyId && ENV.cloudflareR2SecretAccessKey) {
+  // استخدم Manus أولاً — روابط عامة مضمونة بدون مشاكل CORS أو 403
+  if (ENV.forgeApiKey) {
     try {
-      return await r2Put(relKey, data, contentType);
+      return await manusStoragePut(relKey, data, contentType);
     } catch (err) {
-      console.warn(`[Storage] R2 failed, falling back to Manus: ${(err as Error).message}`);
-      // fallback لـ Manus
-      if (ENV.forgeApiKey) {
-        return await manusStoragePut(relKey, data, contentType);
+      console.warn(`[Storage] Manus failed, falling back to R2: ${(err as Error).message}`);
+      // fallback لـ R2 إذا كانت المفاتيح متاحة
+      if (ENV.cloudflareR2AccessKeyId && ENV.cloudflareR2SecretAccessKey) {
+        return await r2Put(relKey, data, contentType);
       }
       throw err;
     }
   }
 
-  // fallback لـ Manus
-  return await manusStoragePut(relKey, data, contentType);
+  // fallback لـ R2
+  if (ENV.cloudflareR2AccessKeyId && ENV.cloudflareR2SecretAccessKey) {
+    return await r2Put(relKey, data, contentType);
+  }
+
+  throw new Error("No storage configured: set BUILT_IN_FORGE_API_URL/KEY or CLOUDFLARE_R2_*");
 }
 
 export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
