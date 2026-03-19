@@ -580,14 +580,13 @@ export class VideoProducer {
 
     const results = await Promise.allSettled(
       imagePaths.map(async (imgPath, i) => {
-        // رفع الصورة إلى S3 (الكل بالتوازي)
+        // قراءة الصورة وتحويلها إلى base64 data URI مباشرة (بدون رفع إلى S3)
         const imgBuffer = await fs.readFile(imgPath);
-        const imgKey = `runway-input/scene_${i + 1}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.png`;
-        const { url: imageUrl } = await storagePut(imgKey, imgBuffer, "image/png");
 
         const motionPreset = selectMotionForDomain(domain, i);
         const videoUrl = await this.runway.imageToVideo({
-          imageUrl,
+          imageUrl: "",
+          imageBuffer: imgBuffer,
           motionPreset,
           duration: 5,
           ratio: dims.runwayRatio as any,

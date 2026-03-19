@@ -134,6 +134,14 @@ interface VideoJobState {
   isAutonomous?: boolean;
   thinkingSteps?: ThinkingStep[];
   decision?: DirectorDecision | null;
+  // مقاييس الإنتاج
+  metrics?: {
+    usedRunway?: boolean;
+    usedElevenLabs?: boolean;
+    sceneCount?: number;
+    durationMs?: number;
+    fileSizeMB?: number;
+  };
 }
 
 // ── نوع القصد المكتشف ─────────────────────────────────────────────────────────

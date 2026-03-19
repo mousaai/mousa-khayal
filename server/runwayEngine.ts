@@ -25,10 +25,11 @@ export type RunwayMotionPreset =
   | "orbit_slow";        // دوران بطيء
 
 export interface RunwayGenerateOptions {
-  imageUrl: string;           // رابط الصورة المصدر
+  imageUrl: string;           // رابط الصورة المصدر أو base64 data URI
+  imageBuffer?: Buffer;       // بيانات الصورة الخام (يُحوَّل إلى data URI تلقائياً)
   motionPreset?: RunwayMotionPreset;
   duration?: 5 | 10;          // مدة الفيديو بالثواني
-  ratio?: "1280:720" | "720:1280" | "1104:832" | "832:1104";
+  ratio?: "1280:768" | "768:1280" | "1104:832" | "832:1104" | "16:9" | "9:16";
   seed?: number;
   promptText?: string;        // نص اختياري لتوجيه الحركة
 }
@@ -113,10 +114,27 @@ export class RunwayEngine {
     const motionPreset = options.motionPreset ?? "cinematic_pan";
     const promptText = options.promptText ?? MOTION_PROMPTS[motionPreset];
     const duration = options.duration ?? 5;
-    const ratio = options.ratio ?? "1280:720";
+    // تحويل النسب القديمة إلى النسب الصحيحة المقبولة من Runway API
+    const rawRatio = options.ratio ?? "1280:768";
+    const ratio = this.normalizeRatio(rawRatio);
 
     try {
-      console.log(`  [Runway] بدء تحريك الصورة: ${motionPreset}`);
+      console.log(`  [Runway] بدء تحريك الصورة: ${motionPreset} (${ratio})`);
+
+      // تحويل الصورة إلى base64 data URI إذا كانت URL خارجية
+      let promptImage: string;
+      if (options.imageBuffer) {
+        promptImage = `data:image/png;base64,${options.imageBuffer.toString("base64")}`;
+      } else if (options.imageUrl.startsWith("data:")) {
+        promptImage = options.imageUrl;
+      } else {
+        // تحميل الصورة وتحويلها إلى base64
+        const imgResp = await fetch(options.imageUrl);
+        if (!imgResp.ok) throw new Error(`Failed to fetch image: ${imgResp.status}`);
+        const imgBuf = Buffer.from(await imgResp.arrayBuffer());
+        const mimeType = imgResp.headers.get("content-type") || "image/png";
+        promptImage = `data:${mimeType};base64,${imgBuf.toString("base64")}`;
+      }
 
       // إنشاء مهمة التوليد
       const createResponse = await fetch(`${this.baseUrl}/image_to_video`, {
@@ -128,7 +146,7 @@ export class RunwayEngine {
         },
         body: JSON.stringify({
           model: "gen4_turbo",
-          promptImage: options.imageUrl,
+          promptImage,
           promptText,
           duration,
           ratio,
@@ -200,6 +218,28 @@ export class RunwayEngine {
   }
 
   /**
+   * تحويل النسب إلى الصيغة المقبولة من Runway API
+   */
+  private normalizeRatio(ratio: string): string {
+    // النسب المقبولة من Runway API: "1280:720"|"720:1280"|"1104:832"|"832:1104"|"960:960"|"1584:672"
+    const map: Record<string, string> = {
+      "1280:720":  "1280:720",
+      "720:1280":  "720:1280",
+      "1280:768":  "1280:720",  // تصحيح النسبة الخاطئة
+      "768:1280":  "720:1280",  // تصحيح النسبة الخاطئة
+      "1104:832":  "1104:832",
+      "832:1104":  "832:1104",
+      "960:960":   "960:960",
+      "1584:672":  "1584:672",
+      "16:9":      "1280:720",
+      "9:16":      "720:1280",
+      "1:1":       "960:960",
+      "4:3":       "1104:832",
+    };
+    return map[ratio] ?? "1280:720";
+  }
+
+  /**
    * التحقق من صحة API Key
    */
   async validateApiKey(): Promise<boolean> {
@@ -236,7 +276,7 @@ export class RunwayEngine {
         imageUrl: imageUrls[i],
         motionPreset,
         duration: 5,
-        ratio: "1280:720",
+        ratio: "1280:768" as any,
       });
       results.push(videoUrl);
       console.log(`  [Runway] ${i + 1}/${imageUrls.length}: ${videoUrl ? "✓" : "✗ (fallback)"}`);
