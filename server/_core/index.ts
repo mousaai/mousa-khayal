@@ -27,25 +27,59 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   }
   throw new Error(`No available port found starting from ${startPort}`);
 }
-
-// ── تنظيف الـ jobs العالقة عند بدء التشغيل ────────────────────────────────
+// ── استئناف الـ jobs المتوقفة عند بدء التشغيل ─────────────────────────────────────────
 async function cleanupStuckJobs() {
   try {
     const { getDb } = await import("../db");
     const { videoJobs } = await import("../../drizzle/schema");
-    const { inArray } = await import("drizzle-orm");
+    const { inArray, eq } = await import("drizzle-orm");
     const db = await getDb();
     if (!db) return;
-    // تحويل جميع الـ jobs بحالة pending/processing إلى failed
-    // لأن السيرفر أُعيد تشغيله وهذه الـ jobs لن تكتمل أبداً
-    const result = await db.update(videoJobs)
-      .set({
-        status: "failed",
-        currentStep: "انقطع الإنتاج بسبب إعادة تشغيل السيرفر",
-        error: "Server restarted during production",
-      })
+
+    // جلب جميع الـ jobs المتوقفة
+    const stuckJobs = await db
+      .select()
+      .from(videoJobs)
       .where(inArray(videoJobs.status, ["pending", "processing"]));
-    console.log(`[Startup] Cleaned up stuck jobs`);
+
+    let resumed = 0;
+    let failed = 0;
+
+    for (const job of stuckJobs) {
+      // إذا كان لديه scriptData وعدد محاولات < 3 → استئناف
+      if (job.scriptData && (job.retryCount ?? 0) < 3) {
+        // تأخير بسيط لضمان تحميل الروترات بالكامل
+        setTimeout(async () => {
+          try {
+            const { videoRouter } = await import("../videoRouter");
+            // استخدام runProductionJob عبر الروتر
+            const { runProductionJobExported } = await import("../videoRouter");
+            if (typeof runProductionJobExported === "function") {
+              await runProductionJobExported(job.id, job.scriptData, job.optionsData ?? {});
+            }
+          } catch (e) {
+            console.warn(`[Startup] فشل استئناف ${job.id}:`, e);
+          }
+        }, 3000 + resumed * 2000); // تأخير متدرج لتجنب الحمل الزائد
+        resumed++;
+      } else {
+        // إذا لم يكن لديه بيانات كافية أو تجاوز عدد المحاولات → فشل
+        await db.update(videoJobs)
+          .set({
+            status: "failed",
+            currentStep: "انقطع الإنتاج بسبب إعادة تشغيل السيرفر",
+            error: "Server restarted during production — max retries exceeded",
+          })
+          .where(eq(videoJobs.id, job.id));
+        failed++;
+      }
+    }
+
+    if (stuckJobs.length > 0) {
+      console.log(`[Startup] استئناف ${resumed} مهمة وإلغاء ${failed} مهمة`);
+    } else {
+      console.log(`[Startup] Cleaned up stuck jobs`);
+    }
   } catch (e) {
     console.warn("[Startup] cleanupStuckJobs error:", e);
   }

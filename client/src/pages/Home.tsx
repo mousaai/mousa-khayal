@@ -1525,7 +1525,9 @@ export default function Home() {
               {videoJob.status === "failed" && (
                 <div className="mt-2 space-y-2">
                   <p className="text-xs" style={{ color: "rgba(239,68,68,0.8)", fontFamily: "'Tajawal', sans-serif" }}>
-                    {videoJob.error?.includes("Server restarted")
+                    {videoJob.error?.includes("Server restarted") && videoJob.error?.includes("max retries")
+                      ? "⚡ انقطع الإنتاج بسبب إعادة تشغيل السيرفر وتجاوز عدد المحاولات — يمكنك إعادة المحاولة يدوياً"
+                      : videoJob.error?.includes("Server restarted")
                       ? "⚡ انقطع الإنتاج بسبب إعادة تشغيل السيرفر — يمكنك إعادة المحاولة الآن"
                       : videoJob.error?.includes("Image generation")
                       ? "🎨 فشل توليد الصور — يرجى إعادة المحاولة"

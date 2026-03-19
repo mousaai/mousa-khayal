@@ -374,7 +374,7 @@ describe("videoRouter v2.0 — التحقق من schema", () => {
   });
 });
 
-describe("server/_core/index.ts — cleanup الـ jobs العالقة", () => {
+describe("server/_core/index.ts — استئناف الـ jobs المتوقفة", () => {
   it("يحتوي على cleanupStuckJobs عند بدء التشغيل", () => {
     const { readFileSync } = require("node:fs");
     const src = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/_core/index.ts", "utf-8");
@@ -388,8 +388,18 @@ describe("server/_core/index.ts — cleanup الـ jobs العالقة", () => {
   it("يستدعي cleanupStuckJobs عند بدء تشغيل السيرفر", () => {
     const { readFileSync } = require("node:fs");
     const src = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/_core/index.ts", "utf-8");
-    // يجب أن يكون الاستدعاء داخل startServer
     expect(src).toContain("await cleanupStuckJobs()");
+  });
+
+  it("يحتوي على منطق استئناف المهام بدلاً من إلغائها", () => {
+    const { readFileSync } = require("node:fs");
+    const src = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/_core/index.ts", "utf-8");
+    // يجب أن يحتوي على منطق الاستئناف عند وجود scriptData
+    expect(src).toContain("scriptData");
+    expect(src).toContain("retryCount");
+    expect(src).toContain("runProductionJobExported");
+    // ويحتوي على تأخير متدرج لتجنب الحمل الزائد
+    expect(src).toContain("setTimeout");
   });
 });
 

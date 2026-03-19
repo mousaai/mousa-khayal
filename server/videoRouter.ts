@@ -81,7 +81,12 @@ const productionOptionsSchema = z.object({
 // helpers للـ DB
 // ═══════════════════════════════════════════════════════════
 
-async function createJobInDB(jobId: string, description?: string) {
+async function createJobInDB(
+  jobId: string,
+  description?: string,
+  scriptData?: any,
+  optionsData?: any
+) {
   const db = await getDb();
   if (!db) return;
   await db.insert(videoJobsTable).values({
@@ -90,6 +95,11 @@ async function createJobInDB(jobId: string, description?: string) {
     progress: 0,
     currentStep: "جاري التحضير...",
     description: description ?? null,
+    scriptData: scriptData ?? null,
+    optionsData: optionsData ?? null,
+    sceneStates: null,
+    retryCount: 0,
+    lastHeartbeat: new Date(),
   });
 }
 
@@ -100,6 +110,9 @@ async function updateJobInDB(jobId: string, update: {
   videoUrl?: string;
   error?: string;
   metrics?: any;
+  sceneStates?: any;
+  retryCount?: number;
+  lastHeartbeat?: Date;
 }) {
   try {
     const db = await getDb();
@@ -112,12 +125,121 @@ async function updateJobInDB(jobId: string, update: {
         ...(update.videoUrl !== undefined && { videoUrl: update.videoUrl }),
         ...(update.error !== undefined && { error: update.error }),
         ...(update.metrics !== undefined && { metrics: update.metrics }),
+        ...(update.sceneStates !== undefined && { sceneStates: update.sceneStates }),
+        ...(update.retryCount !== undefined && { retryCount: update.retryCount }),
+        ...(update.lastHeartbeat !== undefined && { lastHeartbeat: update.lastHeartbeat }),
       })
       .where(eq(videoJobsTable.id, jobId));
   } catch (e) {
     console.error("[videoRouter] updateJobInDB error:", e);
   }
 }
+
+// كشف واستئناف المهام المتوقفة (processing > 5 دقائق بدون heartbeat)
+async function resumeStaleJobs() {
+  try {
+    const db = await getDb();
+    if (!db) return;
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const staleJobs = await db
+      .select()
+      .from(videoJobsTable)
+      .where(eq(videoJobsTable.status, "processing"))
+      .limit(5);
+
+    for (const job of staleJobs) {
+      const heartbeat = job.lastHeartbeat ? new Date(job.lastHeartbeat).getTime() : 0;
+      if (heartbeat < fiveMinutesAgo.getTime() && job.scriptData && job.retryCount < 3) {
+        console.log(`[videoRouter] استئناف مهمة متوقفة: ${job.id} (محاولة ${(job.retryCount ?? 0) + 1}/3)`);
+        await updateJobInDB(job.id, { retryCount: (job.retryCount ?? 0) + 1, lastHeartbeat: new Date() });
+        runProductionJob(job.id, job.scriptData as any, job.optionsData as any);
+      }
+    }
+  } catch (e) {
+    console.error("[videoRouter] resumeStaleJobs error:", e);
+  }
+}
+
+// تشغيل مهمة إنتاج في الخلفية مع heartbeat منتظم
+export async function runProductionJobExported(
+  jobId: string,
+  scriptData: any,
+  optionsData: any
+): Promise<void> {
+  return runProductionJob(jobId, scriptData, optionsData);
+}
+
+async function runProductionJob(
+  jobId: string,
+  scriptData: any,
+  optionsData: any
+) {
+  const heartbeatInterval = setInterval(async () => {
+    await updateJobInDB(jobId, { lastHeartbeat: new Date() });
+  }, 30_000); // heartbeat كل 30 ثانية
+
+  try {
+    await updateJobInDB(jobId, { status: "processing", currentStep: "تحليل المحتوى...", progress: 2, lastHeartbeat: new Date() });
+
+    let script: VideoScript;
+    if (scriptData.scenes) {
+      script = scriptData as VideoScript;
+    } else {
+      script = await generateVideoScript(
+        scriptData.description,
+        scriptData.language ?? "ar",
+        scriptData.voice ?? "ar_male",
+        scriptData.sceneCount ?? 5
+      );
+    }
+
+    const producer = new VideoProducer();
+    const videoUrl = await producer.produce(
+      script,
+      {
+        aspectRatio: optionsData?.aspectRatio ?? "16:9",
+        mode: optionsData?.mode ?? "production",
+        musicVolume: optionsData?.musicVolume ?? 0.12,
+        useRunway: optionsData?.useRunway ?? true,
+        useElevenLabs: optionsData?.useElevenLabs ?? true,
+        quality: optionsData?.quality ?? "fast",
+      },
+      async (update: Partial<VideoJob>) => {
+        await updateJobInDB(jobId, {
+          status: update.status as any,
+          progress: update.progress,
+          currentStep: update.currentStep,
+          videoUrl: update.videoUrl,
+          error: update.error,
+          metrics: update.metrics,
+          lastHeartbeat: new Date(),
+        });
+      }
+    );
+
+    await updateJobInDB(jobId, { status: "done", progress: 100, currentStep: "اكتمل الإنتاج!", videoUrl });
+
+    try {
+      await notifyOwner({
+        title: "✨ خيال — اكتمل الإنتاج!",
+        content: `فيديوك جاهز للمشاهدة والتحميل.\nرابط الفيديو: ${videoUrl}`,
+      });
+    } catch { /* الإشعار اختياري */ }
+
+  } catch (err) {
+    await updateJobInDB(jobId, {
+      status: "failed",
+      progress: 0,
+      currentStep: "فشل الإنتاج",
+      error: err instanceof Error ? err.message : String(err),
+    });
+  } finally {
+    clearInterval(heartbeatInterval);
+  }
+}
+
+// بدء فحص المهام المتوقفة كل 5 دقائق
+setInterval(resumeStaleJobs, 5 * 60 * 1000);
 
 async function getJobFromDB(jobId: string) {
   const db = await getDb();
@@ -167,66 +289,17 @@ export const videoRouter = router({
     .mutation(async ({ input }) => {
       const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-      await createJobInDB(jobId, input.description);
+      // حفظ السيناريو والخيارات في DB للاستئناف عند الانقطاع
+      const scriptData = input.script ?? {
+        description: input.description,
+        language: input.language,
+        voice: input.voice,
+        sceneCount: input.sceneCount,
+      };
+      await createJobInDB(jobId, input.description, scriptData, input.options ?? {});
 
-      // تشغيل الإنتاج في الخلفية — يستمر حتى لو أغلق المتصفح
-      (async () => {
-        try {
-          await updateJobInDB(jobId, { status: "processing", currentStep: "توليد السيناريو...", progress: 2 });
-
-          let script: VideoScript | undefined = input.script as VideoScript | undefined;
-          if (!script) {
-            if (!input.description) throw new Error("يجب تقديم وصف أو سيناريو");
-            script = await generateVideoScript(
-              input.description,
-              input.language,
-              input.voice,
-              input.sceneCount
-            );
-          }
-
-          const producer = new VideoProducer();
-          const videoUrl = await producer.produce(
-            script,
-            {
-              aspectRatio: input.options?.aspectRatio ?? "16:9",
-              mode: input.options?.mode ?? "production",
-              musicVolume: input.options?.musicVolume ?? 0.12,
-              useRunway: input.options?.useRunway ?? true,
-              useElevenLabs: input.options?.useElevenLabs ?? true,
-              quality: input.options?.quality ?? "fast",
-            },
-            async (update: Partial<VideoJob>) => {
-              await updateJobInDB(jobId, {
-                status: update.status as any,
-                progress: update.progress,
-                currentStep: update.currentStep,
-                videoUrl: update.videoUrl,
-                error: update.error,
-                metrics: update.metrics,
-              });
-            }
-          );
-
-          await updateJobInDB(jobId, { status: "done", progress: 100, currentStep: "اكتمل الإنتاج!", videoUrl });
-
-          // ── إشعار المنصة عند اكتمال الإنتاج ──
-          try {
-            await notifyOwner({
-              title: "✨ خيال — اكتمل الإنتاج!",
-              content: `فيديوك جاهز للمشاهدة والتحميل.\nرابط الفيديو: ${videoUrl}`,
-            });
-          } catch { /* الإشعار اختياري */ }
-
-        } catch (err) {
-          await updateJobInDB(jobId, {
-            status: "failed",
-            progress: 0,
-            currentStep: "فشل الإنتاج",
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      })();
+      // تشغيل مع heartbeat — يستمر حتى لو أغلق المتصفح
+      runProductionJob(jobId, scriptData, input.options ?? {});
 
       return { jobId };
     }),
@@ -272,64 +345,17 @@ export const videoRouter = router({
     .mutation(async ({ input }) => {
       const jobId = `quick_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-      await createJobInDB(jobId, input.description);
+      // حفظ البيانات في DB للاستئناف عند الانقطاع
+      const scriptData = {
+        description: input.description,
+        language: input.language,
+        voice: input.voice,
+        sceneCount: input.sceneCount,
+      };
+      await createJobInDB(jobId, input.description, scriptData, input.options ?? {});
 
-      // يعمل في الخلفية — يستمر حتى لو أغلق المتصفح
-      (async () => {
-        try {
-          await updateJobInDB(jobId, { status: "processing", currentStep: "تحليل المحتوى وكتابة السيناريو...", progress: 3 });
-
-          const script = await generateVideoScript(
-            input.description,
-            input.language,
-            input.voice,
-            input.sceneCount
-          );
-
-          await updateJobInDB(jobId, { currentStep: `السيناريو جاهز: "${script.title}"`, progress: 8 });
-
-          const producer = new VideoProducer();
-          const videoUrl = await producer.produce(
-            script,
-            {
-              aspectRatio: input.options?.aspectRatio ?? "16:9",
-              mode: input.options?.mode ?? "production",
-              musicVolume: input.options?.musicVolume ?? 0.12,
-              useRunway: input.options?.useRunway ?? true,
-              useElevenLabs: input.options?.useElevenLabs ?? true,
-              quality: input.options?.quality ?? "fast",
-            },
-            async (update: Partial<VideoJob>) => {
-              await updateJobInDB(jobId, {
-                status: update.status as any,
-                progress: update.progress,
-                currentStep: update.currentStep,
-                videoUrl: update.videoUrl,
-                error: update.error,
-                metrics: update.metrics,
-              });
-            }
-          );
-
-          await updateJobInDB(jobId, { status: "done", progress: 100, currentStep: "اكتمل الإنتاج!", videoUrl });
-
-          // ── إشعار المنصة عند اكتمال الإنتاج ──
-          try {
-            await notifyOwner({
-              title: "✨ خيال — اكتمل الإنتاج!",
-              content: `فيديوك جاهز للمشاهدة والتحميل.\nرابط الفيديو: ${videoUrl}`,
-            });
-          } catch { /* الإشعار اختياري */ }
-
-        } catch (err) {
-          await updateJobInDB(jobId, {
-            status: "failed",
-            progress: 0,
-            currentStep: "فشل الإنتاج",
-            error: err instanceof Error ? err.message : String(err),
-          });
-        }
-      })();
+      // تشغيل مع heartbeat — يستمر حتى لو أغلق المتصفح
+      runProductionJob(jobId, scriptData, input.options ?? {});
 
       return { jobId };
     }),

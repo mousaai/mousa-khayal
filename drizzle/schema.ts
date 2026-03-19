@@ -113,6 +113,12 @@ export const videoJobs = mysqlTable("video_jobs", {
   videoUrl: text("videoUrl"),
   error: text("error"),
   metrics: json("metrics"),
+  // حقول الاستئناف: حفظ حالة كل مشهد لاستئناف من نقطة التوقف
+  sceneStates: json("sceneStates"), // Array<{imageUrl?, audioUrl?, videoUrl?, done: boolean}>
+  scriptData: json("scriptData"),   // VideoScript كاملة لإعادة الاستخدام عند الاستئناف
+  optionsData: json("optionsData"), // VideoProductionOptions
+  retryCount: int("retryCount").default(0).notNull(),
+  lastHeartbeat: timestamp("lastHeartbeat").defaultNow(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
 });
