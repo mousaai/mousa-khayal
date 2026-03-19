@@ -284,3 +284,71 @@ export const imageCache = mysqlTable("image_cache", {
 
 export type ImageCache = typeof imageCache.$inferSelect;
 export type InsertImageCache = typeof imageCache.$inferInsert;
+
+// ══════════════════════════════════════════════════════════════
+// سجل فشل خيال — يُسجّل كل تقصير ويُحلّله لتحسين الأداء
+// ══════════════════════════════════════════════════════════════
+export const khayalFailures = mysqlTable("khayal_failures", {
+  id: int("id").autoincrement().primaryKey(),
+  // نوع الفشل
+  failureType: mysqlEnum("failureType", [
+    "llm_error",       // فشل نموذج اللغة
+    "image_error",     // فشل توليد الصورة
+    "storage_error",   // فشل التخزين
+    "timeout",         // انتهاء المهلة
+    "quality_low",     // جودة منخفضة (تقييم المستخدم)
+    "content_blocked", // محتوى محظور
+    "other",           // أخرى
+  ]).notNull(),
+  // مزود الخدمة الذي فشل
+  provider: mysqlEnum("provider", ["khayal", "manus", "openai", "replicate", "runway", "elevenlabs"]).notNull(),
+  // مزود الخدمة الذي سد الفجوة
+  fallbackProvider: mysqlEnum("fallbackProvider", ["manus", "openai", "replicate", "none"]),
+  // تفاصيل الفشل
+  errorMessage: text("errorMessage"),
+  errorCode: varchar("errorCode", { length: 32 }),
+  // السياق
+  operation: varchar("operation", { length: 64 }).notNull(), // "generateImage", "invokeLLM", etc.
+  inputSummary: text("inputSummary"),   // ملخص المدخلات (بدون بيانات حساسة)
+  promptUsed: text("promptUsed"),       // البرومبت الذي فشل
+  // التحسين
+  analysisResult: text("analysisResult"),  // تحليل سبب الفشل (من LLM)
+  suggestedFix: text("suggestedFix"),      // الإصلاح المقترح
+  fixApplied: int("fixApplied").default(0).notNull(), // 1=تم تطبيق الإصلاح
+  // الأداء
+  durationMs: int("durationMs"),
+  retryCount: int("retryCount").default(0).notNull(),
+  userId: int("userId"),
+  jobId: varchar("jobId", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type KhayalFailure = typeof khayalFailures.$inferSelect;
+export type InsertKhayalFailure = typeof khayalFailures.$inferInsert;
+
+// ══════════════════════════════════════════════════════════════
+// تحسينات البرومبت التلقائية — يُخزّن كل تحسين تعلّمه النظام
+// ══════════════════════════════════════════════════════════════
+export const promptImprovements = mysqlTable("prompt_improvements", {
+  id: int("id").autoincrement().primaryKey(),
+  // التصنيف
+  operation: varchar("operation", { length: 64 }).notNull(), // "generateImage", "analyzeScene", etc.
+  domain: varchar("domain", { length: 64 }),                 // nature, architecture, etc.
+  failureType: varchar("failureType", { length: 64 }),       // نوع الفشل الذي أدى للتحسين
+  // البرومبت قبل وبعد
+  originalPrompt: text("originalPrompt").notNull(),
+  improvedPrompt: text("improvedPrompt").notNull(),
+  improvementReason: text("improvementReason"),
+  // الأداء
+  successRateBefore: int("successRateBefore").default(0), // % نجاح قبل التحسين
+  successRateAfter: int("successRateAfter"),               // % نجاح بعد التحسين (يُحدَّث لاحقاً)
+  useCount: int("useCount").default(0).notNull(),          // عدد مرات استخدام البرومبت المحسّن
+  isActive: int("isActive").default(1).notNull(),          // 1=نشط, 0=مؤرشف
+  // المصدر
+  triggeredByFailureId: int("triggeredByFailureId"),       // الفشل الذي أدى لهذا التحسين
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PromptImprovement = typeof promptImprovements.$inferSelect;
+export type InsertPromptImprovement = typeof promptImprovements.$inferInsert;

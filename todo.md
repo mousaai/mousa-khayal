@@ -818,3 +818,28 @@
 - [ ] بناء نظام مصادقة خاص بخيال (email/password + Google OAuth)
 - [ ] إزالة جميع imports من server/_core المعتمدة على Manus
 - [x] اختبار شامل بعد الاستبدال (202/202 ناجحة)
+
+## 💰 تقليل التكاليف — مارس 2026
+
+- [ ] إضافة TTS مجاني (Web Speech API + gTTS) كبديل لـ ElevenLabs (توفير $450/شهر)
+- [ ] تقليل مدة فيديو Runway من 5 ثوانٍ إلى 3 ثوانٍ للمشهد (توفير 40%)
+- [ ] نظام تدرج ذكي: TTS مجاني افتراضياً، ElevenLabs للمستخدمين المميزين فقط
+- [ ] تقليل عدد المشاهد الافتراضي من 5 إلى 3 (توفير 40% على Runway)
+
+## 🔀 النموذج الهجين (Manus + مستقل)
+
+- [ ] بناء HybridRouter لـ LLM: Manus للمهام البسيطة، OpenAI للمعقدة
+- [ ] بناء HybridRouter لتوليد الصور: Manus أولاً، Replicate عند الفشل أو الحمل العالي
+- [ ] بناء HybridRouter للتخزين: Cloudflare R2 أولاً، Manus S3 كـ fallback
+- [ ] لوحة تحكم تكاليف في الخادم لمراقبة الاستخدام الفعلي
+
+## 🧠 النظام الهجين الذكي (خيال + Manus + التحسين الذاتي)
+
+- [x] إنشاء manusLLM.ts (استدعاء Manus LLM مباشرة)
+- [x] إنشاء manusImage.ts (استدعاء Manus Image مباشرة)
+- [x] إصلاح hybridRouter.ts (ربط manusLLM و manusImage)
+- [x] بناء KhayalSelfImprove: تسجيل التقصير وتحليله
+- [x] بناء KhayalSelfImprove: تحسين البرومبتات تلقائياً بعد كل فشل
+- [x] جدول khayal_failures و prompt_improvements في قاعدة البيانات لتتبع الأنماط
+- [x] لوحة مراقبة في الواجهة (/monitor): إحصاءات الفشل والتحسينات
+- [x] تنبيه تلقائي للمالك عند تكرار نفس نوع الفشل 3+ مرات (notifyOwner)

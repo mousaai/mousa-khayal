@@ -21,6 +21,7 @@ import { checkContent, SAFE_CONTENT_DIRECTIVE } from "./contentFilter";
 import { analyzeDomain, buildDomainPrompt, quickDetectDomain } from "./domainEngine";
 import type { DomainAnalysis } from "./domainEngine";
 import { generateScript } from "./scriptEngine";
+import { recordFailure, getImprovedPrompt } from "./khayalSelfImprove";
 
 // ═══════════════════════════════════════════════════════════════
 // CAMERA ANGLES — زوايا الكاميرا المحددة لكتلة واحدة
@@ -494,18 +495,36 @@ export const khayalRouter = router({
             ? [{ url: input.referenceImageUrl, mimeType: "image/jpeg" as const }]
             : undefined;
 
-          const { url } = await generateImage({
-            prompt: scene.prompt,
-            originalImages,
-          });
+          // فحص إذا يوجد برومبت محسّن من التحسين الذاتي
+          const improvedPrompt = await getImprovedPrompt("generateImage", scene.prompt);
+          const finalPrompt = improvedPrompt ?? scene.prompt;
+
+          let imageUrl = "";
+          const imgStart = Date.now();
+          try {
+            const { url } = await generateImage({ prompt: finalPrompt, originalImages });
+            imageUrl = url || "";
+          } catch (imgErr: unknown) {
+            void recordFailure({
+              failureType: "image_error",
+              provider: "khayal",
+              fallbackProvider: "manus",
+              operation: "generateImage",
+              errorMessage: imgErr instanceof Error ? imgErr.message : String(imgErr),
+              promptUsed: finalPrompt,
+              durationMs: Date.now() - imgStart,
+              inputSummary: input.description.slice(0, 200),
+            });
+            throw imgErr;
+          }
 
           if (db && projectId) {
             await db.insert(khayalScenes).values({
               projectId,
               sceneType: scene.type,
               sceneLabel: scene.label,
-              imageUrl: url || "",
-              prompt: scene.prompt,
+              imageUrl,
+              prompt: finalPrompt,
               arabicCaption: scene.arabicCaption || "",
               order: index,
             });
@@ -514,8 +533,8 @@ export const khayalRouter = router({
           return {
             type: scene.type,
             label: scene.label,
-            imageUrl: url,
-            prompt: scene.prompt,
+            imageUrl,
+            prompt: finalPrompt,
             arabicCaption: scene.arabicCaption || "",
             order: index,
           };
