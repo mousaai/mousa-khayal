@@ -339,7 +339,7 @@ export const videoRouter = router({
       description: z.string().min(2).max(2000),
       language: z.enum(["ar", "en"]).default("ar"),
       voice: voiceEnum.default("ar_male"),
-      sceneCount: z.number().min(3).max(8).default(5),
+      sceneCount: z.number().min(3).max(8).default(3),
       options: productionOptionsSchema.optional(),
     }))
     .mutation(async ({ input }) => {

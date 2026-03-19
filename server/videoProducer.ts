@@ -289,8 +289,9 @@ export class VideoProducer {
           filmGenre
         ),
         // الخطوة 2: توليد الصوت بالتوازي مع الصور
+        // في وضع fast: نستخدم turbo دائماً (أسرع 3x من multilingual)
         useElevenLabs
-          ? this.generateAudioElevenLabs(script, mode).then(p => { if (p) usedElevenLabs = true; return p; })
+          ? this.generateAudioElevenLabs(script, quality === "fast" ? "draft" : mode).then(p => { if (p) usedElevenLabs = true; return p; })
           : Promise.resolve(null as string | null),
       ]);
 
@@ -411,14 +412,14 @@ export class VideoProducer {
       scenes.map(async (scene, i) => {
         const imgPath = path.join(this.workDir, `scene_${i + 1}.png`);
 
-        // بناء prompt مخصص للنوع السينمائي
-        const genreEnhancedPrompt = `${genreDNA.promptPrefix} ${characterPart}${scene.imagePrompt}, ${genreDNA.lightingStyle}, ${genreDNA.colorGrading}, ${genreDNA.promptSuffix}, ultra photorealistic, 8K`;
+        // بناء prompt مخصص للنوع السينمائي (موجز ودقيق لتسريع API)
+        const genreEnhancedPrompt = `${genreDNA.promptPrefix} ${characterPart}${scene.imagePrompt}, ${genreDNA.lightingStyle}, ${genreDNA.colorGrading}, ${genreDNA.promptSuffix}`;
 
-        // retry تلقائي 3 محاولات
+        // retry مرة واحدة فقط (أسرع من 3 محاولات)
         let imageUrl: string | undefined;
         let lastErr: Error | null = null;
 
-        for (let attempt = 1; attempt <= 3; attempt++) {
+        for (let attempt = 1; attempt <= 2; attempt++) {
           try {
             const genOptions: Parameters<typeof generateImage>[0] = {
               prompt: genreEnhancedPrompt,
@@ -435,8 +436,8 @@ export class VideoProducer {
             if (imageUrl) break;
           } catch (e: any) {
             lastErr = e;
-            console.warn(`[VideoProducer] generateImage attempt ${attempt}/3 failed for scene ${i+1}: ${e.message}`);
-            if (attempt < 3) await new Promise(r => setTimeout(r, 2000 * attempt));
+            console.warn(`[VideoProducer] generateImage attempt ${attempt}/2 failed for scene ${i+1}: ${e.message}`);
+            if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
           }
         }
 
@@ -445,13 +446,18 @@ export class VideoProducer {
         const response = await fetch(imageUrl);
         const buffer = Buffer.from(await response.arrayBuffer());
 
-        await sharp(buffer)
-          .resize(dims.width, dims.height, { fit: "cover" })
-          .png()
-          .toFile(imgPath);
+        // حفظ بـ jpeg في وضع fast (أسرع 3x من png)
+        const useJpeg = dims.width <= 1280;
+        const finalImgPath = useJpeg ? imgPath.replace('.png', '.jpg') : imgPath;
+        const sharpBase = sharp(buffer).resize(dims.width, dims.height, { fit: "cover" });
+        if (useJpeg) {
+          await sharpBase.toFormat('jpeg', { quality: 90 }).toFile(finalImgPath);
+        } else {
+          await sharpBase.toFormat('png').toFile(finalImgPath);
+        }
 
-        console.log(`  ✓ صورة ${i + 1}/${scenes.length} جاهزة (${genre})`);
-        return imgPath;
+        console.log(`  ✓ صورة ${i + 1}/${scenes.length} جاهزة (${genre}) [${useJpeg ? 'jpeg' : 'png'}]`);
+        return finalImgPath;
       })
     );
 
@@ -466,16 +472,11 @@ export class VideoProducer {
       } else {
         // في حالة فشل مشهد واحد: استخدم placeholder
         console.error(`[VideoProducer] فشل توليد صورة ${i+1}:`, r.reason);
-        // إنشاء صورة placeholder بسيطة
-        const placeholderPath = path.join(this.workDir, `scene_${i + 1}.png`);
-        await sharp({
-          create: {
-            width: dims.width,
-            height: dims.height,
-            channels: 3,
-            background: { r: 10, g: 10, b: 20 },
-          },
-        }).png().toFile(placeholderPath);
+        const useJpeg2 = dims.width <= 1280;
+        const placeholderPath = path.join(this.workDir, `scene_${i + 1}${useJpeg2 ? '.jpg' : '.png'}`);
+        const ph = sharp({ create: { width: dims.width, height: dims.height, channels: 3, background: { r: 10, g: 10, b: 20 } } });
+        if (useJpeg2) await ph.toFormat('jpeg', { quality: 90 }).toFile(placeholderPath);
+        else await ph.toFormat('png').toFile(placeholderPath);
         paths.push(placeholderPath);
       }
     }
@@ -969,7 +970,7 @@ export class VideoProducer {
         .duration(duration)
         .fps(CONFIG.fps)
         .videoCodec("libx264")
-        .outputOptions([`-preset ${preset}`, `-crf ${crf}`, "-pix_fmt yuv420p"])
+        .outputOptions([`-preset ${preset}`, `-crf ${crf}`, "-pix_fmt yuv420p", "-threads 0"])
         .output(outputPath)
         .on("end", () => resolve())
         .on("error", (err: Error) => {
@@ -1201,7 +1202,7 @@ export async function generateVideoScript(
   userInput: string,
   language: "ar" | "en" = "ar",
   voice: VoiceId = "ar_male",
-  sceneCount: number = 6,
+  sceneCount: number = 3,
   characterDescription?: string,
   referenceImageUrl?: string
 ): Promise<VideoScript> {
