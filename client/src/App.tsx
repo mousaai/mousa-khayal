@@ -5,10 +5,8 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
-import KnowledgeBar from "./components/KnowledgeBar";
 import MyFilms from "./pages/MyFilms";
 import SharePage from "./pages/SharePage";
-import MonitorDashboard from "./pages/MonitorDashboard";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -17,7 +15,6 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path={"/my-films"} component={MyFilms} />
       <Route path={"/share/:shareId"} component={SharePage} />
-      <Route path={"/monitor"} component={MonitorDashboard} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
@@ -40,7 +37,6 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
-          <KnowledgeBar />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

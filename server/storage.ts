@@ -1,210 +1,102 @@
-/**
- * Storage Helper — Cloudflare R2 (مستقل عن Manus)
- *
- * استراتيجية التكلفة المنخفضة:
- * - Cloudflare R2: مجاني حتى 10GB + بدون رسوم نقل (egress) — الأفضل للفيديوهات والصور
- * - Fallback: Manus Built-in إذا لم تكن مفاتيح R2 متاحة
- *
- * الأولوية: Cloudflare R2 → Manus (fallback)
- *
- * إعداد R2:
- * 1. أنشئ bucket في Cloudflare R2 Dashboard
- * 2. أنشئ API Token بصلاحية Admin Read & Write
- * 3. أضف المتغيرات: CLOUDFLARE_R2_ACCOUNT_ID, CLOUDFLARE_R2_ACCESS_KEY_ID,
- *    CLOUDFLARE_R2_SECRET_ACCESS_KEY, CLOUDFLARE_R2_BUCKET_NAME
- * 4. (اختياري) CLOUDFLARE_R2_PUBLIC_URL لروابط عامة مباشرة
- */
+// Preconfigured storage helpers for Manus WebDev templates
+// Uses the Biz-provided storage proxy (Authorization: Bearer <token>)
 
-import { ENV } from "./_core/env";
-import {
-  S3Client,
-  PutObjectCommand,
-  GetObjectCommand,
-} from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { ENV } from './_core/env';
 
-// ─── Cloudflare R2 Client ─────────────────────────────────────────────────────
-function getR2Client(): S3Client | null {
-  const { cloudflareR2AccountId, cloudflareR2AccessKeyId, cloudflareR2SecretAccessKey } = ENV;
-  if (!cloudflareR2AccountId || !cloudflareR2AccessKeyId || !cloudflareR2SecretAccessKey) {
-    return null;
-  }
-
-  return new S3Client({
-    region: "auto",
-    endpoint: `https://${cloudflareR2AccountId}.r2.cloudflarestorage.com`,
-    credentials: {
-      accessKeyId: cloudflareR2AccessKeyId,
-      secretAccessKey: cloudflareR2SecretAccessKey,
-    },
-  });
-}
-
-// ─── R2: رفع ملف ─────────────────────────────────────────────────────────────
-async function r2Put(
-  relKey: string,
-  data: Buffer | Uint8Array | string,
-  contentType: string
-): Promise<{ key: string; url: string }> {
-  const client = getR2Client();
-  if (!client) throw new Error("Cloudflare R2 not configured");
-
-  const bucket = ENV.cloudflareR2BucketName || "khayal-media";
-  const key = relKey.replace(/^\/+/, "");
-
-  const body = typeof data === "string" ? Buffer.from(data) : data;
-
-  await client.send(
-    new PutObjectCommand({
-      Bucket: bucket,
-      Key: key,
-      Body: body,
-      ContentType: contentType,
-    })
-  );
-
-  // إذا كان هناك رابط عام مخصص (Custom Domain)، استخدمه
-  if (ENV.cloudflareR2PublicUrl) {
-    const publicBase = ENV.cloudflareR2PublicUrl.replace(/\/+$/, "");
-    return { key, url: `${publicBase}/${key}` };
-  }
-
-  // وإلا أنشئ رابطاً موقّعاً صالحاً لمدة 7 أيام
-  const signedUrl = await getSignedUrl(
-    client,
-    new GetObjectCommand({ Bucket: bucket, Key: key }),
-    { expiresIn: 7 * 24 * 60 * 60 } // 7 أيام
-  );
-
-  return { key, url: signedUrl };
-}
-
-// ─── R2: الحصول على رابط ─────────────────────────────────────────────────────
-async function r2Get(relKey: string): Promise<{ key: string; url: string }> {
-  const client = getR2Client();
-  if (!client) throw new Error("Cloudflare R2 not configured");
-
-  const bucket = ENV.cloudflareR2BucketName || "khayal-media";
-  const key = relKey.replace(/^\/+/, "");
-
-  if (ENV.cloudflareR2PublicUrl) {
-    const publicBase = ENV.cloudflareR2PublicUrl.replace(/\/+$/, "");
-    return { key, url: `${publicBase}/${key}` };
-  }
-
-  const signedUrl = await getSignedUrl(
-    client,
-    new GetObjectCommand({ Bucket: bucket, Key: key }),
-    { expiresIn: 7 * 24 * 60 * 60 }
-  );
-
-  return { key, url: signedUrl };
-}
-
-// ─── Manus Fallback ───────────────────────────────────────────────────────────
 type StorageConfig = { baseUrl: string; apiKey: string };
 
-function getManusConfig(): StorageConfig {
+function getStorageConfig(): StorageConfig {
   const baseUrl = ENV.forgeApiUrl;
   const apiKey = ENV.forgeApiKey;
+
   if (!baseUrl || !apiKey) {
-    throw new Error("No storage configured: set CLOUDFLARE_R2_* or BUILT_IN_FORGE_API_URL/KEY");
+    throw new Error(
+      "Storage proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
+    );
   }
+
   return { baseUrl: baseUrl.replace(/\/+$/, ""), apiKey };
 }
 
-function buildManusUploadUrl(baseUrl: string, relKey: string): URL {
+function buildUploadUrl(baseUrl: string, relKey: string): URL {
   const url = new URL("v1/storage/upload", ensureTrailingSlash(baseUrl));
-  url.searchParams.set("path", relKey.replace(/^\/+/, ""));
+  url.searchParams.set("path", normalizeKey(relKey));
   return url;
+}
+
+async function buildDownloadUrl(
+  baseUrl: string,
+  relKey: string,
+  apiKey: string
+): Promise<string> {
+  const downloadApiUrl = new URL(
+    "v1/storage/downloadUrl",
+    ensureTrailingSlash(baseUrl)
+  );
+  downloadApiUrl.searchParams.set("path", normalizeKey(relKey));
+  const response = await fetch(downloadApiUrl, {
+    method: "GET",
+    headers: buildAuthHeaders(apiKey),
+  });
+  return (await response.json()).url;
 }
 
 function ensureTrailingSlash(value: string): string {
   return value.endsWith("/") ? value : `${value}/`;
 }
 
-async function manusStoragePut(
-  relKey: string,
+function normalizeKey(relKey: string): string {
+  return relKey.replace(/^\/+/, "");
+}
+
+function toFormData(
   data: Buffer | Uint8Array | string,
-  contentType: string
-): Promise<{ key: string; url: string }> {
-  const { baseUrl, apiKey } = getManusConfig();
-  const key = relKey.replace(/^\/+/, "");
-  const uploadUrl = buildManusUploadUrl(baseUrl, key);
-
-  const bufData = typeof data === "string" ? Buffer.from(data) : Buffer.from(data as Uint8Array);
-  const blob = new Blob([bufData.buffer.slice(bufData.byteOffset, bufData.byteOffset + bufData.byteLength)], { type: contentType });
+  contentType: string,
+  fileName: string
+): FormData {
+  const blob =
+    typeof data === "string"
+      ? new Blob([data], { type: contentType })
+      : new Blob([data as any], { type: contentType });
   const form = new FormData();
-  form.append("file", blob, key.split("/").pop() ?? key);
-
-  const response = await fetch(uploadUrl, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}` },
-    body: form,
-  });
-
-  if (!response.ok) {
-    const message = await response.text().catch(() => response.statusText);
-    throw new Error(`Manus storage upload failed (${response.status}): ${message}`);
-  }
-
-  const url = (await response.json()).url;
-  return { key, url };
+  form.append("file", blob, fileName || "file");
+  return form;
 }
 
-async function manusStorageGet(relKey: string): Promise<{ key: string; url: string }> {
-  const { baseUrl, apiKey } = getManusConfig();
-  const key = relKey.replace(/^\/+/, "");
-  const downloadApiUrl = new URL("v1/storage/downloadUrl", ensureTrailingSlash(baseUrl));
-  downloadApiUrl.searchParams.set("path", key);
-
-  const response = await fetch(downloadApiUrl, {
-    method: "GET",
-    headers: { Authorization: `Bearer ${apiKey}` },
-  });
-  return { key, url: (await response.json()).url };
+function buildAuthHeaders(apiKey: string): HeadersInit {
+  return { Authorization: `Bearer ${apiKey}` };
 }
 
-// ─── الدوال العامة — Manus أولاً (روابط عامة مضمونة)، R2 كـ fallback ──────────
 export async function storagePut(
   relKey: string,
   data: Buffer | Uint8Array | string,
   contentType = "application/octet-stream"
 ): Promise<{ key: string; url: string }> {
-  // استخدم Manus أولاً — روابط عامة مضمونة بدون مشاكل CORS أو 403
-  if (ENV.forgeApiKey) {
-    try {
-      return await manusStoragePut(relKey, data, contentType);
-    } catch (err) {
-      console.warn(`[Storage] Manus failed, falling back to R2: ${(err as Error).message}`);
-      // fallback لـ R2 إذا كانت المفاتيح متاحة
-      if (ENV.cloudflareR2AccessKeyId && ENV.cloudflareR2SecretAccessKey) {
-        return await r2Put(relKey, data, contentType);
-      }
-      throw err;
-    }
-  }
+  const { baseUrl, apiKey } = getStorageConfig();
+  const key = normalizeKey(relKey);
+  const uploadUrl = buildUploadUrl(baseUrl, key);
+  const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
+  const response = await fetch(uploadUrl, {
+    method: "POST",
+    headers: buildAuthHeaders(apiKey),
+    body: formData,
+  });
 
-  // fallback لـ R2
-  if (ENV.cloudflareR2AccessKeyId && ENV.cloudflareR2SecretAccessKey) {
-    return await r2Put(relKey, data, contentType);
+  if (!response.ok) {
+    const message = await response.text().catch(() => response.statusText);
+    throw new Error(
+      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
+    );
   }
-
-  throw new Error("No storage configured: set BUILT_IN_FORGE_API_URL/KEY or CLOUDFLARE_R2_*");
+  const url = (await response.json()).url;
+  return { key, url };
 }
 
-export async function storageGet(relKey: string): Promise<{ key: string; url: string }> {
-  if (ENV.cloudflareR2AccessKeyId && ENV.cloudflareR2SecretAccessKey) {
-    try {
-      return await r2Get(relKey);
-    } catch (err) {
-      console.warn(`[Storage] R2 get failed, falling back to Manus: ${(err as Error).message}`);
-      if (ENV.forgeApiKey) {
-        return await manusStorageGet(relKey);
-      }
-      throw err;
-    }
-  }
-
-  return await manusStorageGet(relKey);
+export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
+  const { baseUrl, apiKey } = getStorageConfig();
+  const key = normalizeKey(relKey);
+  return {
+    key,
+    url: await buildDownloadUrl(baseUrl, key, apiKey),
+  };
 }

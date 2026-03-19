@@ -64,34 +64,6 @@
       "when": 1773920818922,
       "tag": "0008_married_dakota_north",
       "breakpoints": true
-    },
-    {
-      "idx": 9,
-      "version": "5",
-      "when": 1773948497600,
-      "tag": "0009_loose_prism",
-      "breakpoints": true
-    },
-    {
-      "idx": 10,
-      "version": "5",
-      "when": 1773949895263,
-      "tag": "0010_flippant_the_santerians",
-      "breakpoints": true
-    },
-    {
-      "idx": 11,
-      "version": "5",
-      "when": 1773951416555,
-      "tag": "0011_regular_raza",
-      "breakpoints": true
-    },
-    {
-      "idx": 12,
-      "version": "5",
-      "when": 1773955965859,
-      "tag": "0012_misty_banshee",
-      "breakpoints": true
     }
   ]
 }

@@ -1,1 +1,0 @@
-ALTER TABLE `khayal_projects` MODIFY COLUMN `scenarioType` enum('design','develop','deteriorate','compare','imagine','transform','fantasy','historical','nature') NOT NULL DEFAULT 'imagine';

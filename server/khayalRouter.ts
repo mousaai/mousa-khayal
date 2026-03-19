@@ -21,7 +21,6 @@ import { checkContent, SAFE_CONTENT_DIRECTIVE } from "./contentFilter";
 import { analyzeDomain, buildDomainPrompt, quickDetectDomain } from "./domainEngine";
 import type { DomainAnalysis } from "./domainEngine";
 import { generateScript } from "./scriptEngine";
-import { recordFailure, getImprovedPrompt } from "./khayalSelfImprove";
 
 // ═══════════════════════════════════════════════════════════════
 // CAMERA ANGLES — زوايا الكاميرا المحددة لكتلة واحدة
@@ -472,7 +471,7 @@ export const khayalRouter = router({
             title: input.title || analysis.title || input.description.slice(0, 80),
             description: input.description,
             inputType: input.referenceImageUrl ? "mixed" : "text",
-            scenarioType: (analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine" | "transform" | "fantasy" | "historical" | "nature") || "imagine",
+            scenarioType: (analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine") || "imagine",
             inputData: {
               description: input.description,
               referenceImageUrl: input.referenceImageUrl,
@@ -495,36 +494,18 @@ export const khayalRouter = router({
             ? [{ url: input.referenceImageUrl, mimeType: "image/jpeg" as const }]
             : undefined;
 
-          // فحص إذا يوجد برومبت محسّن من التحسين الذاتي
-          const improvedPrompt = await getImprovedPrompt("generateImage", scene.prompt);
-          const finalPrompt = improvedPrompt ?? scene.prompt;
-
-          let imageUrl = "";
-          const imgStart = Date.now();
-          try {
-            const { url } = await generateImage({ prompt: finalPrompt, originalImages });
-            imageUrl = url || "";
-          } catch (imgErr: unknown) {
-            void recordFailure({
-              failureType: "image_error",
-              provider: "khayal",
-              fallbackProvider: "manus",
-              operation: "generateImage",
-              errorMessage: imgErr instanceof Error ? imgErr.message : String(imgErr),
-              promptUsed: finalPrompt,
-              durationMs: Date.now() - imgStart,
-              inputSummary: input.description.slice(0, 200),
-            });
-            throw imgErr;
-          }
+          const { url } = await generateImage({
+            prompt: scene.prompt,
+            originalImages,
+          });
 
           if (db && projectId) {
             await db.insert(khayalScenes).values({
               projectId,
               sceneType: scene.type,
               sceneLabel: scene.label,
-              imageUrl,
-              prompt: finalPrompt,
+              imageUrl: url || "",
+              prompt: scene.prompt,
               arabicCaption: scene.arabicCaption || "",
               order: index,
             });
@@ -533,8 +514,8 @@ export const khayalRouter = router({
           return {
             type: scene.type,
             label: scene.label,
-            imageUrl,
-            prompt: finalPrompt,
+            imageUrl: url,
+            prompt: scene.prompt,
             arabicCaption: scene.arabicCaption || "",
             order: index,
           };
@@ -606,7 +587,7 @@ export const khayalRouter = router({
           title: analysis.title || input.description.slice(0, 80),
           description: input.description,
           inputType: input.referenceImageUrl ? "mixed" : "text",
-          scenarioType: (analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine" | "transform" | "fantasy" | "historical" | "nature") || "imagine",
+          scenarioType: (analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine") || "imagine",
           inputData: {
             description: input.description,
             durationMinutes: input.durationMinutes,

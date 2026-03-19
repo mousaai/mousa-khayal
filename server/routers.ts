@@ -6,7 +6,6 @@ import { khayalRouter } from "./khayalRouter";
 import { videoRouter } from "./videoRouter";
 import { chatRouter } from "./chatRouter";
 import { exportRouter } from "./exportRouter";
-import { monitorRouter } from "./monitorRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -24,7 +23,6 @@ export const appRouter = router({
   video: videoRouter,
   chat: chatRouter,
   export: exportRouter,
-  monitor: monitorRouter,
 });
 
 export type AppRouter = typeof appRouter;

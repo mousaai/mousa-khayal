@@ -8,7 +8,6 @@ import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import KhayalCinematicViewer from "@/components/KhayalCinematicViewer";
 import ImmersiveViewer from "@/components/ImmersiveViewer";
-import SmartProductionModal from "@/components/SmartProductionModal";
 import type { GenerationResult, DocumentAnalysis, ImmersiveResult } from "@/types/khayal";
 import { musicEngine, selectMusicMood } from "@/lib/musicEngine";
 
@@ -319,10 +318,6 @@ export default function Home() {
   const memoryStatusQuery = trpc.video.getMemoryStatus.useQuery(undefined, {
     staleTime: 60_000, // تحديث كل دقيقة
   });
-
-  // ── نافذة الإنتاج الذكية ──
-  const [showSmartModal, setShowSmartModal] = useState(false);
-  const [llmUnavailable, setLlmUnavailable] = useState(false);
   const [surpriseAnnouncement, setSurpriseAnnouncement] = useState<string | null>(null);
 
   // ── SSE: استبدال polling بـ EventSource حي ──
@@ -695,9 +690,9 @@ export default function Home() {
 
       const isProKw = ["مشروع", "معماري", "وثائقي", "تسويقي", "تعليمي", "علمي", "تاريخي", "documentary", "marketing", "educational", "من الصفر", "دورة حياة", "مراحل البناء"].some(k => lower.includes(k.toLowerCase()));
 
+      // 🔒 الفيديو مجمّد مؤقتاً — تحويل كل طلبات الفيديو إلى صور سينمائية
       if (hasVideoKw || hasSequence) {
-        const isPro = isProKw || hasSequence;
-        return { type: "video", outputMode: isPro ? "pro" : "fast", label: activeLang === "AR" ? (isPro ? "✨ فيديو احترافي" : "⚡ فيديو سريع") : (isPro ? "✨ Pro Video" : "⚡ Fast Video") };
+        return { type: "image", outputMode: "images", label: activeLang === "AR" ? "🎨 مشاهد سينمائية" : "🎨 Cinematic Scenes" };
       }
 
       // كشف طلب صورة صريح
@@ -711,7 +706,8 @@ export default function Home() {
         return { type: "image", outputMode: "images", label: activeLang === "AR" ? "🎨 مشاهد سينمائية" : "🎨 Cinematic Scenes" };
 
       // افتراضي ذكي: وصف طويل (> 40 حرف) = فيديو سريع، وصف قصير = صورة
-      if (text.length > 40) return { type: "video", outputMode: isProKw ? "pro" : "fast", label: activeLang === "AR" ? "🎬 فيديو سينمائي" : "🎬 Cinematic Video" };
+      // 🔒 الفيديو مجمّد — وصف طويل = صور سينمائية متعددة
+      if (text.length > 40) return { type: "image", outputMode: "images", label: activeLang === "AR" ? "🎨 مشاهد سينمائية" : "🎨 Cinematic Scenes" };
 
       // وصف قصير = صورة سينمائية
       return { type: "image", outputMode: "images", label: activeLang === "AR" ? "🎨 صورة سينمائية" : "🎨 Cinematic Image" };
@@ -921,14 +917,8 @@ export default function Home() {
             thinkingSteps: [],
             decision: null,
           });
-        } catch (err: any) {
-          const msg = err?.message ?? "";
-          if (msg.includes("usage exhausted") || msg.includes("412") || msg.includes("quota") || msg.includes("Precondition Failed")) {
-            setLlmUnavailable(true);
-            setShowSmartModal(true);
-          } else {
-            console.error(err);
-          }
+        } catch (err) {
+          console.error(err);
         }
         return;
       }
@@ -1003,14 +993,8 @@ export default function Home() {
             options: { aspectRatio: "16:9", mode: "production", musicVolume: 0.12, useRunway: true, useElevenLabs: true, quality: videoQuality },
           });
           setVideoJob({ jobId: result.jobId, status: "pending", progress: 0, currentStep: "جاري التحضير..." });
-        } catch (err: any) {
-          const msg = err?.message ?? "";
-          if (msg.includes("usage exhausted") || msg.includes("412") || msg.includes("quota") || msg.includes("Precondition Failed")) {
-            setLlmUnavailable(true);
-            setShowSmartModal(true);
-          } else {
-            console.error(err);
-          }
+        } catch (err) {
+          console.error(err);
         }
       } else if (intent === "script") {
         setIsGeneratingScript(true);
@@ -1799,10 +1783,10 @@ export default function Home() {
                       {videoJob.progress}%
                       {videoJob.progress > 5 && videoJob.progress < 95 && (
                         <span className="mr-2" style={{ color: "rgba(148,163,184,0.5)" }}>
-                          {videoJob.progress < 40 ? "≈ 2-3 دقائق (توليد صور)" :
-                           videoJob.progress < 65 ? "≈ 1-2 دقيقة (تحريك مشاهد)" :
-                           videoJob.progress < 80 ? "≈ دقيقة (دمج + صوت)" :
-                           "≈ ثواني (رفع الفيديو)"}
+                          {videoJob.progress < 40 ? "≈ 3-5 دقائق" :
+                           videoJob.progress < 65 ? "≈ 2-4 دقائق (Runway)" :
+                           videoJob.progress < 80 ? "≈ 1-2 دقيقة" :
+                           "≈ أقل من دقيقة"}
                         </span>
                       )}
                     </p>
@@ -1965,28 +1949,10 @@ export default function Home() {
                       ? "⚡ انقطع الإنتاج بسبب إعادة تشغيل السيرفر — يمكنك إعادة المحاولة الآن"
                       : videoJob.error?.includes("Image generation")
                       ? "🎨 فشل توليد الصور — يرجى إعادة المحاولة"
-                      : videoJob.error?.includes("usage exhausted") || videoJob.error?.includes("Precondition Failed")
-                      ? "🤖 محرك الذكاء الاصطناعي وصل لحد الاستخدام — جرّب سيناريو جاهز أو اكتب مشاهدك يدوياً"
                       : videoJob.error || "حدث خطأ أثناء الإنتاج"}
                   </p>
-
-                  {/* زر البدائل الذكية — يظهر عند خطأ LLM */}
-                  {(videoJob.error?.includes("usage exhausted") || videoJob.error?.includes("Precondition Failed")) && (
-                    <button
-                      onClick={() => {
-                        setLlmUnavailable(true);
-                        setShowSmartModal(true);
-                      }}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105 active:scale-95"
-                      style={{ background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.3)", color: "#34d399", fontFamily: "'Tajawal', sans-serif" }}
-                    >
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-                      جرّب بدائل ذكية (سيناريو جاهز أو يدوي)
-                    </button>
-                  )}
-
                   {/* زر إعادة المحاولة — يُعيد الإنتاج بنفس الوصف */}
-                  {prompt.trim() && !videoJob.error?.includes("usage exhausted") && !videoJob.error?.includes("Precondition Failed") && (
+                  {prompt.trim() && (
                     <button
                       onClick={async () => {
                         localStorage.removeItem("khayal_video_job");
@@ -2281,18 +2247,6 @@ export default function Home() {
         </div>
 
       </div>
-
-      {/* ═══ نافذة الإنتاج الذكية ═══ */}
-      <SmartProductionModal
-        open={showSmartModal}
-        onClose={() => setShowSmartModal(false)}
-        llmUnavailable={llmUnavailable}
-        initialDescription={prompt}
-        onJobStarted={(jobId, title) => {
-          setVideoJob({ jobId, status: "pending", progress: 0, currentStep: "جاري التحضير..." });
-          setShowSmartModal(false);
-        }}
-      />
 
       {/* ═══ CSS ANIMATIONS ═══ */}
       <style>{`

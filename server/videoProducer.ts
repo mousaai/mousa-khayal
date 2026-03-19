@@ -235,7 +235,7 @@ export class VideoProducer {
   async produce(
     script: VideoScript,
     options: VideoProductionOptions = {},
-    onProgress?: (job: Partial<VideoJob>) => Promise<void> | void
+    onProgress?: (job: Partial<VideoJob>) => void
   ): Promise<string> {
     this.workDir = await fs.mkdtemp(path.join(os.tmpdir(), "khayal-video-"));
     this.startTime = Date.now();
@@ -255,8 +255,8 @@ export class VideoProducer {
       ? ASPECT_CONFIGS_PRO[aspectRatio]
       : ASPECT_CONFIGS_FAST[aspectRatio];
 
-    const report = async (step: string, progress: number) => {
-      await onProgress?.({ status: "processing", currentStep: step, progress });
+    const report = (step: string, progress: number) => {
+      onProgress?.({ status: "processing", currentStep: step, progress });
       console.log(`[VideoProducer] ${progress}% — ${step}`);
     };
 
@@ -395,7 +395,6 @@ export class VideoProducer {
     filmGenre?: FilmGenre
   ): Promise<string[]> {
     const { generateImage } = await import("./_core/imageGeneration");
-    const { getCachedImage, cacheImage } = await import("./promptCache");
 
     // الحصول على DNA النوع السينمائي
     const genre = filmGenre ?? "general";
@@ -416,48 +415,29 @@ export class VideoProducer {
         // بناء prompt مخصص للنوع السينمائي (موجز ودقيق لتسريع API)
         const genreEnhancedPrompt = `${genreDNA.promptPrefix} ${characterPart}${scene.imagePrompt}, ${genreDNA.lightingStyle}, ${genreDNA.colorGrading}, ${genreDNA.promptSuffix}`;
 
-        // فحص Prompt Cache أولاً (توفير 100% من وقت التوليد)
+        // retry مرة واحدة فقط (أسرع من 3 محاولات)
         let imageUrl: string | undefined;
         let lastErr: Error | null = null;
 
-        // لا نستخدم cache للمشهد الأول مع صورة مرجعية (image-to-image فريد)
-        const useCache = !(i === 0 && referenceImageUrl);
-        if (useCache) {
-          const cached = await getCachedImage(genreEnhancedPrompt, dims.width, dims.height);
-          if (cached) {
-            imageUrl = cached;
-            console.log(`  ⚡ مشهد ${i + 1} من Cache (0 ثانية)`);
-          }
-        }
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          try {
+            const genOptions: Parameters<typeof generateImage>[0] = {
+              prompt: genreEnhancedPrompt,
+            };
 
-        if (!imageUrl) {
-          // retry: محاولتان تلقائيتان لتوليد الصورة
-          for (let attempt = 1; attempt <= 2; attempt++) {
-            try {
-              const genOptions: Parameters<typeof generateImage>[0] = {
-                prompt: genreEnhancedPrompt,
-              };
-
-              // المشهد الأول: استخدم الصورة المرفقة كمرجع بصري (image-to-image)
-              if (i === 0 && referenceImageUrl) {
-                genOptions.originalImages = [{ url: referenceImageUrl, mimeType: "image/jpeg" }];
-                console.log(`[VideoProducer] المشهد 1: استخدام الصورة المرفقة كمرجع بصري`);
-              }
-
-              const res = await generateImage(genOptions);
-              imageUrl = res.url;
-              if (imageUrl) {
-                // حفظ في Cache للمرة القادمة
-                if (useCache) {
-                  cacheImage(genreEnhancedPrompt, imageUrl, dims.width, dims.height).catch(() => {});
-                }
-                break;
-              }
-            } catch (e: any) {
-              lastErr = e;
-              console.warn(`[VideoProducer] generateImage attempt ${attempt}/2 failed for scene ${i+1}: ${e.message}`);
-              if (attempt < 2) await new Promise(r => setTimeout(r, 500));
+            // المشهد الأول: استخدم الصورة المرفقة كمرجع بصري (image-to-image)
+            if (i === 0 && referenceImageUrl) {
+              genOptions.originalImages = [{ url: referenceImageUrl, mimeType: "image/jpeg" }];
+              console.log(`[VideoProducer] المشهد 1: استخدام الصورة المرفقة كمرجع بصري`);
             }
+
+            const res = await generateImage(genOptions);
+            imageUrl = res.url;
+            if (imageUrl) break;
+          } catch (e: any) {
+            lastErr = e;
+            console.warn(`[VideoProducer] generateImage attempt ${attempt}/2 failed for scene ${i+1}: ${e.message}`);
+            if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
           }
         }
 
@@ -600,22 +580,8 @@ export class VideoProducer {
     let completed = 0;
     onProgress?.(`تحريك ${total} مشاهد بالتوازي... (0/${total})`, 40);
 
-    // تحقق سريع: إذا Runway غير متاح، تخطَّ مباشرة لـ Ken Burns
-    if (!this.runway.isAvailable()) {
-      console.log(`[Runway★] غير متاح — Ken Burns مباشرة لـ ${total} مشهد`);
-      onProgress?.(`Ken Burns (Runway غير متاح)`, 65);
-      return new Array(total).fill(null);
-    }
-
     const results = await Promise.allSettled(
       imagePaths.map(async (imgPath, i) => {
-        // تحقق من isAvailable قبل كل مشهد (قد يصبح غير متاح بعد 429)
-        if (!this.runway.isAvailable()) {
-          completed++;
-          onProgress?.(`Ken Burns مشهد ${i + 1} (${completed}/${total})`, Math.round(40 + (completed / total) * 25));
-          return null;
-        }
-
         // قراءة الصورة وتحويلها إلى base64 data URI مباشرة (بدون رفع إلى S3)
         const imgBuffer = await fs.readFile(imgPath);
 
@@ -829,33 +795,31 @@ export class VideoProducer {
     onProgress?: (step: string, pct: number) => void,
     quality: "fast" | "pro" = "fast"
   ): Promise<string[]> {
-    // توازي كامل: كل المشاهد تُبنى في نفس الوقت
-    onProgress?.(`بناء ${scenes.length} مشاهد بالتوازي...`, 55);
+    const scenePaths: string[] = [];
 
-    let completed = 0;
-    const results = await Promise.all(
-      scenes.map(async (scene, i) => {
-        const imgPath = imagePaths[i];
-        const outputPath = path.join(this.workDir, `scene_${i + 1}_final.mp4`);
+    for (let i = 0; i < scenes.length; i++) {
+      const scene = scenes[i];
+      const imgPath = imagePaths[i];
+      const outputPath = path.join(this.workDir, `scene_${i + 1}_final.mp4`);
 
-        const imgWithSub = path.join(this.workDir, `scene_${i + 1}_sub.png`);
-        await this.drawSubtitle(imgPath, scene.subtitle, imgWithSub, dims);
+      // تحديث دقيق لكل مشهد: 55% إلى 75%
+      const sceneProgress = 55 + Math.round((i / scenes.length) * 20);
+      onProgress?.(
+        `بناء مشهد ${i + 1}/${scenes.length}... (${Math.round(((i + 1) / scenes.length) * 100)}%)`,
+        sceneProgress
+      );
 
-        const motion = scene.zoom ?? "zoom_in";
-        await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath, quality);
+      const imgWithSub = path.join(this.workDir, `scene_${i + 1}_sub.png`);
+      await this.drawSubtitle(imgPath, scene.subtitle, imgWithSub, dims);
 
-        completed++;
-        const pct = 55 + Math.round((completed / scenes.length) * 20);
-        onProgress?.(`جاهز ${completed}/${scenes.length} مشاهد...`, pct);
-        console.log(`  ✓ مشهد ${i + 1} جاهز (Ken Burns: ${motion})`);
+      const motion = scene.zoom ?? "zoom_in";
+      await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath, quality);
 
-        return { i, outputPath };
-      })
-    );
+      scenePaths.push(outputPath);
+      console.log(`  ✓ مشهد ${i + 1} جاهز (Ken Burns: ${motion})`);
+    }
 
-    // إعادة الترتيب حسب الرقم الأصلي (Promise.all قد يعيد بترتيب غير متوقع)
-    results.sort((a, b) => a.i - b.i);
-    return results.map(r => r.outputPath);
+    return scenePaths;
   }
 
   // ─────────────────────────────────────────────────────────
@@ -1000,13 +964,10 @@ export class VideoProducer {
       // MOTION_EFFECTS تتضمن scale+format+crop بشكل كامل
       const fullFilter = motionFn(duration, dims.width, dims.height, CONFIG.fps);
 
-      // توزيع ذكي للأنوية: عند التوازي الكامل نستخدم 2 أنوية لكل مشهد
-      const totalCores = os.cpus().length; // 6 أنوية
-      const threads = Math.max(2, Math.floor(totalCores / 2)); // 3 أنوية/مشهد عند التوازي
-      // fast mode: veryfast+crf23 (جودة ممتازة + سرعة عالية)
-      // pro mode: medium+crf18 (جودة سينمائية)
-      const preset = quality === "pro" ? "medium" : "veryfast";
-      const crf = quality === "pro" ? 18 : 23;
+      // threads = 2 per job (6 cores / 3 concurrent jobs = 2 threads/job)
+      const threads = Math.max(1, Math.floor(os.cpus().length / 3));
+      const preset = quality === "pro" ? "fast" : "superfast";
+      const crf = quality === "pro" ? 20 : 26;
 
       ffmpeg()
         .input(imgPath)
@@ -1015,15 +976,7 @@ export class VideoProducer {
         .duration(duration)
         .fps(CONFIG.fps)
         .videoCodec("libx264")
-        .outputOptions([
-          `-preset ${preset}`,
-          `-crf ${crf}`,
-          "-pix_fmt yuv420p",
-          `-threads ${threads}`,
-          "-movflags +faststart",  // تسريع التشغيل الفوري
-          "-profile:v high",       // H.264 High Profile للجودة
-          "-level 4.1",
-        ])
+        .outputOptions([`-preset ${preset}`, `-crf ${crf}`, "-pix_fmt yuv420p", `-threads ${threads}`, "-tune fastdecode"])
         .output(outputPath)
         .on("end", () => resolve())
         .on("error", (err: Error) => {
@@ -1250,7 +1203,7 @@ export class VideoProducer {
     newImagePrompt: string,
     existingSceneVideoUrls: Array<string | null>,
     options: VideoProductionOptions = {},
-    onProgress?: (job: Partial<VideoJob>) => Promise<void> | void
+    onProgress?: (job: Partial<VideoJob>) => void
   ): Promise<string> {
     this.workDir = await fs.mkdtemp(path.join(os.tmpdir(), "khayal-edit-"));
     this.startTime = Date.now();
@@ -1491,42 +1444,7 @@ export async function generateVideoScript(
   ]
 }`;
 
-  // ═══ الطبقة 1: البحث في DB (مجاني، فوري) ═══
-  try {
-    const { getScript: hybridGetScript } = await import("./hybridScriptEngine");
-    const hybridResult = await hybridGetScript(userInput, sceneCount);
-    if (hybridResult.source === "db" && hybridResult.confidence >= 50) {
-      console.log(`[generateVideoScript] ✓ DB hit (${hybridResult.confidence}% confidence)`);
-      const hs = hybridResult.script;
-      return {
-        title: hs.title,
-        language: language as "ar" | "en",
-        voice: voice as any,
-        narration: hs.narration ?? hs.scenes?.map((s: any) => s.caption).join(" ") ?? "",
-        domain: hs.genre ?? "general",
-        musicMood: (hs.musicMood ?? "ambient") as any,
-        filmGenre,
-        characterDescription,
-        referenceImageUrl,
-        scenes: (hs.scenes ?? []).map((s: any, i: number) => ({
-          imagePrompt: s.prompt ?? s.imagePrompt ?? `Cinematic scene ${i + 1}`,
-          subtitle: s.caption ?? s.label ?? `مشهد ${i + 1}`,
-          narration: s.caption ?? s.narration ?? "",
-          duration: s.duration ?? 6,
-          zoom: "zoom_in" as any,
-          transition: "fade" as any,
-          sceneType: "b_roll" as any,
-        })),
-      } as VideoScript;
-    }
-  } catch (dbErr: any) {
-    console.warn("[generateVideoScript] DB search failed:", dbErr.message?.slice(0, 60));
-  }
-
-  // ═══ الطبقة 2: LLM خارجي ═══
-  let response: any;
-  try {
-    response = await invokeLLM({
+  const response = await invokeLLM({
     messages: [
       { role: "system", content: systemPrompt },
       {
@@ -1582,30 +1500,4 @@ export async function generateVideoScript(
     characterDescription,
     referenceImageUrl,
   } as VideoScript;
-  } catch (llmErr: any) {
-    // فشل LLM (usage exhausted, 412, network) → استخدام سيناريو جاهز فوراً
-    console.warn(`[generateVideoScript] LLM فشل: ${llmErr.message} — استخدام سيناريو جاهز`);
-    const { findBestScript, prebuiltToVideoScript } = await import("./prebuiltScripts");
-    const prebuilt = findBestScript(userInput);
-    const fallbackScript = prebuiltToVideoScript(prebuilt, userInput.slice(0, 60));
-    return {
-      ...fallbackScript,
-      filmGenre,
-      characterDescription,
-      referenceImageUrl,
-      language: language as "ar" | "en",
-      voice: voice as any,
-      musicMood: "inspiring" as any,
-      narration: fallbackScript.scenes?.map((s: any) => s.narration).join(" ") ?? "",
-      scenes: (fallbackScript.scenes ?? []).map((s: any, i: number) => ({
-        imagePrompt: s.imagePrompt,
-        subtitle: s.title ?? `مشهد ${i + 1}`,
-        narration: s.narration,
-        duration: s.duration ?? 6,
-        zoom: s.motion ?? "zoom_in",
-        transition: s.transition ?? "fade",
-        sceneType: "b_roll",
-      })),
-    } as VideoScript;
-  }
 }

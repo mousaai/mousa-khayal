@@ -151,9 +151,8 @@ describe("generateVideoScript", () => {
     expect(script.title).toBeTruthy();
     expect(script.language).toBe("ar");
     expect(script.voice).toBe("ar_male");
-    // domain يُحدَّد من DB أو المولّد المحلي — يقبل educational أو documentary أو nature
-    expect(["educational", "documentary", "nature", "science", "general"]).toContain(script.domain);
-    expect(script.scenes.length).toBeGreaterThanOrEqual(3);
+    expect(script.domain).toBe("educational");
+    expect(script.scenes).toHaveLength(3);
   });
 
   it("يحتوي كل مشهد على imagePrompt وsubtitle ومدة", async () => {

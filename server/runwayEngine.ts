@@ -96,36 +96,9 @@ export function selectMotionForDomain(domain: string, sceneIndex: number): Runwa
 export class RunwayEngine {
   private apiKey: string;
   private baseUrl = "https://api.dev.runwayml.com/v1";
-  // كاش حالة 429 لتجنب رفع الصور عبثاً
-  private dailyLimitReached = false;
-  private dailyLimitResetAt = 0; // Unix timestamp
 
   constructor(apiKey?: string) {
     this.apiKey = apiKey || ENV.runwayApiKey;
-  }
-
-  /**
-   * التحقق من أن الحد اليومي لم يُبلغ بعد
-   * يعيد false إذا كان الحد بلغ ولم ينتهِ بعد
-   */
-  isAvailable(): boolean {
-    if (!this.apiKey) return false;
-    if (this.dailyLimitReached && Date.now() < this.dailyLimitResetAt) return false;
-    if (this.dailyLimitReached && Date.now() >= this.dailyLimitResetAt) {
-      // إعادة تعيين بعد مرور الوقت
-      this.dailyLimitReached = false;
-    }
-    return true;
-  }
-
-  /**
-   * تسجيل خطأ 429 وتحديد وقت إعادة التعيين (24 ساعة)
-   */
-  private markDailyLimitReached(): void {
-    this.dailyLimitReached = true;
-    // إعادة التعيين بعد 24 ساعة من الآن
-    this.dailyLimitResetAt = Date.now() + 24 * 60 * 60 * 1000;
-    console.warn(`[Runway] تم بلوغ الحد اليومي. سيتم التحويل لـ Ken Burns تلقائياً حتى ${new Date(this.dailyLimitResetAt).toISOString()}`);
   }
 
   /**
@@ -200,8 +173,8 @@ export class RunwayEngine {
    * يعيد رابط الفيديو المنتج أو null عند الفشل
    */
   async imageToVideo(options: RunwayGenerateOptions): Promise<string | null> {
-    if (!this.isAvailable()) {
-      console.warn("[Runway] غير متاح (حد يومي / لا يوجد API key) — تحويل مباشر لـ Ken Burns");
+    if (!this.apiKey) {
+      console.warn("[Runway] API key not configured — skipping image-to-video");
       return null;
     }
 
@@ -261,10 +234,6 @@ export class RunwayEngine {
       if (!createResponse.ok) {
         const errorText = await createResponse.text();
         console.warn(`[Runway] Create task failed (${createResponse.status}): ${errorText}`);
-        // تسجيل 429 لتجنب رفع الصور في المرات القادمة
-        if (createResponse.status === 429) {
-          this.markDailyLimitReached();
-        }
         return null;
       }
 
