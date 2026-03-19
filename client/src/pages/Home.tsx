@@ -1415,8 +1415,8 @@ export default function Home() {
                 </div>
               )}
 
-              {/* ✨ فاجئني — خيال تختار وتنتج بلا أي إدخال */}
-              <button
+              {/* ✨ فاجئني — مجمّد مؤقتاً */}
+              {false && <button
                 onClick={handleSurprise}
                 disabled={surpriseProduceMutation.isPending || !!videoJob}
                 className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
@@ -1439,12 +1439,10 @@ export default function Home() {
                     <span>{activeLang === "AR" ? "فاجئني" : "Surprise"}</span>
                   </>
                 )}
-              </button>
+              </button>}
 
-              {/* فاصل */}
-              <div className="w-px h-3 mx-0.5" style={{ background: "rgba(255,255,255,0.08)" }} />
-
-              {/* سريع / احترافي — ظاهران دائماً كخيار للفيديو */}
+              {/* 🔒 أزرار الفيديو مجمّدة مؤقتاً — سريع/احترافي */}
+              {false && <>
               <button
                 onClick={() => {
                   if (outputMode === "fast") {
@@ -1495,6 +1493,7 @@ export default function Home() {
                 <span>✨</span>
                 <span>{activeLang === "AR" ? "احترافي" : "Pro"}</span>
               </button>
+              </>}
 
               {/* فاصل خفيف */}
               {hasContent && (detectedIntent || isThinking) && (
