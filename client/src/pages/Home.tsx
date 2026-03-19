@@ -179,7 +179,10 @@ export default function Home() {
   // ــ وضع الإخراج — يُحدد تلقائياً من الوصف بالذكاء ــ
   const [outputMode, setOutputMode] = useState<"images" | "fast" | "pro" | "immersive">("fast");
 
-  // ── نتيجة وضع أنا هناك ──
+  // تحكّم يدوي: إذا اختار المستخدم وضعاً يدوياً → لا يُغيّره الكشف التلقائي
+  const [manualMode, setManualMode] = useState<"images" | "fast" | "pro" | "immersive" | null>(null);
+
+  // ــ نتيجة وضع أنا هناك ــ
   const [immersiveResult, setImmersiveResult] = useState<ImmersiveResult | null>(null);
   const [isGeneratingImmersive, setIsGeneratingImmersive] = useState(false);
   const videoQuality: "fast" | "pro" = outputMode === "pro" ? "pro" : "fast";
@@ -412,7 +415,18 @@ export default function Home() {
     }
   }, [prompt]);
 
-  // ── كشف القصد التلقائي بعد توقف الكتابة ──
+  // دالة مساعدة: تحويل outputMode إلى تسمية للعرض
+  const getModeLabel = (mode: "images" | "fast" | "pro" | "immersive") => {
+    const labels: Record<string, Record<string, string>> = {
+      images: { AR: "🎨 صورة سينمائية", EN: "🎨 Cinematic Image" },
+      fast: { AR: "⚡ فيديو سريع", EN: "⚡ Fast Video" },
+      pro: { AR: "✨ فيديو احترافي", EN: "✨ Pro Video" },
+      immersive: { AR: "🌍 أنا هناك — 360°", EN: "🌍 I'm There — 360°" },
+    };
+    return labels[mode]?.[activeLang] || labels[mode]?.["EN"] || "";
+  };
+
+  // ــ كشف القصد التلقائي بعد توقف الكتابة ــ
   useEffect(() => {
     if (intentTimerRef.current) clearTimeout(intentTimerRef.current);
     if (prompt.length < 5) {
@@ -452,8 +466,9 @@ export default function Home() {
 
     const quick = quickDetect(prompt);
     setDetectedIntent(quick.type);
-    setOutputMode(quick.outputMode); // تحديث وضع الإنتاج تلقائياً
-    setIntentLabel(quick.label);
+    // لا تغيّر outputMode إذا اختار المستخدم وضعاً يدوياً
+    if (!manualMode) setOutputMode(quick.outputMode);
+    setIntentLabel(manualMode ? getModeLabel(manualMode) : quick.label);
 
     // كشف ذكي بعد 1.5 ثانية من التوقف — يُحدّث الوضع بدقة أكبر
     intentTimerRef.current = setTimeout(async () => {
@@ -464,8 +479,8 @@ export default function Home() {
         const intentType = result.intent.type as DetectedIntentType;
         const aiOutputMode = (result.intent as any).outputMode as "images" | "fast" | "pro" | "immersive" | undefined;
 
-        // تحديث outputMode من الذكاء
-        if (aiOutputMode) setOutputMode(aiOutputMode);
+        // تحديث outputMode من الذكاء فقط إذا لم يختر المستخدم يدوياً
+        if (aiOutputMode && !manualMode) setOutputMode(aiOutputMode);
 
         const modeLabels: Record<string, Record<string, string>> = {
           images: { AR: "🎨 صورة سينمائية", EN: "🎨 Cinematic Image" },
@@ -473,18 +488,20 @@ export default function Home() {
           pro: { AR: "✨ فيديو احترافي", EN: "✨ Pro Video" },
           immersive: { AR: "🌍 أنا هناك — 360°", EN: "🌍 I'm There — 360°" },
         };
-        if (intentType === "script") {
-          setDetectedIntent("script");
-          setIntentLabel(activeLang === "AR" ? "📄 سيناريو احترافي" : "📄 Professional Script");
-        } else {
-          const finalMode = aiOutputMode || quick.outputMode;
-          setIntentLabel(modeLabels[finalMode]?.[activeLang] || modeLabels[finalMode]?.["EN"] || "");
+        if (!manualMode) {
+          if (intentType === "script") {
+            setDetectedIntent("script");
+            setIntentLabel(activeLang === "AR" ? "📄 سيناريو احترافي" : "📄 Professional Script");
+          } else {
+            const finalMode = aiOutputMode || quick.outputMode;
+            setIntentLabel(modeLabels[finalMode]?.[activeLang] || modeLabels[finalMode]?.["EN"] || "");
+          }
         }
       } catch { /* keep quick detect */ } finally {
         setIsThinking(false);
       }
     }, 1500);
-  }, [prompt, activeLang]);
+  }, [prompt, activeLang, manualMode]);
 
   // ── Live waveform ──
   const startWaveAnimation = useCallback(() => {
@@ -1035,28 +1052,73 @@ export default function Home() {
                   autoFocus
                 />
               </div>
-            )}
-            {/* ــ AI MODE CHIP — يظهر ما فهمه الذكاء تلقائياً ــ */}
-            {intentLabel && (
-              <div className="flex items-center gap-2 px-4 pt-1 pb-0">
+            )}            {/* ـــ شريط التحكّم: أزرار يدوية + chip الكشف التلقائي ـــ */}
+            <div className="flex items-center gap-2 px-4 pt-2 pb-0 flex-wrap">
+              {/* أزرار التحكّم اليدوي */}
+              {([
+                { mode: "images" as const, icon: "🎨", ar: "صور", en: "Images" },
+                { mode: "fast" as const, icon: "⚡", ar: "سريع", en: "Fast" },
+                { mode: "pro" as const, icon: "✨", ar: "احترافي", en: "Pro" },
+                { mode: "immersive" as const, icon: "🌍", ar: "أنا هناك", en: "I'm There" },
+              ] as const).map(({ mode, icon, ar, en }) => {
+                const isActive = outputMode === mode;
+                const colors = {
+                  images: { bg: "rgba(52,211,153,0.15)", border: "rgba(52,211,153,0.5)", color: "#34d399", bgInactive: "rgba(52,211,153,0.05)", borderInactive: "rgba(52,211,153,0.15)" },
+                  fast: { bg: "rgba(96,165,250,0.15)", border: "rgba(96,165,250,0.5)", color: "#60a5fa", bgInactive: "rgba(96,165,250,0.05)", borderInactive: "rgba(96,165,250,0.15)" },
+                  pro: { bg: "rgba(167,139,250,0.15)", border: "rgba(167,139,250,0.5)", color: "#a78bfa", bgInactive: "rgba(167,139,250,0.05)", borderInactive: "rgba(167,139,250,0.15)" },
+                  immersive: { bg: "rgba(255,170,68,0.15)", border: "rgba(255,170,68,0.5)", color: "#ffaa44", bgInactive: "rgba(255,170,68,0.05)", borderInactive: "rgba(255,170,68,0.15)" },
+                }[mode];
+                return (
+                  <button
+                    key={mode}
+                    onClick={() => {
+                      if (manualMode === mode) {
+                        // إلغاء التحكّم اليدوي → عودة للكشف التلقائي
+                        setManualMode(null);
+                      } else {
+                        setManualMode(mode);
+                        setOutputMode(mode);
+                        setIntentLabel(getModeLabel(mode));
+                      }
+                    }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                    style={{
+                      background: isActive ? colors.bg : colors.bgInactive,
+                      border: `1px solid ${isActive ? colors.border : colors.borderInactive}`,
+                      color: isActive ? colors.color : "rgba(255,255,255,0.35)",
+                      fontFamily: "'Tajawal', sans-serif",
+                      boxShadow: isActive ? `0 0 8px ${colors.border}` : "none",
+                    }}
+                    title={activeLang === "AR" ? `تحديد وضع ${ar} يدوياً` : `Force ${en} mode`}
+                  >
+                    <span>{icon}</span>
+                    <span>{activeLang === "AR" ? ar : en}</span>
+                    {manualMode === mode && (
+                      <span style={{ opacity: 0.7, fontSize: 9 }}>✓</span>
+                    )}
+                  </button>
+                );
+              })}
+
+              {/* chip الكشف التلقائي */}
+              {intentLabel && !manualMode && (
                 <div
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all"
                   style={{
-                    background: outputMode === "immersive" ? "rgba(255,170,68,0.12)" : outputMode === "pro" ? "rgba(167,139,250,0.12)" : outputMode === "images" ? "rgba(52,211,153,0.12)" : "rgba(96,165,250,0.12)",
-                    color: outputMode === "immersive" ? "#ffaa44" : outputMode === "pro" ? "#a78bfa" : outputMode === "images" ? "#34d399" : "#60a5fa",
-                    border: `1px solid ${outputMode === "immersive" ? "rgba(255,170,68,0.25)" : outputMode === "pro" ? "rgba(167,139,250,0.25)" : outputMode === "images" ? "rgba(52,211,153,0.25)" : "rgba(96,165,250,0.25)"}`,
+                    background: outputMode === "immersive" ? "rgba(255,170,68,0.08)" : outputMode === "pro" ? "rgba(167,139,250,0.08)" : outputMode === "images" ? "rgba(52,211,153,0.08)" : "rgba(96,165,250,0.08)",
+                    color: outputMode === "immersive" ? "rgba(255,170,68,0.6)" : outputMode === "pro" ? "rgba(167,139,250,0.6)" : outputMode === "images" ? "rgba(52,211,153,0.6)" : "rgba(96,165,250,0.6)",
+                    border: `1px solid ${outputMode === "immersive" ? "rgba(255,170,68,0.15)" : outputMode === "pro" ? "rgba(167,139,250,0.15)" : outputMode === "images" ? "rgba(52,211,153,0.15)" : "rgba(96,165,250,0.15)"}`,
                     fontFamily: "'Tajawal', sans-serif",
                   }}
                 >
                   {isThinking ? (
-                    <span style={{ opacity: 0.7 }}>{activeLang === "AR" ? "جاري التحليل..." : "Analyzing..."}</span>
+                    <span style={{ opacity: 0.5 }}>{activeLang === "AR" ? "⚡ تحليل..." : "⚡ Analyzing..."}</span>
                   ) : (
-                    <span>{intentLabel}</span>
+                    <span style={{ opacity: 0.6 }}>{activeLang === "AR" ? "ذكاء: " : "AI: "}{intentLabel}</span>
                   )}
                 </div>
-              </div>
-            )}
-
+              )}
+            </div>
             {/* ── BOTTOM BAR ── */}
             <div className="flex items-center justify-between px-4 pb-3 pt-1 gap-3">
 

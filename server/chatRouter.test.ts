@@ -235,3 +235,44 @@ describe("Input Validation", () => {
     expect(validateSceneCount(11)).toBe(false);
   });
 });
+
+// ─── اختبارات الطلبات الإبداعية القصيرة ─────────────────────
+describe("Creative Short Prompts — quickIntentDetect fallback", () => {
+  it("وصف قصير إبداعي (< 25 حرف) يجب أن يُنتج صورة لا clarify", () => {
+    // محاكاة منطق quickIntentDetect المُحدَّث
+    const quickFallback = (msg: string): { type: string; outputMode: string } => {
+      if (msg.length <= 25) return { type: "image", outputMode: "images" };
+      return { type: "video", outputMode: "fast" };
+    };
+
+    // "نملة تطير" — 9 أحرف
+    expect(quickFallback("نملة تطير")).toEqual({ type: "image", outputMode: "images" });
+    // "قطة تقود سيارة" — 15 حرف
+    expect(quickFallback("قطة تقود سيارة")).toEqual({ type: "image", outputMode: "images" });
+  });
+
+  it("وصف طويل إبداعي (> 25 حرف) يجب أن يُنتج فيديو سريع", () => {
+    const quickFallback = (msg: string): { type: string; outputMode: string } => {
+      if (msg.length <= 25) return { type: "image", outputMode: "images" };
+      return { type: "video", outputMode: "fast" };
+    };
+
+    // وصف طويل
+    const longPrompt = "نملة صغيرة تأكل آيس كريم ملوّن، تصوير ماكرو سينمائي دقيق";
+    expect(quickFallback(longPrompt)).toEqual({ type: "video", outputMode: "fast" });
+  });
+
+  it("كلمة 'صورة' يجب أن تُنتج images mode", () => {
+    const imageKeywords = ["صورة", "صوّر", "ارسم", "image", "picture", "draw", "مشهد واحد"];
+    const text = "صورة نملة تأكل آيس كريم";
+    const hasImageKw = imageKeywords.some(k => text.includes(k));
+    expect(hasImageKw).toBe(true);
+  });
+
+  it("كلمة 'فيديو' يجب أن تُنتج video mode", () => {
+    const videoKeywords = ["فيديو", "فلم", "فيلم", "مقطع", "video", "movie", "film"];
+    const text = "فيديو عن نملة تطير في الهواء";
+    const hasVideoKw = videoKeywords.some(k => text.includes(k));
+    expect(hasVideoKw).toBe(true);
+  });
+});

@@ -333,8 +333,19 @@ function quickIntentDetect(msg: string): DetectedIntent {
     };
   }
 
-  // افتراضي: فيديو إذا كان النص طويلاً (الذكاء يختار الوضع)
-  if (msg.length > 20) {
+  // افتراضي ذكي: أي وصف إبداعي أو خيالي → صورة أو فيديو حسب الطول
+  // نملة تطير / قطة تقود سيارة / مدينة في السماء → يجب أن تُنتج!
+  if (msg.length > 0) {
+    // وصف قصير (< 25 حرف) → صورة سينمائية
+    if (msg.length <= 25) {
+      return {
+        type: "image",
+        outputMode: "images",
+        confidence: 0.65,
+        params: { description: msg },
+      };
+    }
+    // وصف متوسط أو طويل → فيديو سريع
     return {
       type: "video",
       outputMode: "fast",
