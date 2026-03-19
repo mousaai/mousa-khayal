@@ -28,6 +28,7 @@ import { invokeLLM } from "./_core/llm";
 import { detectFilmGenre, getGenreDNA, type FilmGenre } from "./filmGenreEngine";
 import { selectVoiceForDomain, type ElevenLabsVoiceId } from "./elevenLabsEngine";
 import type { VoiceId } from "./videoProducer";
+import { getMemory, memoryToHints, type KhayalMemorySnapshot } from "./khayalMemory";
 
 // ══════════════════════════════════════════════════════════════
 // أنواع القرارات
@@ -145,8 +146,16 @@ function quickAnalyze(description: string): Partial<DirectorDecision> {
 
 export async function directAutonomously(
   description: string,
-  onStep?: (step: ThinkingStep) => void
+  onStep?: (step: ThinkingStep) => void,
+  userId?: string
 ): Promise<DirectorDecision> {
+  // قراءة ذاكرة خيال لهذا المستخدم
+  const memory: KhayalMemorySnapshot = userId
+    ? await getMemory(userId)
+    : { userId: 'guest', totalProductions: 0, preferredGenre: null, preferredVoice: null,
+        preferredAspectRatio: null, preferredSceneCount: 5, preferredStyle: null,
+        preferredDuration: null, genreHistory: {}, voiceHistory: {}, domainHistory: {}, hasMemory: false };
+  const memoryHints = memoryToHints(memory);
   const steps: ThinkingStep[] = [];
   const addStep = (step: Omit<ThinkingStep, "timestamp" | "status">, status: ThinkingStep["status"] = "done") => {
     const s: ThinkingStep = { ...step, status, timestamp: Date.now() };
@@ -271,7 +280,7 @@ export async function directAutonomously(
           content: `الوصف: "${description}"
 النوع السينمائي: ${dna.labelAr}
 نوع الإنتاج: ${productionLabels[productionType]}
-اللغة: ${language === "ar" ? "عربي" : "إنجليزي"}
+اللغة: ${language === "ar" ? "عربي" : "إنجليزي"}${memoryHints}
 
 أجب بـ JSON:
 {

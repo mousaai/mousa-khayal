@@ -177,3 +177,30 @@ export type InsertSceneRevision = typeof sceneRevisions.$inferInsert;
 // تحديث video_jobs لتخزين بيانات إضافية
 // ملاحظة: هذه الحقول ستُضاف عبر ترحيل قاعدة البيانات
 // للآن نخزّنها في metrics JSON الموجود بالفعل
+
+// ══════════════════════════════════════════════════════════════
+// جدول ذاكرة خيال — تتعلم من تفضيلات كل مستخدم
+// ══════════════════════════════════════════════════════════════
+export const userPreferences = mysqlTable("user_preferences", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: varchar("userId", { length: 128 }).notNull().unique(), // openId أو IP للزوار
+  // التفضيلات المُستخلصة من الاستخدام
+  preferredGenre: varchar("preferredGenre", { length: 64 }), // أكثر نوع فيلم استخدمه
+  preferredVoice: varchar("preferredVoice", { length: 64 }), // آخر صوت اختاره
+  preferredAspectRatio: varchar("preferredAspectRatio", { length: 16 }), // "16:9" | "9:16" | "1:1"
+  preferredSceneCount: int("preferredSceneCount").default(5), // متوسط عدد المشاهد
+  preferredStyle: varchar("preferredStyle", { length: 64 }), // الأسلوب البصري المفضل
+  preferredDuration: varchar("preferredDuration", { length: 16 }), // "short" | "medium" | "long"
+  // إحصاءات الاستخدام
+  totalProductions: int("totalProductions").default(0).notNull(),
+  genreHistory: json("genreHistory"), // { [genre]: count }
+  voiceHistory: json("voiceHistory"), // { [voiceId]: count }
+  domainHistory: json("domainHistory"), // { [domain]: count }
+  // آخر تحديث
+  lastProductionAt: timestamp("lastProductionAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type UserPreferences = typeof userPreferences.$inferSelect;
+export type InsertUserPreferences = typeof userPreferences.$inferInsert;

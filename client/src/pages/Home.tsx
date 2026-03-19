@@ -305,11 +305,103 @@ export default function Home() {
   const detectIntentMutation = trpc.chat.detectIntent.useMutation();
 
   const autonomousProduceMutation = trpc.video.autonomousProduce.useMutation();
+  const surpriseProduceMutation = trpc.video.surpriseProduce.useMutation();
+  const memoryStatusQuery = trpc.video.getMemoryStatus.useQuery(undefined, {
+    staleTime: 60_000, // تحديث كل دقيقة
+  });
+  const [surpriseAnnouncement, setSurpriseAnnouncement] = useState<string | null>(null);
+
+  // ── SSE: استبدال polling بـ EventSource حي ──
+  const sseRef = useRef<EventSource | null>(null);
+
+  useEffect(() => {
+    // أوقف SSE القديم عند تغيير الـ job
+    if (sseRef.current) {
+      sseRef.current.close();
+      sseRef.current = null;
+    }
+    if (!videoJob?.jobId || videoJob.status === 'done' || videoJob.status === 'failed') return;
+
+    const es = new EventSource(`/api/sse/job/${videoJob.jobId}`);
+    sseRef.current = es;
+
+    es.addEventListener('thinking', (e: MessageEvent) => {
+      try {
+        const step = JSON.parse(e.data);
+        setVideoJob(prev => {
+          if (!prev) return prev;
+          const existing = prev.thinkingSteps ?? [];
+          // تجنب التكرار
+          const alreadyExists = existing.some(s => s.label === step.label && s.detail === step.detail);
+          if (alreadyExists) return prev;
+          return { ...prev, thinkingSteps: [...existing, step] };
+        });
+      } catch { /* ignore */ }
+    });
+
+    es.addEventListener('progress', (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        setVideoJob(prev => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            status: data.status ?? prev.status,
+            progress: data.progress ?? prev.progress,
+            currentStep: data.currentStep ?? prev.currentStep,
+            decision: data.decision ?? prev.decision,
+          };
+        });
+      } catch { /* ignore */ }
+    });
+
+    es.addEventListener('done', (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        setVideoJob(prev => {
+          if (!prev) return prev;
+          return { ...prev, status: 'done', progress: 100, currentStep: '✅ اكتمل الإنتاج!', videoUrl: data.videoUrl };
+        });
+        // إشعار المتصفح
+        if ('Notification' in window && Notification.permission === 'granted') {
+          new Notification('✨ خيال — اكتمل الإنتاج!', { body: 'فيديوك جاهز للمشاهدة', icon: '/favicon.ico' });
+        }
+        setChatMessages(prev => [
+          ...prev,
+          { role: 'assistant' as const, content: '✨ اكتمل الإنتاج! فيديوك جاهز. اضغط على زر التحميل لحفظ الفيديو.', timestamp: Date.now() },
+        ]);
+        es.close();
+      } catch { /* ignore */ }
+    });
+
+    es.addEventListener('failed', (e: MessageEvent) => {
+      try {
+        const data = JSON.parse(e.data);
+        setVideoJob(prev => prev ? { ...prev, status: 'failed', error: data.error } : null);
+        setChatMessages(prev => [
+          ...prev,
+          { role: 'assistant' as const, content: '❌ حدث خطأ في الإنتاج. هل تريد إعادة المحاولة؟', timestamp: Date.now() },
+        ]);
+        es.close();
+      } catch { /* ignore */ }
+    });
+
+    es.onerror = () => {
+      // SSE انقطع — الـ polling القديم سيستمر كـ fallback
+    };
+
+    return () => {
+      es.close();
+      sseRef.current = null;
+    };
+  }, [videoJob?.jobId]);
+
   const autonomousDecisionQuery = trpc.video.getAutonomousDecision.useQuery(
     { jobId: videoJob?.jobId ?? "" },
     {
-      enabled: !!videoJob?.isAutonomous && !!videoJob?.jobId && videoJob.status !== "done" && videoJob.status !== "failed",
-      refetchInterval: 1500,
+      // fallback polling فقط إذا كان SSE غير متاح
+      enabled: !!videoJob?.isAutonomous && !!videoJob?.jobId && videoJob.status !== "done" && videoJob.status !== "failed" && !sseRef.current,
+      refetchInterval: 3000,
     }
   );
 
@@ -963,6 +1055,35 @@ export default function Home() {
     });
   };
 
+  // ── فاجئني: خيال تختار وتنتج بلا أي إدخال ──
+  const handleSurprise = async () => {
+    if (isGenerating || isGeneratingScript) return;
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
+    }
+    try {
+      const res = await surpriseProduceMutation.mutateAsync({});
+      setSurpriseAnnouncement(res.announcement);
+      setVideoJob({
+        jobId: res.jobId,
+        status: 'pending',
+        progress: 0,
+        currentStep: res.announcement,
+        isAutonomous: true,
+        thinkingSteps: [],
+        decision: null,
+      });
+      setShowChat(true);
+      setChatMessages([{
+        role: 'assistant' as const,
+        content: `🌟 ${res.announcement}`,
+        timestamp: Date.now(),
+      }]);
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -1265,6 +1386,49 @@ export default function Home() {
               >
                 <span>🧠</span>
                 <span>{activeLang === "AR" ? "ذاتية" : "Auto"}</span>
+              </button>
+
+              {/* 🧠 مؤشر ذاكرة خيال — يظهر بعد 3 إنتاجات */}
+              {memoryStatusQuery.data?.hasMemory && (
+                <div
+                  className="flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-bold"
+                  style={{
+                    background: "rgba(52,211,153,0.08)",
+                    border: "1px solid rgba(52,211,153,0.2)",
+                    color: "rgba(52,211,153,0.7)",
+                    fontFamily: "'Tajawal', sans-serif",
+                  }}
+                  title={`خيال تتذكرك — ${memoryStatusQuery.data.totalProductions} إنتاج`}
+                >
+                  <span>🧠</span>
+                  <span>{activeLang === "AR" ? `تتذكرك (${memoryStatusQuery.data.totalProductions})` : `Memory (${memoryStatusQuery.data.totalProductions})`}</span>
+                </div>
+              )}
+
+              {/* ✨ فاجئني — خيال تختار وتنتج بلا أي إدخال */}
+              <button
+                onClick={handleSurprise}
+                disabled={surpriseProduceMutation.isPending || !!videoJob}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                style={{
+                  background: surpriseProduceMutation.isPending ? "rgba(236,72,153,0.18)" : "rgba(236,72,153,0.08)",
+                  border: `1px solid ${surpriseProduceMutation.isPending ? "rgba(236,72,153,0.5)" : "rgba(236,72,153,0.2)"}`,
+                  color: surpriseProduceMutation.isPending ? "#f9a8d4" : "rgba(148,163,184,0.5)",
+                  fontFamily: "'Tajawal', sans-serif",
+                }}
+                title={activeLang === "AR" ? "خيال تختار الموضوع وتنتج كاملاً من الصفر" : "Khayal picks topic and produces from scratch"}
+              >
+                {surpriseProduceMutation.isPending ? (
+                  <>
+                    <div className="w-2.5 h-2.5 border border-pink-400/40 border-t-pink-400 rounded-full animate-spin" />
+                    <span>{activeLang === "AR" ? "تختار..." : "Picking..."}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>✨</span>
+                    <span>{activeLang === "AR" ? "فاجئني" : "Surprise"}</span>
+                  </>
+                )}
               </button>
 
               {/* فاصل */}
@@ -1605,7 +1769,17 @@ export default function Home() {
                     {videoJob.currentStep} — {videoJob.progress}%
                   </p>
 
-                  {/* 🧠 خطوات تفكير خيال الحية */}
+                  {/* 🌟 إعلان فاجئني */}
+                  {surpriseAnnouncement && videoJob.isAutonomous && (
+                    <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "rgba(236,72,153,0.08)", border: "1px solid rgba(236,72,153,0.2)" }}>
+                      <span className="text-base">✨</span>
+                      <p className="text-xs font-bold" style={{ color: "#f9a8d4", fontFamily: "'Tajawal', sans-serif" }}>
+                        {surpriseAnnouncement}
+                      </p>
+                    </div>
+                  )}
+
+              {/* 🧠 خطوات تفكير خيال الحية */}
                   {videoJob.isAutonomous && videoJob.thinkingSteps && videoJob.thinkingSteps.length > 0 && (
                     <div className="mt-3 rounded-xl overflow-hidden" style={{ background: "rgba(250,204,21,0.04)", border: "1px solid rgba(250,204,21,0.15)" }}>
                       <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: "1px solid rgba(250,204,21,0.1)" }}>

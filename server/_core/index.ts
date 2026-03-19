@@ -8,6 +8,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import mediaRoutes from "../mediaRoutes";
+import sseRouter from "../sseRouter";
 import compression from "compression";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
@@ -129,6 +130,8 @@ async function startServer() {
   registerOAuthRoutes(app);
   // Media endpoints (transcribe + upload)
   app.use(mediaRoutes);
+  // SSE: بث حالة المهام الحية
+  app.use(sseRouter);
   // tRPC API
   app.use(
     "/api/trpc",

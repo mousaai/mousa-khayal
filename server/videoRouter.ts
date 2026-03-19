@@ -22,6 +22,9 @@ import { eq, desc } from "drizzle-orm";
 import { notifyOwner } from "./_core/notification";
 import { jobQueue } from "./jobQueue";
 import { directAutonomously, decisionToProductionParams, type DirectorDecision } from "./autonomousDirector";
+import { broadcastProgress } from "./sseRouter";
+import { recordProduction } from "./khayalMemory";
+import { pickSurprise } from "./surpriseEngine";
 // ═══════════════════════════════════════════════════════════
 // Zod schemas للمدخلاتت
 // ═══════════════════════════════════════════════════════════
@@ -132,6 +135,15 @@ async function updateJobInDB(jobId: string, update: {
         ...(update.lastHeartbeat !== undefined && { lastHeartbeat: update.lastHeartbeat }),
       })
       .where(eq(videoJobsTable.id, jobId));
+    // بث SSE فوراً لجميع المستمعين الحيين
+    broadcastProgress(jobId, {
+      progress: update.progress,
+      currentStep: update.currentStep,
+      status: update.status,
+      videoUrl: update.videoUrl,
+      error: update.error,
+      decision: (update.metrics as any)?.decision,
+    });
   } catch (e) {
     console.error("[videoRouter] updateJobInDB error:", e);
   }
@@ -728,13 +740,15 @@ Be specific and objective. Use English for the description as it works best with
   autonomousProduce: publicProcedure
     .input(z.object({
       description: z.string().min(2).max(2000),
+      userId: z.string().optional(), // openId أو IP للذاكرة
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const jobId = `auto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const memUserId = input.userId ?? (ctx as any)?.user?.openId ?? `guest_${Math.random().toString(36).slice(2, 8)}`;
       await createJobInDB(jobId, input.description);
       await updateJobInDB(jobId, { status: 'pending', currentStep: '🧠 خيال تفكر...', progress: 0 });
 
-      const qUserId = `auto_${Math.random().toString(36).slice(2, 8)}`;
+      const qUserId = memUserId;
       jobQueue.enqueue(jobId, qUserId, async () => {
         await updateJobInDB(jobId, { status: 'processing', currentStep: '🧠 خيال تحلل الفكرة...', progress: 2 });
 
@@ -809,6 +823,16 @@ Be specific and objective. Use English for the description as it works best with
         );
 
         await updateJobInDB(jobId, { status: 'done', progress: 100, currentStep: '✅ اكتمل الإنتاج!', videoUrl });
+        // تسجيل الإنتاج في ذاكرة خيال
+        recordProduction(memUserId, {
+          genre: decision.genre,
+          voiceId: decision.voice,
+          aspectRatio: decision.aspectRatio,
+          sceneCount: decision.sceneCount,
+          style: decision.genreLabel,
+          duration: decision.productionType === 'pro_video' ? 'long' : 'short',
+          domain: decision.genre,
+        }).catch(() => {});
         try {
           await notifyOwner({
             title: '✨ خيال — اكتمل الإنتاج الذاتي!',
@@ -821,6 +845,128 @@ Be specific and objective. Use English for the description as it works best with
       });
 
       return { jobId };
+    }),
+
+  // ════════════════════════════════════════════════════════════════
+  // surpriseProduce — خيال تختار الموضوع وتنتج كاملاً من الصفر (فاجئني)
+  // ════════════════════════════════════════════════════════════════
+  surpriseProduce: publicProcedure
+    .input(z.object({
+      userId: z.string().optional(),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const memUserId = input.userId ?? (ctx as any)?.user?.openId ?? `guest_${Math.random().toString(36).slice(2, 8)}`;
+
+      // خيال تختار الموضوع
+      const surprise = await pickSurprise(memUserId);
+
+      const jobId = `surprise_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      await createJobInDB(jobId, surprise.description);
+      await updateJobInDB(jobId, {
+        status: 'pending',
+        currentStep: surprise.announcement,
+        progress: 0,
+        metrics: { surpriseAnnouncement: surprise.announcement, surpriseTopic: surprise.topic.title },
+      });
+
+      jobQueue.enqueue(jobId, memUserId, async () => {
+        await updateJobInDB(jobId, { status: 'processing', currentStep: `🧠 خيال تحلل: ${surprise.topic.title}`, progress: 2 });
+
+        const thinkingSteps: any[] = [];
+        const decision = await directAutonomously(surprise.description, async (step) => {
+          thinkingSteps.push(step);
+          await updateJobInDB(jobId, {
+            currentStep: `${step.icon} ${step.label}: ${step.detail}`,
+            progress: Math.min(15, 2 + thinkingSteps.length * 2),
+            metrics: {
+              thinkingSteps: [...thinkingSteps],
+              decision: null,
+              surpriseAnnouncement: surprise.announcement,
+              surpriseTopic: surprise.topic.title,
+            },
+          });
+        }, memUserId);
+
+        await updateJobInDB(jobId, {
+          currentStep: `🎬 ${decision.filmTitle} — بدأ الإنتاج`,
+          progress: 16,
+          metrics: {
+            thinkingSteps: decision.thinkingSteps,
+            decision: {
+              productionType: decision.productionType,
+              genre: decision.genre,
+              genreLabel: decision.genreLabel,
+              genreEmoji: decision.genreEmoji,
+              voice: decision.voice,
+              sceneCount: decision.sceneCount,
+              filmTitle: decision.filmTitle,
+              understanding: decision.understanding,
+              reasoning: decision.reasoning,
+            },
+            surpriseAnnouncement: surprise.announcement,
+            surpriseTopic: surprise.topic.title,
+          },
+        });
+
+        const params = decisionToProductionParams(decision);
+        const script = await generateVideoScript(params.description, params.language, params.voice, params.sceneCount);
+        await updateJobInDB(jobId, { currentStep: `📝 السيناريو جاهز: "${script.title}"`, progress: 22 });
+
+        const producer = new VideoProducer();
+        const videoUrl = await producer.produce(
+          script,
+          {
+            aspectRatio: params.options?.aspectRatio ?? '16:9',
+            mode: 'production',
+            musicVolume: 0.12,
+            useRunway: true,
+            useElevenLabs: true,
+            quality: decision.productionType === 'pro_video' ? 'pro' : 'fast',
+          },
+          async (update: Partial<VideoJob>) => {
+            await updateJobInDB(jobId, {
+              status: update.status as any,
+              progress: update.progress ? Math.max(22, update.progress) : undefined,
+              currentStep: update.currentStep,
+              videoUrl: update.videoUrl,
+              error: update.error,
+              metrics: update.metrics ? {
+                ...update.metrics,
+                thinkingSteps: decision.thinkingSteps,
+                decision: {
+                  productionType: decision.productionType,
+                  genre: decision.genre,
+                  genreLabel: decision.genreLabel,
+                  genreEmoji: decision.genreEmoji,
+                  voice: decision.voice,
+                  sceneCount: decision.sceneCount,
+                  filmTitle: decision.filmTitle,
+                  understanding: decision.understanding,
+                  reasoning: decision.reasoning,
+                },
+                surpriseAnnouncement: surprise.announcement,
+                surpriseTopic: surprise.topic.title,
+              } : undefined,
+            });
+          }
+        );
+
+        await updateJobInDB(jobId, { status: 'done', progress: 100, currentStep: '✅ اكتمل الإنتاج!', videoUrl });
+        recordProduction(memUserId, {
+          genre: decision.genre,
+          voiceId: decision.voice,
+          aspectRatio: decision.aspectRatio,
+          sceneCount: decision.sceneCount,
+          style: decision.genreLabel,
+          duration: decision.productionType === 'pro_video' ? 'long' : 'short',
+          domain: surprise.topic.domain,
+        }).catch(() => {});
+      }).catch(async (err: Error) => {
+        const msg = err.message.includes(':') ? err.message.split(':')[1] : err.message;
+        await updateJobInDB(jobId, { status: 'failed', error: msg, currentStep: msg });
+      });
+
+      return { jobId, announcement: surprise.announcement, topicTitle: surprise.topic.title };
     }),
 
   // ════════════════════════════════════════════════════════════════
@@ -839,4 +985,19 @@ Be specific and objective. Use English for the description as it works best with
         decision: metrics?.decision ?? null,
       };
     }),
+
+  // ════════════════════════════════════════════════════════════════
+  // getMemoryStatus — حالة ذاكرة خيال للمستخدم الحالي
+  // ════════════════════════════════════════════════════════════════
+  getMemoryStatus: publicProcedure.query(async ({ ctx }) => {
+    if (!ctx.user) return { hasMemory: false, totalProductions: 0, preferredGenre: null, preferredVoice: null };
+    const { getMemory } = await import('./khayalMemory');
+    const memory = await getMemory(String(ctx.user.id));
+    return {
+      hasMemory: memory.hasMemory,
+      totalProductions: memory.totalProductions,
+      preferredGenre: memory.preferredGenre,
+      preferredVoice: memory.preferredVoice,
+    };
+  }),
 });

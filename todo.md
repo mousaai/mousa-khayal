@@ -638,3 +638,32 @@
 - [x] لوحة قرارات خيال (النوع + الصوت + المشاهد + عنوان الفيلم)
 - [x] إصلاح خطأ IPv6 في rate limiter (validate: { ip: false })
 - [x] اختبارات autonomousDirector: 4 اختبارات جديدة (إجمالي 154 ناجح)
+
+## 🚀 الميزات الثلاث المتقدمة — مارس 19
+
+### SSE Stream حي
+- [ ] endpoint SSE: GET /api/khayal-stream/:jobId — يبثّ خطوات التفكير فور حدوثها
+- [ ] استبدال polling بـ EventSource في الواجهة
+- [ ] animation سلسة لظهور كل خطوة تفكير
+
+### ذاكرة خيال
+- [ ] جدول userPreferences في قاعدة البيانات (userId, genre, voice, aspectRatio, sceneCount, usageCount)
+- [ ] محرك khayalMemory.ts: يحفظ ويقرأ ويُحدّث تفضيلات المستخدم
+- [ ] autonomousDirector يستشير الذاكرة عند اتخاذ القرارات
+- [ ] مؤشر "خيال تتذكرك" في الواجهة
+
+### وضع "فاجئني"
+- [ ] surpriseMe procedure في videoRouter: خيال تختار الموضوع كاملاً
+- [ ] قاعدة بيانات مواضيع إلهام (50+ موضوع عبر 10 مجالات)
+- [ ] زر "✨ فاجئني" في الواجهة مع animation خاصة
+- [ ] عرض "خيال اختارت لك: ..." قبل بدء الإنتاج
+
+## ✅ الميزات الثلاث المتقدمة — منجزة مارس 19
+- [x] SSE stream حي: sseRouter.ts + EventSource في الواجهة (بدلاً من polling)
+- [x] broadcastProgress() مدمج في updateJobInDB — يبثّ كل تحديث فوراً
+- [x] ذاكرة خيال: جدول userPreferences + khayalMemory.ts + getMemoryStatus procedure
+- [x] مؤشر "🧠 تتذكرك" في الواجهة — يظهر بعد 3 إنتاجات ناجحة
+- [x] وضع "فاجئني": surpriseEngine.ts (50+ موضوع، 10 مجالات) + surpriseProduce procedure
+- [x] زر "✨ فاجئني" في الواجهة مع إعلان "خيال اختارت لك..."
+- [x] إصلاح ip-address dependency المفقودة (كانت تسبب require is not defined)
+- [x] 154 اختبار ناجح، 0 أخطاء TypeScript
