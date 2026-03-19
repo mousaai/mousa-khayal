@@ -1176,17 +1176,74 @@ export default function Home() {
                   autoFocus
                 />
               </div>
-            )}            {/* ـــ شريط ذكي: chip الكشف التلقائي + سريع/احترافي عند الفيديو فقط ـــ */}
+            )}            {/* ـــ شريط التحكّم: سريع/احترافي دائماً + chip الكشف التلقائي للباقي ـــ */}
             <div className="flex items-center gap-2 px-4 pt-2 pb-0 flex-wrap">
 
-              {/* chip الكشف التلقائي — يظهر دائماً عند وجود محتوى */}
+              {/* سريع / احترافي — ظاهران دائماً كخيار للفيديو */}
+              <button
+                onClick={() => {
+                  if (outputMode === "fast") {
+                    // إلغاء التحديد اليدوي → عودة للكشف التلقائي
+                    setManualMode(null);
+                    setOutputMode("images");
+                  } else {
+                    setManualMode("fast");
+                    setOutputMode("fast");
+                    setIntentLabel(activeLang === "AR" ? "⚡ فيديو سريع" : "⚡ Fast Video");
+                  }
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                style={{
+                  background: outputMode === "fast" ? "rgba(96,165,250,0.18)" : "rgba(96,165,250,0.06)",
+                  border: `1px solid ${outputMode === "fast" ? "rgba(96,165,250,0.55)" : "rgba(96,165,250,0.18)"}`,
+                  color: outputMode === "fast" ? "#60a5fa" : "rgba(148,163,184,0.5)",
+                  fontFamily: "'Tajawal', sans-serif",
+                  boxShadow: outputMode === "fast" ? "0 0 10px rgba(96,165,250,0.2)" : "none",
+                }}
+                title={activeLang === "AR" ? "فيديو سريع (720p)" : "Fast video (720p)"}
+              >
+                <span>⚡</span>
+                <span>{activeLang === "AR" ? "سريع" : "Fast"}</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  if (outputMode === "pro") {
+                    setManualMode(null);
+                    setOutputMode("images");
+                  } else {
+                    setManualMode("pro");
+                    setOutputMode("pro");
+                    setIntentLabel(activeLang === "AR" ? "✨ فيديو احترافي" : "✨ Pro Video");
+                  }
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                style={{
+                  background: outputMode === "pro" ? "rgba(167,139,250,0.18)" : "rgba(167,139,250,0.06)",
+                  border: `1px solid ${outputMode === "pro" ? "rgba(167,139,250,0.55)" : "rgba(167,139,250,0.18)"}`,
+                  color: outputMode === "pro" ? "#a78bfa" : "rgba(148,163,184,0.5)",
+                  fontFamily: "'Tajawal', sans-serif",
+                  boxShadow: outputMode === "pro" ? "0 0 10px rgba(167,139,250,0.2)" : "none",
+                }}
+                title={activeLang === "AR" ? "فيديو احترافي (1080p + انتقالات سينمائية)" : "Pro video (1080p + cinematic transitions)"}
+              >
+                <span>✨</span>
+                <span>{activeLang === "AR" ? "احترافي" : "Pro"}</span>
+              </button>
+
+              {/* فاصل خفيف */}
               {hasContent && (detectedIntent || isThinking) && (
+                <div className="w-px h-4 mx-0.5" style={{ background: "rgba(255,255,255,0.08)" }} />
+              )}
+
+              {/* chip الكشف التلقائي — يظهر عند وجود محتوى وعدم اختيار فيديو يدوي */}
+              {hasContent && (detectedIntent || isThinking) && outputMode !== "fast" && outputMode !== "pro" && (
                 <div
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all"
                   style={{
-                    background: outputMode === "immersive" ? "rgba(255,170,68,0.1)" : outputMode === "pro" ? "rgba(167,139,250,0.1)" : outputMode === "images" ? "rgba(52,211,153,0.1)" : "rgba(96,165,250,0.1)",
-                    color: outputMode === "immersive" ? "#ffaa44" : outputMode === "pro" ? "#a78bfa" : outputMode === "images" ? "#34d399" : "#60a5fa",
-                    border: `1px solid ${outputMode === "immersive" ? "rgba(255,170,68,0.25)" : outputMode === "pro" ? "rgba(167,139,250,0.25)" : outputMode === "images" ? "rgba(52,211,153,0.25)" : "rgba(96,165,250,0.25)"}`,
+                    background: outputMode === "immersive" ? "rgba(255,170,68,0.1)" : outputMode === "images" ? "rgba(52,211,153,0.1)" : "rgba(96,165,250,0.08)",
+                    color: outputMode === "immersive" ? "#ffaa44" : outputMode === "images" ? "#34d399" : "rgba(148,163,184,0.6)",
+                    border: `1px solid ${outputMode === "immersive" ? "rgba(255,170,68,0.25)" : outputMode === "images" ? "rgba(52,211,153,0.25)" : "rgba(255,255,255,0.08)"}`,
                     fontFamily: "'Tajawal', sans-serif",
                     animation: "fadeIn 0.3s ease",
                   }}
@@ -1194,45 +1251,11 @@ export default function Home() {
                   {isThinking ? (
                     <>
                       <div className="w-2 h-2 border border-current/40 border-t-current rounded-full animate-spin" />
-                      <span>{activeLang === "AR" ? "يحلل..." : "Analyzing..."}</span>
+                      <span style={{ opacity: 0.6 }}>{activeLang === "AR" ? "يحلل..." : "Analyzing..."}</span>
                     </>
                   ) : (
                     <span>{intentLabel}</span>
                   )}
-                </div>
-              )}
-
-              {/* خياران للفيديو فقط — يظهران عند كشف فيديو */}
-              {hasContent && (detectedIntent === "video" || outputMode === "fast" || outputMode === "pro") && !isThinking && (
-                <div className="flex items-center gap-1.5" style={{ animation: "fadeIn 0.3s ease" }}>
-                  <button
-                    onClick={() => { setManualMode("fast"); setOutputMode("fast"); setIntentLabel(activeLang === "AR" ? "⚡ فيديو سريع" : "⚡ Fast Video"); }}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95"
-                    style={{
-                      background: outputMode === "fast" ? "rgba(96,165,250,0.18)" : "rgba(96,165,250,0.05)",
-                      border: `1px solid ${outputMode === "fast" ? "rgba(96,165,250,0.5)" : "rgba(96,165,250,0.15)"}`,
-                      color: outputMode === "fast" ? "#60a5fa" : "rgba(96,165,250,0.45)",
-                      fontFamily: "'Tajawal', sans-serif",
-                      boxShadow: outputMode === "fast" ? "0 0 8px rgba(96,165,250,0.25)" : "none",
-                    }}
-                  >
-                    <span>⚡</span>
-                    <span>{activeLang === "AR" ? "سريع" : "Fast"}</span>
-                  </button>
-                  <button
-                    onClick={() => { setManualMode("pro"); setOutputMode("pro"); setIntentLabel(activeLang === "AR" ? "✨ فيديو احترافي" : "✨ Pro Video"); }}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95"
-                    style={{
-                      background: outputMode === "pro" ? "rgba(167,139,250,0.18)" : "rgba(167,139,250,0.05)",
-                      border: `1px solid ${outputMode === "pro" ? "rgba(167,139,250,0.5)" : "rgba(167,139,250,0.15)"}`,
-                      color: outputMode === "pro" ? "#a78bfa" : "rgba(167,139,250,0.45)",
-                      fontFamily: "'Tajawal', sans-serif",
-                      boxShadow: outputMode === "pro" ? "0 0 8px rgba(167,139,250,0.25)" : "none",
-                    }}
-                  >
-                    <span>✨</span>
-                    <span>{activeLang === "AR" ? "احترافي" : "Pro"}</span>
-                  </button>
                 </div>
               )}
             </div>
