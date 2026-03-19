@@ -576,7 +576,9 @@ export class VideoProducer {
     domain: string,
     onProgress?: (step: string, pct: number) => void
   ): Promise<Array<string | null>> {
-    onProgress?.(`تحريك ${imagePaths.length} مشاهد بالتوازي...`, 40);
+    const total = imagePaths.length;
+    let completed = 0;
+    onProgress?.(`تحريك ${total} مشاهد بالتوازي... (0/${total})`, 40);
 
     const results = await Promise.allSettled(
       imagePaths.map(async (imgPath, i) => {
@@ -593,12 +595,16 @@ export class VideoProducer {
           promptText: scenes[i].imagePrompt,
         });
 
+        completed++;
+        const pct = Math.round(40 + (completed / total) * 25); // 40% → 65%
+        const status = videoUrl ? "✓" : "✗ Ken Burns";
         console.log(`  [Runway★] مشهد ${i + 1}: ${videoUrl ? "✓ متحرك" : "✗ Ken Burns Fallback"}`);
+        onProgress?.(`تحريك المشاهد... ${status} مشهد ${i + 1} (${completed}/${total} مكتمل)`, pct);
         return videoUrl;
       })
     );
 
-    onProgress?.(`اكتمل Runway لـ ${imagePaths.length} مشهد`, 65);
+    onProgress?.(`اكتمل Runway لـ ${total} مشهد`, 65);
 
     return results.map((r) => {
       if (r.status === "fulfilled") return r.value;

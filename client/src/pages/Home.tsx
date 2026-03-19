@@ -1765,8 +1765,8 @@ export default function Home() {
               {videoJob.status !== "done" && videoJob.status !== "failed" && (
                 <>
                   {/* شريط التقدم */}
-                  <div className="w-full bg-white/10 rounded-full h-2 mb-2 overflow-hidden">
-                    <div className="h-full rounded-full transition-all duration-500"
+                  <div className="w-full bg-white/10 rounded-full h-2.5 mb-2 overflow-hidden">
+                    <div className="h-full rounded-full transition-all duration-700"
                       style={{
                         width: `${videoJob.progress}%`,
                         background: videoJob.isAutonomous
@@ -1774,9 +1774,22 @@ export default function Home() {
                           : "linear-gradient(90deg, #3b82f6, #0ea5e9)"
                       }} />
                   </div>
-                  <p className="text-xs" style={{ color: "rgba(148,163,184,0.6)", fontFamily: "'Tajawal', sans-serif" }}>
-                    {videoJob.currentStep} — {videoJob.progress}%
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs" style={{ color: "rgba(148,163,184,0.75)", fontFamily: "'Tajawal', sans-serif" }}>
+                      {videoJob.currentStep}
+                    </p>
+                    <p className="text-xs font-bold" style={{ color: "rgba(148,163,184,0.9)", fontFamily: "'Tajawal', sans-serif" }}>
+                      {videoJob.progress}%
+                      {videoJob.progress > 5 && videoJob.progress < 95 && (
+                        <span className="mr-2" style={{ color: "rgba(148,163,184,0.5)" }}>
+                          {videoJob.progress < 40 ? "≈ 3-5 دقائق" :
+                           videoJob.progress < 65 ? "≈ 2-4 دقائق (Runway)" :
+                           videoJob.progress < 80 ? "≈ 1-2 دقيقة" :
+                           "≈ أقل من دقيقة"}
+                        </span>
+                      )}
+                    </p>
+                  </div>
 
                   {/* 🌟 إعلان فاجئني */}
                   {surpriseAnnouncement && videoJob.isAutonomous && (

@@ -175,9 +175,9 @@ export class RunwayEngine {
   /**
    * متابعة حالة المهمة حتى الاكتمال
    */
-  private async pollTask(taskId: string, maxWaitMs = 120000): Promise<string | null> {
+  private async pollTask(taskId: string, maxWaitMs = 360000): Promise<string | null> {
     const startTime = Date.now();
-    const pollInterval = 3000; // كل 3 ثوانٍ
+    const pollInterval = 5000; // كل 5 ثوانٍ — THROTTLED يحتاج وقتاً أطول
 
     while (Date.now() - startTime < maxWaitMs) {
       await new Promise((r) => setTimeout(r, pollInterval));
