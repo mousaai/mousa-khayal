@@ -385,10 +385,12 @@ describe("server/_core/index.ts — استئناف الـ jobs المتوقفة"
     expect(src).toContain('"processing"');
   });
 
-  it("يستدعي cleanupStuckJobs عند بدء تشغيل السيرفر", () => {
+  it("يستدعي cleanupStuckJobs عند بدء تشغيل السيرفر (مؤجلة لضمان استقرار DB)", () => {
     const { readFileSync } = require("node:fs");
     const src = readFileSync("/home/ubuntu/tashkila-3d-walkthrough/server/_core/index.ts", "utf-8");
-    expect(src).toContain("await cleanupStuckJobs()");
+    // تم تغيير الاستدعاء ليكون مؤجلاً (setTimeout) بدلاً من فوري لتجنب ECONNRESET
+    expect(src).toContain("cleanupStuckJobs");
+    expect(src).toContain("setTimeout");
   });
 
   it("يحتوي على منطق استئناف المهام بدلاً من إلغائها", () => {

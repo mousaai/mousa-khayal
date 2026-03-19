@@ -88,8 +88,8 @@ async function cleanupStuckJobs() {
 async function startServer() {
   const app = express();
   const server = createServer(app);
-  // تنظيف الـ jobs العالقة من الجلسة السابقة
-  await cleanupStuckJobs();
+  // تنظيف الـ jobs العالقة بعد 10 ثواني من بدء السيرفر (لضمان استقرار اتصال DB)
+  setTimeout(() => cleanupStuckJobs().catch(e => console.warn("[Startup] cleanupStuckJobs deferred error:", e)), 10_000);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));

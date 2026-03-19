@@ -1380,33 +1380,56 @@ export default function Home() {
                 <input ref={docInputRef} type="file" accept=".pdf,.doc,.docx,.txt,image/*" onChange={handleDocUpload} className="hidden" />
               </div>
 
-              {/* Right: generate button — يتكيف مع نوع الإخراج تلقائياً */}
+              {/* Right: generate button — ذكي وراقي يتكيف مع نوع الإخراج */}
               <button
                 onClick={handleGenerate}
                 disabled={isGenerating || isGeneratingScript || isGeneratingImmersive || !hasContent}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-xl font-bold text-sm transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 flex-shrink-0"
+                className="relative flex items-center gap-2 px-5 py-2.5 rounded-xl font-bold text-sm transition-all duration-300 hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100 flex-shrink-0 overflow-hidden"
                 style={{
                   fontFamily: "'Tajawal', sans-serif",
                   background: (isGenerating || isGeneratingScript || isGeneratingImmersive)
-                    ? "rgba(139,92,246,0.3)"
+                    ? "rgba(139,92,246,0.25)"
                     : outputMode === "immersive"
-                    ? "linear-gradient(135deg, #b45309 0%, #f59e0b 50%, #fbbf24 100%)"
-                    : (outputMode === "fast" || outputMode === "pro" || detectedIntent === "video")
-                    ? "linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 100%)"
+                    ? "linear-gradient(135deg, #92400e 0%, #d97706 40%, #fbbf24 100%)"
+                    : outputMode === "pro"
+                    ? "linear-gradient(135deg, #1e1b4b 0%, #4338ca 50%, #818cf8 100%)"
+                    : outputMode === "fast"
+                    ? "linear-gradient(135deg, #0c4a6e 0%, #0284c7 50%, #38bdf8 100%)"
+                    : detectedIntent === "video"
+                    ? "linear-gradient(135deg, #1e3a5f 0%, #1d4ed8 50%, #60a5fa 100%)"
                     : detectedIntent === "script"
-                    ? "linear-gradient(135deg, #065f46 0%, #10b981 100%)"
-                    : "linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #0ea5e9 100%)",
+                    ? "linear-gradient(135deg, #064e3b 0%, #059669 50%, #34d399 100%)"
+                    : "linear-gradient(135deg, #3b0764 0%, #7c3aed 50%, #a78bfa 100%)",
                   color: "white",
                   boxShadow: (isGenerating || isGeneratingScript || isGeneratingImmersive) ? "none"
-                    : outputMode === "immersive" ? "0 0 20px rgba(251,191,36,0.4)"
-                    : (outputMode === "fast" || outputMode === "pro" || detectedIntent === "video") ? "0 0 20px rgba(14,165,233,0.35)"
-                    : "0 0 20px rgba(124,58,237,0.4)",
-                  minWidth: 110,
+                    : outputMode === "immersive" ? "0 0 24px rgba(251,191,36,0.5), 0 4px 12px rgba(0,0,0,0.4)"
+                    : outputMode === "pro" ? "0 0 24px rgba(99,102,241,0.6), 0 4px 12px rgba(0,0,0,0.4)"
+                    : outputMode === "fast" ? "0 0 24px rgba(14,165,233,0.5), 0 4px 12px rgba(0,0,0,0.4)"
+                    : detectedIntent === "video" ? "0 0 24px rgba(29,78,216,0.5), 0 4px 12px rgba(0,0,0,0.4)"
+                    : detectedIntent === "script" ? "0 0 24px rgba(5,150,105,0.5), 0 4px 12px rgba(0,0,0,0.4)"
+                    : "0 0 28px rgba(124,58,237,0.6), 0 4px 12px rgba(0,0,0,0.4)",
+                  minWidth: 120,
+                  border: (isGenerating || isGeneratingScript || isGeneratingImmersive)
+                    ? "1px solid rgba(139,92,246,0.3)"
+                    : outputMode === "pro" ? "1px solid rgba(129,140,248,0.4)"
+                    : outputMode === "fast" ? "1px solid rgba(56,189,248,0.4)"
+                    : "1px solid rgba(255,255,255,0.15)",
                 }}
               >
+                {/* shimmer effect */}
+                {!(isGenerating || isGeneratingScript || isGeneratingImmersive) && hasContent && (
+                  <span
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                      background: "linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.18) 50%, transparent 60%)",
+                      animation: "shimmerBtn 2.5s ease-in-out infinite",
+                    }}
+                  />
+                )}
+
                 {isGeneratingImmersive ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-amber-400/30 border-t-amber-400 rounded-full animate-spin" />
+                    <div className="w-4 h-4 border-2 border-amber-400/40 border-t-amber-300 rounded-full animate-spin" />
                     <span>{activeLang === "AR" ? "ينقلك هناك..." : "Teleporting..."}</span>
                   </>
                 ) : (isGenerating || isGeneratingScript) ? (
@@ -1415,13 +1438,17 @@ export default function Home() {
                     <span>{activeLang === "AR" ? "يُشكّل..." : "Generating..."}</span>
                   </>
                 ) : outputMode === "immersive" ? (
-                  <span>🌍 {activeLang === "AR" ? "انقلني هناك" : "Take Me There"}</span>
-                ) : (outputMode === "fast" || outputMode === "pro" || detectedIntent === "video") ? (
-                  <span>🎬 {activeLang === "AR" ? "أنتج" : "Produce"}</span>
+                  <span className="relative z-10">🌍 {activeLang === "AR" ? "انقلني هناك" : "Take Me There"}</span>
+                ) : outputMode === "pro" ? (
+                  <span className="relative z-10">✨ {activeLang === "AR" ? "إنتاج احترافي" : "Pro Produce"}</span>
+                ) : outputMode === "fast" ? (
+                  <span className="relative z-10">⚡ {activeLang === "AR" ? "إنتاج سريع" : "Quick Produce"}</span>
+                ) : detectedIntent === "video" ? (
+                  <span className="relative z-10">🎬 {activeLang === "AR" ? "أنتج" : "Produce"}</span>
                 ) : detectedIntent === "script" ? (
-                  <span>📄 {activeLang === "AR" ? "اكتب" : "Write"}</span>
+                  <span className="relative z-10">📄 {activeLang === "AR" ? "اكتب" : "Write"}</span>
                 ) : (
-                  <span>🎨 {activeLang === "AR" ? "صوّر" : "Generate"}</span>
+                  <span className="relative z-10">🎨 {activeLang === "AR" ? "صوّر" : "Generate"}</span>
                 )}
               </button>
             </div>
