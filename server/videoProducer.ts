@@ -395,6 +395,7 @@ export class VideoProducer {
     filmGenre?: FilmGenre
   ): Promise<string[]> {
     const { generateImage } = await import("./_core/imageGeneration");
+    const { getCachedImage, cacheImage } = await import("./promptCache");
 
     // الحصول على DNA النوع السينمائي
     const genre = filmGenre ?? "general";
@@ -415,29 +416,48 @@ export class VideoProducer {
         // بناء prompt مخصص للنوع السينمائي (موجز ودقيق لتسريع API)
         const genreEnhancedPrompt = `${genreDNA.promptPrefix} ${characterPart}${scene.imagePrompt}, ${genreDNA.lightingStyle}, ${genreDNA.colorGrading}, ${genreDNA.promptSuffix}`;
 
-        // retry مرة واحدة فقط (أسرع من 3 محاولات)
+        // فحص Prompt Cache أولاً (توفير 100% من وقت التوليد)
         let imageUrl: string | undefined;
         let lastErr: Error | null = null;
 
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          try {
-            const genOptions: Parameters<typeof generateImage>[0] = {
-              prompt: genreEnhancedPrompt,
-            };
+        // لا نستخدم cache للمشهد الأول مع صورة مرجعية (image-to-image فريد)
+        const useCache = !(i === 0 && referenceImageUrl);
+        if (useCache) {
+          const cached = await getCachedImage(genreEnhancedPrompt, dims.width, dims.height);
+          if (cached) {
+            imageUrl = cached;
+            console.log(`  ⚡ مشهد ${i + 1} من Cache (0 ثانية)`);
+          }
+        }
 
-            // المشهد الأول: استخدم الصورة المرفقة كمرجع بصري (image-to-image)
-            if (i === 0 && referenceImageUrl) {
-              genOptions.originalImages = [{ url: referenceImageUrl, mimeType: "image/jpeg" }];
-              console.log(`[VideoProducer] المشهد 1: استخدام الصورة المرفقة كمرجع بصري`);
+        if (!imageUrl) {
+          // retry: محاولتان تلقائيتان لتوليد الصورة
+          for (let attempt = 1; attempt <= 2; attempt++) {
+            try {
+              const genOptions: Parameters<typeof generateImage>[0] = {
+                prompt: genreEnhancedPrompt,
+              };
+
+              // المشهد الأول: استخدم الصورة المرفقة كمرجع بصري (image-to-image)
+              if (i === 0 && referenceImageUrl) {
+                genOptions.originalImages = [{ url: referenceImageUrl, mimeType: "image/jpeg" }];
+                console.log(`[VideoProducer] المشهد 1: استخدام الصورة المرفقة كمرجع بصري`);
+              }
+
+              const res = await generateImage(genOptions);
+              imageUrl = res.url;
+              if (imageUrl) {
+                // حفظ في Cache للمرة القادمة
+                if (useCache) {
+                  cacheImage(genreEnhancedPrompt, imageUrl, dims.width, dims.height).catch(() => {});
+                }
+                break;
+              }
+            } catch (e: any) {
+              lastErr = e;
+              console.warn(`[VideoProducer] generateImage attempt ${attempt}/2 failed for scene ${i+1}: ${e.message}`);
+              if (attempt < 2) await new Promise(r => setTimeout(r, 500));
             }
-
-            const res = await generateImage(genOptions);
-            imageUrl = res.url;
-            if (imageUrl) break;
-          } catch (e: any) {
-            lastErr = e;
-            console.warn(`[VideoProducer] generateImage attempt ${attempt}/2 failed for scene ${i+1}: ${e.message}`);
-            if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
           }
         }
 
@@ -809,31 +829,33 @@ export class VideoProducer {
     onProgress?: (step: string, pct: number) => void,
     quality: "fast" | "pro" = "fast"
   ): Promise<string[]> {
-    const scenePaths: string[] = [];
+    // توازي كامل: كل المشاهد تُبنى في نفس الوقت
+    onProgress?.(`بناء ${scenes.length} مشاهد بالتوازي...`, 55);
 
-    for (let i = 0; i < scenes.length; i++) {
-      const scene = scenes[i];
-      const imgPath = imagePaths[i];
-      const outputPath = path.join(this.workDir, `scene_${i + 1}_final.mp4`);
+    let completed = 0;
+    const results = await Promise.all(
+      scenes.map(async (scene, i) => {
+        const imgPath = imagePaths[i];
+        const outputPath = path.join(this.workDir, `scene_${i + 1}_final.mp4`);
 
-      // تحديث دقيق لكل مشهد: 55% إلى 75%
-      const sceneProgress = 55 + Math.round((i / scenes.length) * 20);
-      onProgress?.(
-        `بناء مشهد ${i + 1}/${scenes.length}... (${Math.round(((i + 1) / scenes.length) * 100)}%)`,
-        sceneProgress
-      );
+        const imgWithSub = path.join(this.workDir, `scene_${i + 1}_sub.png`);
+        await this.drawSubtitle(imgPath, scene.subtitle, imgWithSub, dims);
 
-      const imgWithSub = path.join(this.workDir, `scene_${i + 1}_sub.png`);
-      await this.drawSubtitle(imgPath, scene.subtitle, imgWithSub, dims);
+        const motion = scene.zoom ?? "zoom_in";
+        await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath, quality);
 
-      const motion = scene.zoom ?? "zoom_in";
-      await this.buildSceneVideo(imgWithSub, scene.duration, motion, dims, outputPath, quality);
+        completed++;
+        const pct = 55 + Math.round((completed / scenes.length) * 20);
+        onProgress?.(`جاهز ${completed}/${scenes.length} مشاهد...`, pct);
+        console.log(`  ✓ مشهد ${i + 1} جاهز (Ken Burns: ${motion})`);
 
-      scenePaths.push(outputPath);
-      console.log(`  ✓ مشهد ${i + 1} جاهز (Ken Burns: ${motion})`);
-    }
+        return { i, outputPath };
+      })
+    );
 
-    return scenePaths;
+    // إعادة الترتيب حسب الرقم الأصلي (Promise.all قد يعيد بترتيب غير متوقع)
+    results.sort((a, b) => a.i - b.i);
+    return results.map(r => r.outputPath);
   }
 
   // ─────────────────────────────────────────────────────────
@@ -978,10 +1000,13 @@ export class VideoProducer {
       // MOTION_EFFECTS تتضمن scale+format+crop بشكل كامل
       const fullFilter = motionFn(duration, dims.width, dims.height, CONFIG.fps);
 
-      // threads = 2 per job (6 cores / 3 concurrent jobs = 2 threads/job)
-      const threads = Math.max(1, Math.floor(os.cpus().length / 3));
-      const preset = quality === "pro" ? "fast" : "superfast";
-      const crf = quality === "pro" ? 20 : 26;
+      // توزيع ذكي للأنوية: عند التوازي الكامل نستخدم 2 أنوية لكل مشهد
+      const totalCores = os.cpus().length; // 6 أنوية
+      const threads = Math.max(2, Math.floor(totalCores / 2)); // 3 أنوية/مشهد عند التوازي
+      // fast mode: veryfast+crf23 (جودة ممتازة + سرعة عالية)
+      // pro mode: medium+crf18 (جودة سينمائية)
+      const preset = quality === "pro" ? "medium" : "veryfast";
+      const crf = quality === "pro" ? 18 : 23;
 
       ffmpeg()
         .input(imgPath)
@@ -990,7 +1015,15 @@ export class VideoProducer {
         .duration(duration)
         .fps(CONFIG.fps)
         .videoCodec("libx264")
-        .outputOptions([`-preset ${preset}`, `-crf ${crf}`, "-pix_fmt yuv420p", `-threads ${threads}`, "-tune fastdecode"])
+        .outputOptions([
+          `-preset ${preset}`,
+          `-crf ${crf}`,
+          "-pix_fmt yuv420p",
+          `-threads ${threads}`,
+          "-movflags +faststart",  // تسريع التشغيل الفوري
+          "-profile:v high",       // H.264 High Profile للجودة
+          "-level 4.1",
+        ])
         .output(outputPath)
         .on("end", () => resolve())
         .on("error", (err: Error) => {

@@ -793,3 +793,13 @@
 - [x] جدولة أسبوعية: كل أحد الساعة 3 صباحاً يسحب 10,000 سيناريو جديد
 - [x] واجهة KnowledgeBar: مؤشر المكتبة الحية في الواجهة
 - [x] endpoints إدارة المعرفة (getLibraryStats, triggerHarvest) في videoRouter
+
+## ⚡ تسريع أقصى + رفع الجودة — مارس 19
+
+- [ ] Prompt Cache: جدول image_cache في DB لتجنّب توليد نفس الصورة مرتين
+- [ ] توليد الصور بالتوازي الكامل: Promise.all بدلاً من تسلسلي
+- [ ] FFmpeg parallel: توليد كل مشهد بالتوازي ثم دمج
+- [ ] جودة أعلى: JPEG quality=95 + scale=1920x1080 بدلاً من 1280x720
+- [ ] Ken Burns Pro: حركات أكثر تنوعاً وسلاسة (zoom+pan معاً)
+- [ ] TTS turbo: استخدام eleven_turbo_v2_5 للعربي
+- [ ] قياس الوقت قبل وبعد

@@ -262,3 +262,21 @@ export const productionMemory = mysqlTable("production_memory", {
 
 export type ProductionMemory = typeof productionMemory.$inferSelect;
 export type InsertProductionMemory = typeof productionMemory.$inferInsert;
+
+// ══════════════════════════════════════════════════════════════
+// Prompt Cache — تخزين الصور المولّدة لتجنّب التكرار
+// ══════════════════════════════════════════════════════════════
+export const imageCache = mysqlTable("image_cache", {
+  id: int("id").autoincrement().primaryKey(),
+  promptHash: varchar("promptHash", { length: 64 }).notNull().unique(), // SHA256 للـ prompt
+  prompt: text("prompt").notNull(),                                     // النص الكامل
+  imageUrl: text("imageUrl").notNull(),                                 // رابط S3/CDN
+  width: int("width").default(1280).notNull(),
+  height: int("height").default(720).notNull(),
+  hitCount: int("hitCount").default(0).notNull(),                       // عدد مرات الاستخدام
+  lastUsedAt: timestamp("lastUsedAt").defaultNow().notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ImageCache = typeof imageCache.$inferSelect;
+export type InsertImageCache = typeof imageCache.$inferInsert;
