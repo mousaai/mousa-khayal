@@ -808,3 +808,13 @@
 
 - [ ] تشخيص سبب عدم التوليد عند الضغط على "صوّر" في وضع صورة سينمائية
 - [ ] إصلاح المشكلة وضمان عمل التوليد
+
+## 🔓 الاستقلالية الكاملة عن Manus — مارس 2026
+
+- [x] استبدال Manus LLM بـ OpenAI GPT-4o-mini/GPT-4o (server/_core/llm.ts)
+- [x] استبدال Manus Image Generation بـ Replicate Flux Schnell (server/_core/imageGeneration.ts)
+- [x] استبدال Manus S3 بـ Cloudflare R2 (server/storage.ts)
+- [x] التحقق من توافق قاعدة البيانات مع PlanetScale (MySQL متوافق — لا يحتاج تعديل)
+- [ ] بناء نظام مصادقة خاص بخيال (email/password + Google OAuth)
+- [ ] إزالة جميع imports من server/_core المعتمدة على Manus
+- [x] اختبار شامل بعد الاستبدال (202/202 ناجحة)

@@ -1,3 +1,12 @@
+/**
+ * LLM Helper — OpenAI-powered (مستقل عن Manus)
+ *
+ * استراتيجية التكلفة المنخفضة:
+ * - GPT-4o-mini: للمهام البسيطة (تحليل النصوص، توليد البرومبتات، الفلترة) → $0.15/M token
+ * - GPT-4o: للمهام المعقدة (السيناريوهات الطويلة، التحليل العميق) → $2.50/M token
+ *
+ * القاعدة: استخدم mini افتراضياً، وانتقل لـ 4o فقط عند الحاجة الفعلية
+ */
 import { ENV } from "./env";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
@@ -19,7 +28,7 @@ export type FileContent = {
   type: "file_url";
   file_url: {
     url: string;
-    mime_type?: "audio/mpeg" | "audio/wav" | "application/pdf" | "audio/mp4" | "video/mp4" ;
+    mime_type?: "audio/mpeg" | "audio/wav" | "application/pdf" | "audio/mp4" | "video/mp4";
   };
 };
 
@@ -66,6 +75,13 @@ export type InvokeParams = {
   output_schema?: OutputSchema;
   responseFormat?: ResponseFormat;
   response_format?: ResponseFormat;
+  /**
+   * model: اختر النموذج يدوياً أو اتركه فارغاً للاختيار التلقائي
+   * - "mini": GPT-4o-mini (الافتراضي — أرخص 16 مرة)
+   * - "pro": GPT-4o (للمهام المعقدة فقط)
+   * - أي اسم نموذج مباشر مثل "gpt-4o-mini"
+   */
+  model?: "mini" | "pro" | string;
 };
 
 export type ToolCall = {
@@ -110,29 +126,35 @@ export type ResponseFormat =
   | { type: "json_object" }
   | { type: "json_schema"; json_schema: JsonSchema };
 
+// ─── استراتيجية اختيار النموذج ───────────────────────────────────────────────
+// mini: للمهام البسيطة (تحليل، فلترة، برومبتات قصيرة) → أرخص 16 مرة
+// pro: للمهام المعقدة (سيناريوهات طويلة، تحليل عميق متعدد المشاهد)
+const OPENAI_MODELS = {
+  mini: "gpt-4o-mini",   // $0.15/M input — الافتراضي
+  pro: "gpt-4o",         // $2.50/M input — للمعقد فقط
+} as const;
+
+function resolveModel(model?: string): string {
+  if (!model || model === "mini") return OPENAI_MODELS.mini;
+  if (model === "pro") return OPENAI_MODELS.pro;
+  return model; // اسم مباشر
+}
+
+// ─── Normalize helpers ────────────────────────────────────────────────────────
 const ensureArray = (
   value: MessageContent | MessageContent[]
 ): MessageContent[] => (Array.isArray(value) ? value : [value]);
 
 const normalizeContentPart = (
   part: MessageContent
-): TextContent | ImageContent | FileContent => {
-  if (typeof part === "string") {
-    return { type: "text", text: part };
-  }
-
-  if (part.type === "text") {
-    return part;
-  }
-
-  if (part.type === "image_url") {
-    return part;
-  }
-
+): TextContent | ImageContent => {
+  if (typeof part === "string") return { type: "text", text: part };
+  if (part.type === "text") return part;
+  if (part.type === "image_url") return part;
+  // file_url غير مدعوم في OpenAI — نحوّله لنص
   if (part.type === "file_url") {
-    return part;
+    return { type: "text", text: `[File: ${part.file_url.url}]` };
   }
-
   throw new Error("Unsupported message content part");
 };
 
@@ -143,31 +165,16 @@ const normalizeMessage = (message: Message) => {
     const content = ensureArray(message.content)
       .map(part => (typeof part === "string" ? part : JSON.stringify(part)))
       .join("\n");
-
-    return {
-      role,
-      name,
-      tool_call_id,
-      content,
-    };
+    return { role, name, tool_call_id, content };
   }
 
   const contentParts = ensureArray(message.content).map(normalizeContentPart);
 
-  // If there's only text content, collapse to a single string for compatibility
   if (contentParts.length === 1 && contentParts[0].type === "text") {
-    return {
-      role,
-      name,
-      content: contentParts[0].text,
-    };
+    return { role, name, content: contentParts[0].text };
   }
 
-  return {
-    role,
-    name,
-    content: contentParts,
-  };
+  return { role, name, content: contentParts };
 };
 
 const normalizeToolChoice = (
@@ -175,49 +182,21 @@ const normalizeToolChoice = (
   tools: Tool[] | undefined
 ): "none" | "auto" | ToolChoiceExplicit | undefined => {
   if (!toolChoice) return undefined;
-
-  if (toolChoice === "none" || toolChoice === "auto") {
-    return toolChoice;
-  }
+  if (toolChoice === "none" || toolChoice === "auto") return toolChoice;
 
   if (toolChoice === "required") {
-    if (!tools || tools.length === 0) {
-      throw new Error(
-        "tool_choice 'required' was provided but no tools were configured"
-      );
-    }
-
-    if (tools.length > 1) {
-      throw new Error(
-        "tool_choice 'required' needs a single tool or specify the tool name explicitly"
-      );
-    }
-
-    return {
-      type: "function",
-      function: { name: tools[0].function.name },
-    };
+    if (!tools || tools.length === 0)
+      throw new Error("tool_choice 'required' was provided but no tools were configured");
+    if (tools.length > 1)
+      throw new Error("tool_choice 'required' needs a single tool or specify the tool name explicitly");
+    return { type: "function", function: { name: tools[0].function.name } };
   }
 
   if ("name" in toolChoice) {
-    return {
-      type: "function",
-      function: { name: toolChoice.name },
-    };
+    return { type: "function", function: { name: toolChoice.name } };
   }
 
   return toolChoice;
-};
-
-const resolveApiUrl = () =>
-  ENV.forgeApiUrl && ENV.forgeApiUrl.trim().length > 0
-    ? `${ENV.forgeApiUrl.replace(/\/$/, "")}/v1/chat/completions`
-    : "https://forge.manus.im/v1/chat/completions";
-
-const assertApiKey = () => {
-  if (!ENV.forgeApiKey) {
-    throw new Error("OPENAI_API_KEY is not configured");
-  }
 };
 
 const normalizeResponseFormat = ({
@@ -237,23 +216,15 @@ const normalizeResponseFormat = ({
   | undefined => {
   const explicitFormat = responseFormat || response_format;
   if (explicitFormat) {
-    if (
-      explicitFormat.type === "json_schema" &&
-      !explicitFormat.json_schema?.schema
-    ) {
-      throw new Error(
-        "responseFormat json_schema requires a defined schema object"
-      );
-    }
+    if (explicitFormat.type === "json_schema" && !explicitFormat.json_schema?.schema)
+      throw new Error("responseFormat json_schema requires a defined schema object");
     return explicitFormat;
   }
 
   const schema = outputSchema || output_schema;
   if (!schema) return undefined;
-
-  if (!schema.name || !schema.schema) {
+  if (!schema.name || !schema.schema)
     throw new Error("outputSchema requires both name and schema");
-  }
 
   return {
     type: "json_schema",
@@ -265,8 +236,12 @@ const normalizeResponseFormat = ({
   };
 };
 
+// ─── الدالة الرئيسية ──────────────────────────────────────────────────────────
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  assertApiKey();
+  const apiKey = ENV.openaiApiKey;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY is not configured");
+  }
 
   const {
     messages,
@@ -277,10 +252,13 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     output_schema,
     responseFormat,
     response_format,
+    model,
   } = params;
 
+  const selectedModel = resolveModel(model);
+
   const payload: Record<string, unknown> = {
-    model: "gemini-2.5-flash",
+    model: selectedModel,
     messages: messages.map(normalizeMessage),
   };
 
@@ -288,18 +266,14 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     payload.tools = tools;
   }
 
-  const normalizedToolChoice = normalizeToolChoice(
-    toolChoice || tool_choice,
-    tools
-  );
+  const normalizedToolChoice = normalizeToolChoice(toolChoice || tool_choice, tools);
   if (normalizedToolChoice) {
     payload.tool_choice = normalizedToolChoice;
   }
 
-  payload.max_tokens = 32768
-  payload.thinking = {
-    "budget_tokens": 128
-  }
+  // max_tokens: mini يكفيه 4096، pro يحتاج أكثر للسيناريوهات الطويلة
+  const maxTok = params.maxTokens || params.max_tokens;
+  payload.max_tokens = maxTok ?? (selectedModel === OPENAI_MODELS.pro ? 16384 : 4096);
 
   const normalizedResponseFormat = normalizeResponseFormat({
     responseFormat,
@@ -307,16 +281,15 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     outputSchema,
     output_schema,
   });
-
   if (normalizedResponseFormat) {
     payload.response_format = normalizedResponseFormat;
   }
 
-  const response = await fetch(resolveApiUrl(), {
+  const response = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      authorization: `Bearer ${ENV.forgeApiKey}`,
+      authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify(payload),
   });
@@ -324,7 +297,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
   if (!response.ok) {
     const errorText = await response.text();
     throw new Error(
-      `LLM invoke failed: ${response.status} ${response.statusText} – ${errorText}`
+      `LLM invoke failed (${selectedModel}): ${response.status} ${response.statusText} – ${errorText}`
     );
   }
 
