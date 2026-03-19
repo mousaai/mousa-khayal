@@ -104,6 +104,25 @@ interface ChatMsg {
 }
 
 // ── حالة إنتاج الفيديو ────────────────────────────────────────────────────────
+interface ThinkingStep {
+  icon: string;
+  label: string;
+  detail: string;
+  timestamp: number;
+}
+
+interface DirectorDecision {
+  productionType: string;
+  genre: string;
+  genreLabel: string;
+  genreEmoji: string;
+  voice: string;
+  sceneCount: number;
+  filmTitle: string;
+  understanding: string;
+  reasoning: string;
+}
+
 interface VideoJobState {
   jobId: string;
   status: "pending" | "processing" | "done" | "failed";
@@ -111,6 +130,10 @@ interface VideoJobState {
   currentStep: string;
   videoUrl?: string;
   error?: string;
+  // AutonomousDirector
+  isAutonomous?: boolean;
+  thinkingSteps?: ThinkingStep[];
+  decision?: DirectorDecision | null;
 }
 
 // ── نوع القصد المكتشف ─────────────────────────────────────────────────────────
@@ -239,7 +262,7 @@ export default function Home() {
   const [waveData, setWaveData] = useState<number[]>(Array(24).fill(0.5));
 
   // ــ وضع الإخراج — يُحدد تلقائياً من الوصف بالذكاء ــ
-  const [outputMode, setOutputMode] = useState<"images" | "fast" | "pro" | "immersive">("fast");
+  const [outputMode, setOutputMode] = useState<"images" | "fast" | "pro" | "immersive" | "auto">("auto");
 
   // تحكّم يدوي: إذا اختار المستخدم وضعاً يدوياً → لا يُغيّره الكشف التلقائي
   const [manualMode, setManualMode] = useState<"images" | "fast" | "pro" | "immersive" | null>(null);
@@ -281,6 +304,15 @@ export default function Home() {
   const immersiveViewMutation = trpc.khayal.immersiveView.useMutation();
   const detectIntentMutation = trpc.chat.detectIntent.useMutation();
 
+  const autonomousProduceMutation = trpc.video.autonomousProduce.useMutation();
+  const autonomousDecisionQuery = trpc.video.getAutonomousDecision.useQuery(
+    { jobId: videoJob?.jobId ?? "" },
+    {
+      enabled: !!videoJob?.isAutonomous && !!videoJob?.jobId && videoJob.status !== "done" && videoJob.status !== "failed",
+      refetchInterval: 1500,
+    }
+  );
+
   const jobStatusQuery = trpc.video.getJobStatus.useQuery(
     { jobId: videoJob?.jobId ?? "" },
     {
@@ -288,6 +320,16 @@ export default function Home() {
       refetchInterval: 2000,
     }
   );
+
+  // ── مزامنة قرارات AutonomousDirector مع videoJob ──
+  useEffect(() => {
+    if (!autonomousDecisionQuery.data || !videoJob?.isAutonomous) return;
+    const { thinkingSteps, decision } = autonomousDecisionQuery.data;
+    setVideoJob(prev => {
+      if (!prev) return prev;
+      return { ...prev, thinkingSteps: thinkingSteps as ThinkingStep[], decision: decision as DirectorDecision | null };
+    });
+  }, [autonomousDecisionQuery.data]);
 
   // ── إظهار المحادثة عند بدء الإنتاج أو اكتمال الصور ──
   useEffect(() => {
@@ -757,6 +799,28 @@ export default function Home() {
     await checkAndGenerate(finalDesc, async () => {
       const intent = detectedIntent || "image";
 
+      // ── وضع خيال ذاتية (AUTO) — خيال تقرر كل شيء ──
+      if (outputMode === "auto") {
+        if ("Notification" in window && Notification.permission === "default") {
+          Notification.requestPermission();
+        }
+        try {
+          const result = await autonomousProduceMutation.mutateAsync({ description: finalDesc });
+          setVideoJob({
+            jobId: result.jobId,
+            status: "pending",
+            progress: 0,
+            currentStep: "🧠 خيال تفكر...",
+            isAutonomous: true,
+            thinkingSteps: [],
+            decision: null,
+          });
+        } catch (err) {
+          console.error(err);
+        }
+        return;
+      }
+
       // ── وضع أنا هناك ──
       if (outputMode === "immersive") {
         setIsGeneratingImmersive(true);
@@ -1176,8 +1240,35 @@ export default function Home() {
                   autoFocus
                 />
               </div>
-            )}            {/* ـــ شريط التحكّم: سريع/احترافي دائماً + chip الكشف التلقائي للباقي ـــ */}
+            )}            {/* ـــ شريط التحكّم: خيال ذاتية + سريع/احترافي + chip الكشف التلقائي ـــ */}
             <div className="flex items-center gap-2 px-4 pt-2 pb-0 flex-wrap">
+
+              {/* 🧠 خيال ذاتية — الوضع الافتراضي الجديد */}
+              <button
+                onClick={() => {
+                  if (outputMode === "auto") {
+                    setOutputMode("images");
+                  } else {
+                    setManualMode(null);
+                    setOutputMode("auto");
+                  }
+                }}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                style={{
+                  background: outputMode === "auto" ? "rgba(250,204,21,0.18)" : "rgba(250,204,21,0.06)",
+                  border: `1px solid ${outputMode === "auto" ? "rgba(250,204,21,0.6)" : "rgba(250,204,21,0.18)"}`,
+                  color: outputMode === "auto" ? "#facc15" : "rgba(148,163,184,0.5)",
+                  fontFamily: "'Tajawal', sans-serif",
+                  boxShadow: outputMode === "auto" ? "0 0 12px rgba(250,204,21,0.25)" : "none",
+                }}
+                title={activeLang === "AR" ? "خيال تقرر كل شيء تلقائياً — بدون أي اختيارات" : "Khayal decides everything automatically"}
+              >
+                <span>🧠</span>
+                <span>{activeLang === "AR" ? "ذاتية" : "Auto"}</span>
+              </button>
+
+              {/* فاصل */}
+              <div className="w-px h-3 mx-0.5" style={{ background: "rgba(255,255,255,0.08)" }} />
 
               {/* سريع / احترافي — ظاهران دائماً كخيار للفيديو */}
               <button
@@ -1389,6 +1480,8 @@ export default function Home() {
                   fontFamily: "'Tajawal', sans-serif",
                   background: (isGenerating || isGeneratingScript || isGeneratingImmersive)
                     ? "rgba(139,92,246,0.25)"
+                    : outputMode === "auto"
+                    ? "linear-gradient(135deg, #713f12 0%, #ca8a04 40%, #facc15 100%)"
                     : outputMode === "immersive"
                     ? "linear-gradient(135deg, #92400e 0%, #d97706 40%, #fbbf24 100%)"
                     : outputMode === "pro"
@@ -1402,6 +1495,7 @@ export default function Home() {
                     : "linear-gradient(135deg, #3b0764 0%, #7c3aed 50%, #a78bfa 100%)",
                   color: "white",
                   boxShadow: (isGenerating || isGeneratingScript || isGeneratingImmersive) ? "none"
+                    : outputMode === "auto" ? "0 0 28px rgba(250,204,21,0.5), 0 4px 12px rgba(0,0,0,0.4)"
                     : outputMode === "immersive" ? "0 0 24px rgba(251,191,36,0.5), 0 4px 12px rgba(0,0,0,0.4)"
                     : outputMode === "pro" ? "0 0 24px rgba(99,102,241,0.6), 0 4px 12px rgba(0,0,0,0.4)"
                     : outputMode === "fast" ? "0 0 24px rgba(14,165,233,0.5), 0 4px 12px rgba(0,0,0,0.4)"
@@ -1437,6 +1531,8 @@ export default function Home() {
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                     <span>{activeLang === "AR" ? "يُشكّل..." : "Generating..."}</span>
                   </>
+                ) : outputMode === "auto" ? (
+                  <span className="relative z-10">🧠 {activeLang === "AR" ? "خيال تقرر" : "Khayal Decides"}</span>
                 ) : outputMode === "immersive" ? (
                   <span className="relative z-10">🌍 {activeLang === "AR" ? "انقلني هناك" : "Take Me There"}</span>
                 ) : outputMode === "pro" ? (
@@ -1498,11 +1594,68 @@ export default function Home() {
                   {/* شريط التقدم */}
                   <div className="w-full bg-white/10 rounded-full h-2 mb-2 overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-500"
-                      style={{ width: `${videoJob.progress}%`, background: "linear-gradient(90deg, #3b82f6, #0ea5e9)" }} />
+                      style={{
+                        width: `${videoJob.progress}%`,
+                        background: videoJob.isAutonomous
+                          ? "linear-gradient(90deg, #ca8a04, #facc15)"
+                          : "linear-gradient(90deg, #3b82f6, #0ea5e9)"
+                      }} />
                   </div>
                   <p className="text-xs" style={{ color: "rgba(148,163,184,0.6)", fontFamily: "'Tajawal', sans-serif" }}>
                     {videoJob.currentStep} — {videoJob.progress}%
                   </p>
+
+                  {/* 🧠 خطوات تفكير خيال الحية */}
+                  {videoJob.isAutonomous && videoJob.thinkingSteps && videoJob.thinkingSteps.length > 0 && (
+                    <div className="mt-3 rounded-xl overflow-hidden" style={{ background: "rgba(250,204,21,0.04)", border: "1px solid rgba(250,204,21,0.15)" }}>
+                      <div className="flex items-center gap-2 px-3 py-2" style={{ borderBottom: "1px solid rgba(250,204,21,0.1)" }}>
+                        <div className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+                        <span className="text-xs font-bold" style={{ color: "#facc15", fontFamily: "'Tajawal', sans-serif" }}>
+                          🧠 خيال تفكّر...
+                        </span>
+                      </div>
+                      <div className="px-3 py-2 space-y-1.5 max-h-40 overflow-y-auto">
+                        {videoJob.thinkingSteps.map((step, i) => (
+                          <div key={i} className="flex items-start gap-2" style={{ animation: "fadeIn 0.3s ease" }}>
+                            <span className="text-sm flex-shrink-0" style={{ marginTop: 1 }}>{step.icon}</span>
+                            <div>
+                              <span className="text-xs font-bold" style={{ color: "rgba(250,204,21,0.9)", fontFamily: "'Tajawal', sans-serif" }}>
+                                {step.label}
+                              </span>
+                              <span className="text-xs" style={{ color: "rgba(250,204,21,0.55)", fontFamily: "'Tajawal', sans-serif" }}>
+                                {" "}— {step.detail}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* 🎬 قرارات خيال بعد التفكير */}
+                  {videoJob.isAutonomous && videoJob.decision && (
+                    <div className="mt-2 rounded-xl px-3 py-2.5" style={{ background: "rgba(250,204,21,0.06)", border: "1px solid rgba(250,204,21,0.2)" }}>
+                      <p className="text-xs font-bold mb-1.5" style={{ color: "#facc15", fontFamily: "'Tajawal', sans-serif" }}>
+                        🎬 قررت خيال:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: "rgba(250,204,21,0.12)", color: "#fde68a", fontFamily: "'Tajawal', sans-serif" }}>
+                          {videoJob.decision.genreEmoji} {videoJob.decision.genreLabel}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: "rgba(96,165,250,0.12)", color: "#93c5fd", fontFamily: "'Tajawal', sans-serif" }}>
+                          🎤 {videoJob.decision.voice}
+                        </span>
+                        <span className="px-2 py-0.5 rounded-full text-xs" style={{ background: "rgba(52,211,153,0.12)", color: "#6ee7b7", fontFamily: "'Tajawal', sans-serif" }}>
+                          🎥 {videoJob.decision.sceneCount} مشاهد
+                        </span>
+                      </div>
+                      {videoJob.decision.filmTitle && (
+                        <p className="text-xs mt-1.5" style={{ color: "rgba(253,230,138,0.7)", fontFamily: "'Tajawal', sans-serif" }}>
+                          "‪{videoJob.decision.filmTitle}‬"
+                        </p>
+                      )}
+                    </div>
+                  )}
                   {/* معلومات الطابور */}
                   {(() => {
                     const qPos = (jobStatusQuery.data as any)?.queuePosition ?? 0;

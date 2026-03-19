@@ -617,3 +617,24 @@
 - [x] Response Compression (gzip level 6): تقليل حجم الردود 70-80%
 - [x] عرض موقع المستخدم في الطابور + وقت الانتظار المتوقع في الواجهة
 - [x] اختبارات jobQueue: 9 اختبارات ناجحة (إجمالي 150 اختبار)
+
+## 🧠 خيال ذاتية الكفاءة — مثل Manus (مارس 19)
+- [ ] بناء autonomousDirector.ts: محرك التخطيط الذاتي (يفكر → يخطط → يُنفّذ)
+- [ ] إضافة thinkingSteps في DB لتتبع خطوات التفكير الحية
+- [ ] دمج AutonomousDirector في quickProduce + startProduction
+- [ ] streaming لخطوات التفكير عبر tRPC subscription أو polling
+- [ ] واجهة "خيال تفكر": عرض خطوات التفكير الحية مثل Manus
+- [ ] اختبارات autonomousDirector
+
+## ✅ خيال ذاتية الكفاءة — مثل Manus — مارس 19
+
+- [x] autonomousDirector.ts: محرك التخطيط والتنفيذ الذاتي (تحليل → تخطيط → قرار → تنفيذ)
+- [x] directAutonomously(): يفكر في 6 خطوات ويبثّها للواجهة في الوقت الحقيقي
+- [x] decisionToProductionParams(): يُحوّل القرار إلى معاملات إنتاج كاملة
+- [x] videoRouter: autonomousProduce procedure (pipeline كامل ذاتي)
+- [x] videoRouter: getAutonomousDecision procedure (جلب خطوات التفكير والقرارات)
+- [x] زر "🧠 ذاتية" في الواجهة — الوضع الافتراضي الجديد
+- [x] لوحة خطوات التفكير الحية (تُبثّ في الوقت الحقيقي مثل Manus)
+- [x] لوحة قرارات خيال (النوع + الصوت + المشاهد + عنوان الفيلم)
+- [x] إصلاح خطأ IPv6 في rate limiter (validate: { ip: false })
+- [x] اختبارات autonomousDirector: 4 اختبارات جديدة (إجمالي 154 ناجح)

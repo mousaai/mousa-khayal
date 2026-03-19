@@ -21,6 +21,7 @@ import {
 import { eq, desc } from "drizzle-orm";
 import { notifyOwner } from "./_core/notification";
 import { jobQueue } from "./jobQueue";
+import { directAutonomously, decisionToProductionParams, type DirectorDecision } from "./autonomousDirector";
 // ═══════════════════════════════════════════════════════════
 // Zod schemas للمدخلاتت
 // ═══════════════════════════════════════════════════════════
@@ -441,7 +442,7 @@ export const videoRouter = router({
         .where(eq(videoJobsTable.status, "done"))
         .orderBy(desc(videoJobsTable.createdAt))
         .limit(input?.limit ?? 20);
-      return rows.map(r => ({
+      return rows.map((r: any) => ({
         jobId: r.id,
         title: r.description?.slice(0, 80) ?? "فيديو",
         description: r.description ?? "",
@@ -719,5 +720,123 @@ Be specific and objective. Use English for the description as it works best with
       })();
 
       return { jobId };
+    }),
+
+  // ════════════════════════════════════════════════════════════════
+  // autonomousProduce — خيال تقرر كل شيء بنفسها (مثل Manus)
+  // ════════════════════════════════════════════════════════════════
+  autonomousProduce: publicProcedure
+    .input(z.object({
+      description: z.string().min(2).max(2000),
+    }))
+    .mutation(async ({ input }) => {
+      const jobId = `auto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      await createJobInDB(jobId, input.description);
+      await updateJobInDB(jobId, { status: 'pending', currentStep: '🧠 خيال تفكر...', progress: 0 });
+
+      const qUserId = `auto_${Math.random().toString(36).slice(2, 8)}`;
+      jobQueue.enqueue(jobId, qUserId, async () => {
+        await updateJobInDB(jobId, { status: 'processing', currentStep: '🧠 خيال تحلل الفكرة...', progress: 2 });
+
+        const thinkingSteps: any[] = [];
+        const decision = await directAutonomously(input.description, async (step) => {
+          thinkingSteps.push(step);
+          await updateJobInDB(jobId, {
+            currentStep: `${step.icon} ${step.label}: ${step.detail}`,
+            progress: Math.min(15, 2 + thinkingSteps.length * 2),
+            metrics: { thinkingSteps: [...thinkingSteps], decision: null },
+          });
+        });
+
+        await updateJobInDB(jobId, {
+          currentStep: `🎬 ${decision.filmTitle} — بدأ الإنتاج`,
+          progress: 16,
+          metrics: {
+            thinkingSteps: decision.thinkingSteps,
+            decision: {
+              productionType: decision.productionType,
+              genre: decision.genre,
+              genreLabel: decision.genreLabel,
+              genreEmoji: decision.genreEmoji,
+              voice: decision.voice,
+              sceneCount: decision.sceneCount,
+              filmTitle: decision.filmTitle,
+              understanding: decision.understanding,
+              reasoning: decision.reasoning,
+            },
+          },
+        });
+
+        const params = decisionToProductionParams(decision);
+        const script = await generateVideoScript(params.description, params.language, params.voice, params.sceneCount);
+        await updateJobInDB(jobId, { currentStep: `📝 السيناريو جاهز: "${script.title}"`, progress: 22 });
+
+        const producer = new VideoProducer();
+        const videoUrl = await producer.produce(
+          script,
+          {
+            aspectRatio: params.options?.aspectRatio ?? '16:9',
+            mode: 'production',
+            musicVolume: 0.12,
+            useRunway: true,
+            useElevenLabs: true,
+            quality: decision.productionType === 'pro_video' ? 'pro' : 'fast',
+          },
+          async (update: Partial<VideoJob>) => {
+            await updateJobInDB(jobId, {
+              status: update.status as any,
+              progress: update.progress ? Math.max(22, update.progress) : undefined,
+              currentStep: update.currentStep,
+              videoUrl: update.videoUrl,
+              error: update.error,
+              metrics: update.metrics ? {
+                ...update.metrics,
+                thinkingSteps: decision.thinkingSteps,
+                decision: {
+                  productionType: decision.productionType,
+                  genre: decision.genre,
+                  genreLabel: decision.genreLabel,
+                  genreEmoji: decision.genreEmoji,
+                  voice: decision.voice,
+                  sceneCount: decision.sceneCount,
+                  filmTitle: decision.filmTitle,
+                  understanding: decision.understanding,
+                  reasoning: decision.reasoning,
+                },
+              } : undefined,
+            });
+          }
+        );
+
+        await updateJobInDB(jobId, { status: 'done', progress: 100, currentStep: '✅ اكتمل الإنتاج!', videoUrl });
+        try {
+          await notifyOwner({
+            title: '✨ خيال — اكتمل الإنتاج الذاتي!',
+            content: `"${decision.filmTitle}" جاهز.\nالنوع: ${decision.genreEmoji} ${decision.genreLabel}\nالصوت: ${decision.voice}\nالمشاهد: ${decision.sceneCount}`,
+          });
+        } catch { /* الإشعار اختياري */ }
+      }).catch(async (err: Error) => {
+        const msg = err.message.includes(':') ? err.message.split(':')[1] : err.message;
+        await updateJobInDB(jobId, { status: 'failed', error: msg, currentStep: msg });
+      });
+
+      return { jobId };
+    }),
+
+  // ════════════════════════════════════════════════════════════════
+  // getAutonomousDecision — جلب قرارات خيال لعرضها في الواجهة
+  // ════════════════════════════════════════════════════════════════
+  getAutonomousDecision: publicProcedure
+    .input(z.object({ jobId: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const rows = await db.select().from(videoJobsTable).where(eq(videoJobsTable.id, input.jobId)).limit(1);
+      if (!rows[0]) return null;
+      const metrics = rows[0].metrics as any;
+      return {
+        thinkingSteps: metrics?.thinkingSteps ?? [],
+        decision: metrics?.decision ?? null,
+      };
     }),
 });
