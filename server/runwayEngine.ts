@@ -102,6 +102,73 @@ export class RunwayEngine {
   }
 
   /**
+   * رفع الصورة إلى Runway uploads endpoint والحصول على runwayUri
+   * البنية: POST /uploads يُرجع { uploadUrl, fields, runwayUri }
+   *            ثم POST multipart إلى uploadUrl باستخدام fields
+   *            ثم استخدام runwayUri مباشرةً كـ promptImage
+   */
+  private async uploadImageToRunway(imageBuffer: Buffer, mimeType = "image/png"): Promise<string | null> {
+    try {
+      const ext = mimeType.includes("jpeg") || mimeType.includes("jpg") ? "jpg" : "png";
+      const filename = `scene_${Date.now()}.${ext}`;
+
+      // الخطوة 1: طلب presigned upload URL + runwayUri
+      const initResp = await fetch(`${this.baseUrl}/uploads`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+          "X-Runway-Version": "2024-11-06",
+        },
+        body: JSON.stringify({
+          filename,
+          contentType: mimeType,
+          fileSize: imageBuffer.byteLength,
+          type: "ephemeral",
+        }),
+      });
+
+      if (!initResp.ok) {
+        const err = await initResp.text();
+        console.warn(`[Runway] Upload init failed (${initResp.status}): ${err}`);
+        return null;
+      }
+
+      const initData = await initResp.json() as {
+        uploadUrl: string;
+        fields: Record<string, string>;
+        runwayUri: string;
+      };
+
+      const { uploadUrl, fields, runwayUri } = initData;
+
+      // الخطوة 2: رفع الصورة باستخدام multipart form
+      const formData = new FormData();
+      for (const [key, value] of Object.entries(fields)) {
+        formData.append(key, value);
+      }
+      formData.append("file", new Blob([new Uint8Array(imageBuffer)], { type: mimeType }), filename);
+
+      const uploadResp = await fetch(uploadUrl, {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!uploadResp.ok) {
+        const errText = await uploadResp.text();
+        console.warn(`[Runway] Upload POST failed (${uploadResp.status}): ${errText.substring(0, 200)}`);
+        return null;
+      }
+
+      console.log(`  [Runway] صورة مرفوعة: ${runwayUri.substring(0, 50)}...`);
+      return runwayUri;
+    } catch (err) {
+      console.warn(`[Runway] Upload error: ${err}`);
+      return null;
+    }
+  }
+
+  /**
    * تحويل صورة إلى فيديو متحرك باستخدام Runway Gen-4 Turbo
    * يعيد رابط الفيديو المنتج أو null عند الفشل
    */
@@ -115,26 +182,36 @@ export class RunwayEngine {
     const promptText = options.promptText ?? MOTION_PROMPTS[motionPreset];
     const duration = options.duration ?? 5;
     // تحويل النسب القديمة إلى النسب الصحيحة المقبولة من Runway API
-    const rawRatio = options.ratio ?? "1280:768";
+    const rawRatio = options.ratio ?? "1280:720";
     const ratio = this.normalizeRatio(rawRatio);
 
     try {
       console.log(`  [Runway] بدء تحريك الصورة: ${motionPreset} (${ratio})`);
 
-      // تحويل الصورة إلى base64 data URI إذا كانت URL خارجية
+      // رفع الصورة إلى Runway uploads endpoint للحصول على runway:// URI
       let promptImage: string;
+      let imageBuffer: Buffer;
+
       if (options.imageBuffer) {
-        promptImage = `data:image/png;base64,${options.imageBuffer.toString("base64")}`;
+        imageBuffer = options.imageBuffer;
       } else if (options.imageUrl.startsWith("data:")) {
-        promptImage = options.imageUrl;
+        // استخراج buffer من base64 data URI
+        const base64Data = options.imageUrl.split(",")[1];
+        imageBuffer = Buffer.from(base64Data, "base64");
       } else {
-        // تحميل الصورة وتحويلها إلى base64
+        // تحميل الصورة من URL
         const imgResp = await fetch(options.imageUrl);
         if (!imgResp.ok) throw new Error(`Failed to fetch image: ${imgResp.status}`);
-        const imgBuf = Buffer.from(await imgResp.arrayBuffer());
-        const mimeType = imgResp.headers.get("content-type") || "image/png";
-        promptImage = `data:${mimeType};base64,${imgBuf.toString("base64")}`;
+        imageBuffer = Buffer.from(await imgResp.arrayBuffer());
       }
+
+      // رفع الصورة إلى Runway
+      const runwayUri = await this.uploadImageToRunway(imageBuffer);
+      if (!runwayUri) {
+        console.warn("[Runway] Failed to upload image — falling back");
+        return null;
+      }
+      promptImage = runwayUri;
 
       // إنشاء مهمة التوليد
       const createResponse = await fetch(`${this.baseUrl}/image_to_video`, {

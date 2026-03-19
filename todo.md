@@ -703,3 +703,19 @@
 - [x] إضافة normalizeRatio() لتحويل أي نسبة إلى النسب المقبولة من Runway
 - [x] تحديث RUNWAY_API_KEY بالـ key الصحيح من حساب Mousa AI
 - [x] التحقق من عمل Runway API (task ID يُرجع بنجاح)
+
+## 🐛 إصلاح الصورة السينمائية — مارس 19, 2026
+
+- [ ] تشخيص سبب عدم ظهور الصورة عند الضغط على "صوّر" (وضع صورة سينمائية)
+- [ ] إصلاح generateScene procedure أو handleGenerate في Home.tsx
+- [ ] التأكد من عرض الصورة بعد الإنتاج
+
+## 🔧 إصلاح Runway uploads endpoint — مارس 19, 2026
+
+- [x] تعديل uploadImageToRunway في runwayEngine.ts: استخدام POST /v1/uploads مع multipart form (بدلاً من base64 مباشرة)
+- [x] البنية الجديدة: POST /uploads يُرجع { uploadUrl, fields, runwayUri } ثم رفع الصورة بـ multipart إلى uploadUrl
+- [x] استخدام runwayUri مباشرةً كـ promptImage في طلب image_to_video
+- [x] إصلاح اختبار imageToVideo في apiKeys.test.ts: استخدام vi.useFakeTimers() + vi.runAllTimersAsync() لتجاوز setTimeout في pollTask
+- [x] تحديث mocks في apiKeys.test.ts لتتوافق مع البنية الجديدة (3 خطوات بدلاً من 4)
+- [x] جميع 166 اختبار ناجحة (11 ملف اختبار)
+- [ ] اختبار Runway مع API حقيقي (ينتظر إعادة تعيين الحد اليومي أو تفعيل Autobilling)
