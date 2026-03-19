@@ -154,7 +154,8 @@ async function resumeStaleJobs() {
   try {
     const db = await getDb();
     if (!db) return;
-    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    // Runway يحتاج 5-15 دقيقة لكل مشهد — نعطيه 20 دقيقة قبل اعتباره متوقفاً
+    const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000);
     const staleJobs = await db
       .select()
       .from(videoJobsTable)
@@ -163,7 +164,7 @@ async function resumeStaleJobs() {
 
     for (const job of staleJobs) {
       const heartbeat = job.lastHeartbeat ? new Date(job.lastHeartbeat).getTime() : 0;
-      if (heartbeat < fiveMinutesAgo.getTime() && job.scriptData && job.retryCount < 3) {
+      if (heartbeat < twentyMinutesAgo.getTime() && job.scriptData && job.retryCount < 3) {
         console.log(`[videoRouter] استئناف مهمة متوقفة: ${job.id} (محاولة ${(job.retryCount ?? 0) + 1}/3)`);
         await updateJobInDB(job.id, { retryCount: (job.retryCount ?? 0) + 1, lastHeartbeat: new Date() });
         runProductionJob(job.id, job.scriptData as any, job.optionsData as any);
