@@ -98,6 +98,8 @@ export interface VideoScript {
   scenes: VideoScene[];
   domain?: string;
   musicMood?: string;
+  /** صورة مرفقة من المستخدم — تُستخدم كإطار بداية للمشهد الأول */
+  referenceImageUrl?: string;
 }
 
 export interface VideoJob {
@@ -257,7 +259,7 @@ export class VideoProducer {
     try {
       // ── الخطوة 1: توليد الصور ──────────────────────────
       report("توليد الصور بالذكاء الاصطناعي...", 5);
-      const imagePaths = await this.generateImages(script.scenes, dims, report);
+      const imagePaths = await this.generateImages(script.scenes, dims, report, script.referenceImageUrl);
 
       // ── الخطوة 2: توليد الصوت (ElevenLabs) ─────────────
       report("توليد الصوت الاحترافي (ElevenLabs)...", 35);
@@ -354,7 +356,8 @@ export class VideoProducer {
   private async generateImages(
     scenes: VideoScene[],
     dims: { width: number; height: number },
-    onProgress?: (step: string, pct: number) => void
+    onProgress?: (step: string, pct: number) => void,
+    referenceImageUrl?: string
   ): Promise<string[]> {
     const paths: string[] = [];
 
@@ -371,11 +374,23 @@ export class VideoProducer {
       // retry تلقائي 3 محاولات عند فشل توليد الصورة
       let imageUrl: string | undefined;
       let lastErr: Error | null = null;
+
+      // المشهد الأول: استخدم الصورة المرفقة كمرجع بصري (image-to-image)
+      const isFirstSceneWithReference = i === 0 && referenceImageUrl;
+
       for (let attempt = 1; attempt <= 3; attempt++) {
         try {
-          const res = await generateImage({
+          const genOptions: Parameters<typeof generateImage>[0] = {
             prompt: scene.imagePrompt + ", ultra photorealistic, 8K, cinematic lighting",
-          });
+          };
+
+          // إذا كان المشهد الأول ومعه صورة مرجعية، أضفها كـ originalImage
+          if (isFirstSceneWithReference) {
+            genOptions.originalImages = [{ url: referenceImageUrl!, mimeType: "image/jpeg" }];
+            console.log(`[VideoProducer] المشهد 1: استخدام الصورة المرفقة كمرجع بصري`);
+          }
+
+          const res = await generateImage(genOptions);
           imageUrl = res.url;
           if (imageUrl) break;
         } catch (e: any) {

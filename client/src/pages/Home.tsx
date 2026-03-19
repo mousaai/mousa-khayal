@@ -51,6 +51,13 @@ const EXAMPLE_PROMPTS = [
   { text: "京都の静かな竹林に囲まれた古い日本の神社", lang: "JA", hint: "image" },
   { text: "Un château médiéval flottant sur un lac de nuages au coucher du soleil", lang: "FR", hint: "image" },
   { text: "Visualiza el ADN humano desenrollándose en una danza cósmica de colores", lang: "ES", hint: "video" },
+  // ── تحويل شخصي (image-to-image) ──
+  { text: "ارفع صورتك واطلب: تخيلني طفلاً في الخامسة من عمري", lang: "AR", hint: "تحويل شخصي" },
+  { text: "ارفع صورتك واطلب: تخيلني بعد 30 سنة من الآن", lang: "AR", hint: "تحويل شخصي" },
+  { text: "ارفع صورة شارع واطلب: كيف يبدو بعد 50 سنة", lang: "AR", hint: "تحويل زمني" },
+  // ── تاريخي ──
+  { text: "معركة عسكرية تاريخية في الصحراء العربية، فرسان بالسيوف، دخان وغروب الشمس", lang: "AR", hint: "فيديو" },
+  { text: "سوق عربي قديم في القرن العاشر، تجار وبضائع وأضواء المصابيح", lang: "AR", hint: "صورة" },
 ];
 
 // ── نصوص الواجهة ─────────────────────────────────────────────────────────────

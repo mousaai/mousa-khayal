@@ -165,55 +165,104 @@ async function deepAnalyzeDescription(
     "clear dawn, first light of day, peaceful serene atmosphere",
   ];
 
-  const systemPrompt = `You are the world's greatest cinematic director and architectural visualization master.
+  // كشف نوع الطلب لاختيار الأسلوب المناسب
+  const isArchitectural = /مبن|بيت|فيلا|برج|مسجد|مدرسة|مستشفى|مكتب|واجهة|تصميم معماري|مخطط|طابق|building|villa|tower|mosque|facade|architectural|floor plan/i.test(description) || !!documentAnalysis;
+  const isPersonal = /تخيلني|تخيل نفسي|حولني|اجعلني|كيف أكون|imagine me|transform me/i.test(description);
+  const isNature = /غابة|بحر|نهر|جبل|صحراء|سماء|forest|ocean|mountain|desert|sky|nature/i.test(description);
+  const isFantasy = /نملة|حيوان|خيال|سحر|تحليق|طيران|ant|fly|magic|fantasy|dragon|creature/i.test(description);
+  const isHistorical = /تاريخ|قديم|حرب|معركة|فرسان|history|ancient|war|battle|knight/i.test(description);
+
+  // بناء الـ system prompt المناسب حسب نوع الطلب
+  let contentTypeGuidance = "";
+  let promptStartRule = "";
+
+  if (isArchitectural && !isPersonal && !isFantasy) {
+    // معماري: استخدم الزوايا المعمارية والقيود الهندسية
+    contentTypeGuidance = `ARCHITECTURAL MODE:
+- ONE building/space seen from ${sceneCount} different angles
+- Maintain geometric consistency across all scenes
+- Add people for scale, environmental context
+${geometricConstraint ? geometricConstraint + "\n" : ""}
+For each scene, use EXACTLY this camera angle:
+${selectedAngles.map((a, i) => `Scene ${i + 1}: ${a.camera} | Lighting: ${LIGHTING_MOODS[i % LIGHTING_MOODS.length]}`).join("\n")}`;
+    promptStartRule = `Start each prompt with: "Ultra photorealistic architectural visualization, award-winning photography,"`;
+  } else if (isPersonal) {
+    // تحويل شخصي: حافظ على ملامح الشخص مع تطبيق التحويل
+    contentTypeGuidance = `PERSONAL TRANSFORMATION MODE:
+- The subject is a REAL PERSON — preserve their facial features, eye color, face shape
+- Apply the requested transformation (age, style, role) while keeping identity recognizable
+- Generate ${sceneCount} variations: different angles, expressions, lighting
+- High-quality portrait photography style`;
+    promptStartRule = `Start each prompt with: "Ultra photorealistic portrait photography, cinematic lighting,"`;
+  } else if (isFantasy) {
+    // خيال إبداعي: حرية كاملة، لا قيود
+    contentTypeGuidance = `CREATIVE FANTASY MODE — NO LIMITS:
+- Bring the imagination to life exactly as described
+- Generate ${sceneCount} cinematic views of the same fantasy concept
+- Different angles, scales, and lighting for maximum visual impact
+- Surrealist photorealism: impossible things look absolutely real`;
+    promptStartRule = `Start each prompt with: "Ultra photorealistic surrealist photography, cinematic render,"`;
+  } else if (isHistorical) {
+    // تاريخي: واقعية تاريخية دقيقة
+    contentTypeGuidance = `HISTORICAL REALISM MODE:
+- Accurate historical details: costumes, weapons, architecture, environment
+- Generate ${sceneCount} cinematic views of the historical scene
+- Epic scale, dramatic lighting, documentary-style realism`;
+    promptStartRule = `Start each prompt with: "Ultra photorealistic historical scene, cinematic photography,"`;
+  } else if (isNature) {
+    // طبيعة: جمال طبيعي حقيقي
+    contentTypeGuidance = `NATURE PHOTOGRAPHY MODE:
+- Breathtaking natural environment, National Geographic quality
+- Generate ${sceneCount} views: wide landscape, medium, close-up details
+- Perfect natural lighting, atmospheric conditions`;
+    promptStartRule = `Start each prompt with: "Ultra photorealistic nature photography, National Geographic quality,"`;
+  } else {
+    // عام: أي شيء يطلبه المستخدم
+    contentTypeGuidance = `UNIVERSAL CREATIVE MODE — NO RESTRICTIONS:
+- Visualize EXACTLY what the user described, with full creative freedom
+- Generate ${sceneCount} cinematic views of the same concept
+- Different angles, lighting, and perspectives for visual richness
+- The only rule: make it look absolutely real and cinematic`;
+    promptStartRule = `Start each prompt with: "Ultra photorealistic cinematic render,"`;
+  }
+
+  const systemPrompt = `You are the world's greatest cinematic director and visual storyteller.
+You can visualize ANYTHING: architecture, people, fantasy, history, nature, science, emotions — with no limits.
 Your work surpasses Hollywood CGI studios in photorealism and artistic vision.
 
 ${SAFE_CONTENT_DIRECTIVE}
 
-FUNDAMENTAL PRINCIPLE: Generate ${sceneCount} views of THE SAME SINGLE ARCHITECTURAL CONCEPT.
-- ONE building / ONE space / ONE concept — seen from ${sceneCount} different angles
-- MULTIPLE camera angles, each with a DIFFERENT lighting mood for cinematic variety
-- NO different buildings or different concepts per scene
-- The viewer should clearly recognize it's the same place from all angles
-- Each scene must feel like a different moment in time (morning, noon, sunset, night...)
-
-${geometricConstraint ? geometricConstraint + "\n" : ""}
+${contentTypeGuidance}
 
 AI ENRICHMENT DIRECTIVE (exceed user expectations):
-- Automatically add: atmospheric haze, volumetric god rays, lens flare, bokeh
-- Add people/life: pedestrians, cyclists, families — for scale and soul
-- Add environmental context: trees, water reflections, urban surroundings
-- Add micro-details: window reflections, material textures, shadow patterns
-- Make every scene feel like an award-winning architectural photograph
-
-For each scene, use EXACTLY this camera angle and lighting mood:
-${selectedAngles.map((a, i) => `Scene ${i + 1}: ${a.camera} | Lighting: ${LIGHTING_MOODS[i % LIGHTING_MOODS.length]}`).join("\n")}
+- Add atmospheric depth: haze, volumetric light, lens effects
+- Add life and context appropriate to the scene
+- Add micro-details that make the scene feel real
+- Each scene should feel like a frame from an award-winning film
 
 Prompt rules:
-1. Start with "Ultra photorealistic cinematic render, award-winning architectural photography,"
-2. Include the SAME building description in EVERY scene (consistency is critical)
-3. Add the specific camera angle and unique lighting for each scene
-4. Include: "8K resolution, ultra-detailed, cinematic color grading, depth of field, volumetric lighting, photorealistic materials, ray-traced reflections"
-5. Add people and life for scale and realism
-6. NEVER change the building's fundamental geometry between scenes
-7. Each prompt should be 80-120 words for maximum quality
+1. ${promptStartRule}
+2. Keep the SAME core concept in EVERY scene (consistency is critical)
+3. Add unique lighting and camera angle for each scene
+4. Include: "8K resolution, ultra-detailed, cinematic color grading, depth of field, volumetric lighting, photorealistic materials"
+5. Each prompt should be 80-120 words for maximum quality
 
 ${previousFeedback ? `User refinement request: ${previousFeedback}` : ""}
 ${documentAnalysis ? `Document context: ${documentAnalysis.mainDescription}` : ""}
 
 Respond ONLY with valid JSON:
 {
-  "title": "poetic project title",
+  "title": "poetic title in the language of the description",
   "unifiedConcept": "single sentence describing the ONE concept being visualized",
   "culturalContext": "cultural/geographic context",
   "detectedLanguage": "ISO 639-1",
-  "scenarioType": "design|develop|deteriorate|compare|imagine",
+  "scenarioType": "design|develop|deteriorate|compare|imagine|transform|fantasy|historical|nature",
   "mainElements": ["el1", "el2", "el3"],
   "atmosphere": "overall atmosphere",
   "cinematicStyle": "cinematic style",
   "musicMood": "ambient|dramatic|peaceful|epic|mysterious|joyful",
   "scenes": [
-    ${selectedAngles.map((a, i) => `{"type": "${a.type}", "label": "${a.label_ar}", "prompt": "Ultra photorealistic cinematic render...", "arabicCaption": "short poetic Arabic phrase", "lightingMood": "${LIGHTING_MOODS[i % LIGHTING_MOODS.length].split(",")[0]}"}`).join(",\n    ")}
+    ${selectedAngles.map((a, i) => `{"type": "${a.type}", "label": "caption in the language of the description", "prompt": "Ultra photorealistic cinematic render...", "arabicCaption": "short poetic phrase in the language of the description", "lightingMood": "${LIGHTING_MOODS[i % LIGHTING_MOODS.length].split(",")[0]}"}`).join(",\n    ")}
   ]
 }`;
 
