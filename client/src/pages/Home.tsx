@@ -497,14 +497,36 @@ export default function Home() {
       return;
     }
 
-    // كشف سريع بالكلمات المفتاحية
+    // كشف سريع بالكلمات المفتاحية — محسّن لتمييز صورة واحدة vs صور متعددة vs فيديو
     const quickDetect = (text: string): { type: DetectedIntentType; outputMode: "images" | "fast" | "pro" | "immersive"; label: string } => {
       const arabic = text;
+      const lower = text.toLowerCase();
 
       // وضع "أنا هناك" — الغمر الكامل
       const immersiveKw = ["أنا في ", "أنا داخل", "أنا بداخل", "أتخيل نفسي", "تخيل نفسي", "لو كنت", "داخل ", "بداخل ", "من داخل", "كأنني في", "i am inside", "imagine myself", "if i were"];
-      if (immersiveKw.some(k => arabic.toLowerCase().includes(k.toLowerCase())))
+      if (immersiveKw.some(k => lower.includes(k.toLowerCase())))
         return { type: "image", outputMode: "immersive", label: activeLang === "AR" ? "🌍 أنا هناك — جولة 360°" : "🌍 I'm There — 360° Tour" };
+
+      // كشف تحويل الهوية الشخصية (image-to-image)
+      const personalTransformPatterns = [
+        /تخيلني|تخيل لي|تخيل نفسي/,
+        /حوّلني|حولني|اجعلني/,
+        /كيف أكون|سأكون|أبدو|سأبدو/,
+        /لو كنت (شاب|طفل|صغير|كبير|رياضي|فنان|ملك)/,
+        /بعد \d+ سن/,
+        /imagine me|transform me|make me look/i,
+      ];
+      if (personalTransformPatterns.some(p => p.test(arabic)))
+        return { type: "image", outputMode: "images", label: activeLang === "AR" ? "🪄 تحويل شخصي" : "🪄 Personal Transform" };
+
+      // كشف السيناريو
+      const scriptKw = ["سيناريو", "script", "اكتب سيناريو", "بدون إنتاج", "فقط الكتابة"];
+      if (scriptKw.some(k => lower.includes(k.toLowerCase())))
+        return { type: "script", outputMode: "fast", label: activeLang === "AR" ? "📄 سيناريو" : "📄 Script" };
+
+      // كشف طلب فيديو صريح
+      const videoKw = ["فيديو", "فلم", "فيلم", "مقطع", "video", "movie", "film", "أنتج", "اصنع فيديو", "اعمل فيديو", "مشاهد متعددة", "تصوير"];
+      const hasVideoKw = videoKw.some(k => lower.includes(k.toLowerCase()));
 
       // كشف التسلسل الزمني والقصة المتطورة → فيديو
       const sequencePatterns = [
@@ -518,42 +540,32 @@ export default function Home() {
         /وبعدين|وبعد ذلك|ثم بعد/,
         /time.?lapse|timelapse/i,
         /before.{0,10}after|قبل.{0,10}بعد/i,
+        /أحلق في السماء|أطير|رحلة في/,
+        /journey|fly over|soar|travel through/i,
       ];
       const hasSequence = sequencePatterns.some(p => p.test(arabic));
 
-      // كشف تحويل الهوية الشخصية (image-to-image)
-      const personalTransformPatterns = [
-        /تخيلني|تخيل\s*لي|تخيل\s*نفسي/,
-        /حوّلني|حولني|اجعلني/,
-        /كيف\s*(أكون|سأكون|أبدو|سأبدو)/,
-        /لو\s*كنت\s*(شاب|طفل|صغير|كبير|رياضي|فنان|ملك)/,
-        /بعد\s*\d+\s*سن/,
-        /imagine me|transform me|make me look/i,
-      ];
-      if (personalTransformPatterns.some(p => p.test(arabic)))
-        return { type: "image", outputMode: "images", label: activeLang === "AR" ? "🪄 تحويل شخصي" : "🪄 Personal Transform" };
-
-      const videoKw = ["فيديو", "فلم", "فيلم", "مقطع", "video", "movie", "film", "أنتج", "اصنع فيديو", "اعمل فيديو", "مشاهد متعددة", "تصوير"];
-      const hasVideoKw = videoKw.some(k => arabic.includes(k));
-      const isProKw = ["مشروع", "معماري", "وثائقي", "تسويقي", "تعليمي", "علمي", "تاريخي", "documentary", "marketing", "educational", "من الصفر", "دورة حياة", "مراحل البناء"].some(k => arabic.includes(k));
+      const isProKw = ["مشروع", "معماري", "وثائقي", "تسويقي", "تعليمي", "علمي", "تاريخي", "documentary", "marketing", "educational", "من الصفر", "دورة حياة", "مراحل البناء"].some(k => lower.includes(k.toLowerCase()));
 
       if (hasVideoKw || hasSequence) {
         const isPro = isProKw || hasSequence;
         return { type: "video", outputMode: isPro ? "pro" : "fast", label: activeLang === "AR" ? (isPro ? "✨ فيديو احترافي" : "⚡ فيديو سريع") : (isPro ? "✨ Pro Video" : "⚡ Fast Video") };
       }
 
-      const scriptKw = ["سيناريو", "script", "اكتب", "بدون إنتاج", "فقط الكتابة"];
-      if (scriptKw.some(k => arabic.includes(k)))
-        return { type: "script", outputMode: "fast", label: activeLang === "AR" ? "📄 سيناريو" : "📄 Script" };
-
-      const imageKw = ["صورة", "صوّر", "ارسم", "image", "picture", "draw", "مشهد", "منظر", "لوحة", "تصميم", "تخيل", "تخيّل"];
-      if (imageKw.some(k => arabic.includes(k)))
+      // كشف طلب صورة صريح
+      const singleImageKw = ["صورة", "image", "picture", "draw", "ارسم", "لوحة", "تصميم"];
+      if (singleImageKw.some(k => lower.includes(k.toLowerCase())))
         return { type: "image", outputMode: "images", label: activeLang === "AR" ? "🎨 صورة سينمائية" : "🎨 Cinematic Image" };
 
-      // افتراضي: أي وصف = إنتاج فوري
-      if (text.length > 30) return { type: "video", outputMode: isProKw ? "pro" : "fast", label: activeLang === "AR" ? "🎬 فيديو سينمائي" : "🎬 Cinematic Video" };
+      // كشف طلب مشهد / منظر / تخيل → صور متعددة
+      const multiImageKw = ["مشهد", "منظر", "تخيل", "تخيّل", "صوّر", "scene", "visualize", "imagine", "envision"];
+      if (multiImageKw.some(k => lower.includes(k.toLowerCase())))
+        return { type: "image", outputMode: "images", label: activeLang === "AR" ? "🎨 مشاهد سينمائية" : "🎨 Cinematic Scenes" };
 
-      // وصف قصير = صورة
+      // افتراضي ذكي: وصف طويل (> 40 حرف) = فيديو سريع، وصف قصير = صورة
+      if (text.length > 40) return { type: "video", outputMode: isProKw ? "pro" : "fast", label: activeLang === "AR" ? "🎬 فيديو سينمائي" : "🎬 Cinematic Video" };
+
+      // وصف قصير = صورة سينمائية
       return { type: "image", outputMode: "images", label: activeLang === "AR" ? "🎨 صورة سينمائية" : "🎨 Cinematic Image" };
     };
 
@@ -1164,70 +1176,63 @@ export default function Home() {
                   autoFocus
                 />
               </div>
-            )}            {/* ـــ شريط التحكّم: أزرار يدوية + chip الكشف التلقائي ـــ */}
+            )}            {/* ـــ شريط ذكي: chip الكشف التلقائي + سريع/احترافي عند الفيديو فقط ـــ */}
             <div className="flex items-center gap-2 px-4 pt-2 pb-0 flex-wrap">
-              {/* أزرار التحكّم اليدوي */}
-              {([
-                { mode: "images" as const, icon: "🎨", ar: "صور", en: "Images" },
-                { mode: "fast" as const, icon: "⚡", ar: "سريع", en: "Fast" },
-                { mode: "pro" as const, icon: "✨", ar: "احترافي", en: "Pro" },
-                { mode: "immersive" as const, icon: "🌍", ar: "أنا هناك", en: "I'm There" },
-              ] as const).map(({ mode, icon, ar, en }) => {
-                const isActive = outputMode === mode;
-                const colors = {
-                  images: { bg: "rgba(52,211,153,0.15)", border: "rgba(52,211,153,0.5)", color: "#34d399", bgInactive: "rgba(52,211,153,0.05)", borderInactive: "rgba(52,211,153,0.15)" },
-                  fast: { bg: "rgba(96,165,250,0.15)", border: "rgba(96,165,250,0.5)", color: "#60a5fa", bgInactive: "rgba(96,165,250,0.05)", borderInactive: "rgba(96,165,250,0.15)" },
-                  pro: { bg: "rgba(167,139,250,0.15)", border: "rgba(167,139,250,0.5)", color: "#a78bfa", bgInactive: "rgba(167,139,250,0.05)", borderInactive: "rgba(167,139,250,0.15)" },
-                  immersive: { bg: "rgba(255,170,68,0.15)", border: "rgba(255,170,68,0.5)", color: "#ffaa44", bgInactive: "rgba(255,170,68,0.05)", borderInactive: "rgba(255,170,68,0.15)" },
-                }[mode];
-                return (
-                  <button
-                    key={mode}
-                    onClick={() => {
-                      if (manualMode === mode) {
-                        // إلغاء التحكّم اليدوي → عودة للكشف التلقائي
-                        setManualMode(null);
-                      } else {
-                        setManualMode(mode);
-                        setOutputMode(mode);
-                        setIntentLabel(getModeLabel(mode));
-                      }
-                    }}
-                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95"
-                    style={{
-                      background: isActive ? colors.bg : colors.bgInactive,
-                      border: `1px solid ${isActive ? colors.border : colors.borderInactive}`,
-                      color: isActive ? colors.color : "rgba(255,255,255,0.35)",
-                      fontFamily: "'Tajawal', sans-serif",
-                      boxShadow: isActive ? `0 0 8px ${colors.border}` : "none",
-                    }}
-                    title={activeLang === "AR" ? `تحديد وضع ${ar} يدوياً` : `Force ${en} mode`}
-                  >
-                    <span>{icon}</span>
-                    <span>{activeLang === "AR" ? ar : en}</span>
-                    {manualMode === mode && (
-                      <span style={{ opacity: 0.7, fontSize: 9 }}>✓</span>
-                    )}
-                  </button>
-                );
-              })}
 
-              {/* chip الكشف التلقائي */}
-              {intentLabel && !manualMode && (
+              {/* chip الكشف التلقائي — يظهر دائماً عند وجود محتوى */}
+              {hasContent && (detectedIntent || isThinking) && (
                 <div
                   className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold transition-all"
                   style={{
-                    background: outputMode === "immersive" ? "rgba(255,170,68,0.08)" : outputMode === "pro" ? "rgba(167,139,250,0.08)" : outputMode === "images" ? "rgba(52,211,153,0.08)" : "rgba(96,165,250,0.08)",
-                    color: outputMode === "immersive" ? "rgba(255,170,68,0.6)" : outputMode === "pro" ? "rgba(167,139,250,0.6)" : outputMode === "images" ? "rgba(52,211,153,0.6)" : "rgba(96,165,250,0.6)",
-                    border: `1px solid ${outputMode === "immersive" ? "rgba(255,170,68,0.15)" : outputMode === "pro" ? "rgba(167,139,250,0.15)" : outputMode === "images" ? "rgba(52,211,153,0.15)" : "rgba(96,165,250,0.15)"}`,
+                    background: outputMode === "immersive" ? "rgba(255,170,68,0.1)" : outputMode === "pro" ? "rgba(167,139,250,0.1)" : outputMode === "images" ? "rgba(52,211,153,0.1)" : "rgba(96,165,250,0.1)",
+                    color: outputMode === "immersive" ? "#ffaa44" : outputMode === "pro" ? "#a78bfa" : outputMode === "images" ? "#34d399" : "#60a5fa",
+                    border: `1px solid ${outputMode === "immersive" ? "rgba(255,170,68,0.25)" : outputMode === "pro" ? "rgba(167,139,250,0.25)" : outputMode === "images" ? "rgba(52,211,153,0.25)" : "rgba(96,165,250,0.25)"}`,
                     fontFamily: "'Tajawal', sans-serif",
+                    animation: "fadeIn 0.3s ease",
                   }}
                 >
                   {isThinking ? (
-                    <span style={{ opacity: 0.5 }}>{activeLang === "AR" ? "⚡ تحليل..." : "⚡ Analyzing..."}</span>
+                    <>
+                      <div className="w-2 h-2 border border-current/40 border-t-current rounded-full animate-spin" />
+                      <span>{activeLang === "AR" ? "يحلل..." : "Analyzing..."}</span>
+                    </>
                   ) : (
-                    <span style={{ opacity: 0.6 }}>{activeLang === "AR" ? "ذكاء: " : "AI: "}{intentLabel}</span>
+                    <span>{intentLabel}</span>
                   )}
+                </div>
+              )}
+
+              {/* خياران للفيديو فقط — يظهران عند كشف فيديو */}
+              {hasContent && (detectedIntent === "video" || outputMode === "fast" || outputMode === "pro") && !isThinking && (
+                <div className="flex items-center gap-1.5" style={{ animation: "fadeIn 0.3s ease" }}>
+                  <button
+                    onClick={() => { setManualMode("fast"); setOutputMode("fast"); setIntentLabel(activeLang === "AR" ? "⚡ فيديو سريع" : "⚡ Fast Video"); }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                    style={{
+                      background: outputMode === "fast" ? "rgba(96,165,250,0.18)" : "rgba(96,165,250,0.05)",
+                      border: `1px solid ${outputMode === "fast" ? "rgba(96,165,250,0.5)" : "rgba(96,165,250,0.15)"}`,
+                      color: outputMode === "fast" ? "#60a5fa" : "rgba(96,165,250,0.45)",
+                      fontFamily: "'Tajawal', sans-serif",
+                      boxShadow: outputMode === "fast" ? "0 0 8px rgba(96,165,250,0.25)" : "none",
+                    }}
+                  >
+                    <span>⚡</span>
+                    <span>{activeLang === "AR" ? "سريع" : "Fast"}</span>
+                  </button>
+                  <button
+                    onClick={() => { setManualMode("pro"); setOutputMode("pro"); setIntentLabel(activeLang === "AR" ? "✨ فيديو احترافي" : "✨ Pro Video"); }}
+                    className="flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold transition-all hover:scale-105 active:scale-95"
+                    style={{
+                      background: outputMode === "pro" ? "rgba(167,139,250,0.18)" : "rgba(167,139,250,0.05)",
+                      border: `1px solid ${outputMode === "pro" ? "rgba(167,139,250,0.5)" : "rgba(167,139,250,0.15)"}`,
+                      color: outputMode === "pro" ? "#a78bfa" : "rgba(167,139,250,0.45)",
+                      fontFamily: "'Tajawal', sans-serif",
+                      boxShadow: outputMode === "pro" ? "0 0 8px rgba(167,139,250,0.25)" : "none",
+                    }}
+                  >
+                    <span>✨</span>
+                    <span>{activeLang === "AR" ? "احترافي" : "Pro"}</span>
+                  </button>
                 </div>
               )}
             </div>
@@ -1352,7 +1357,7 @@ export default function Home() {
                 <input ref={docInputRef} type="file" accept=".pdf,.doc,.docx,.txt,image/*" onChange={handleDocUpload} className="hidden" />
               </div>
 
-              {/* Right: generate button */}
+              {/* Right: generate button — يتكيف مع نوع الإخراج تلقائياً */}
               <button
                 onClick={handleGenerate}
                 disabled={isGenerating || isGeneratingScript || isGeneratingImmersive || !hasContent}
@@ -1363,13 +1368,16 @@ export default function Home() {
                     ? "rgba(139,92,246,0.3)"
                     : outputMode === "immersive"
                     ? "linear-gradient(135deg, #b45309 0%, #f59e0b 50%, #fbbf24 100%)"
-                    : detectedIntent === "video"
+                    : (outputMode === "fast" || outputMode === "pro" || detectedIntent === "video")
                     ? "linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 100%)"
                     : detectedIntent === "script"
                     ? "linear-gradient(135deg, #065f46 0%, #10b981 100%)"
                     : "linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #0ea5e9 100%)",
                   color: "white",
-                  boxShadow: (isGenerating || isGeneratingScript || isGeneratingImmersive) ? "none" : outputMode === "immersive" ? "0 0 20px rgba(251,191,36,0.4)" : "0 0 20px rgba(124,58,237,0.4)",
+                  boxShadow: (isGenerating || isGeneratingScript || isGeneratingImmersive) ? "none"
+                    : outputMode === "immersive" ? "0 0 20px rgba(251,191,36,0.4)"
+                    : (outputMode === "fast" || outputMode === "pro" || detectedIntent === "video") ? "0 0 20px rgba(14,165,233,0.35)"
+                    : "0 0 20px rgba(124,58,237,0.4)",
                   minWidth: 110,
                 }}
               >
@@ -1385,8 +1393,12 @@ export default function Home() {
                   </>
                 ) : outputMode === "immersive" ? (
                   <span>🌍 {activeLang === "AR" ? "انقلني هناك" : "Take Me There"}</span>
+                ) : (outputMode === "fast" || outputMode === "pro" || detectedIntent === "video") ? (
+                  <span>🎬 {activeLang === "AR" ? "أنتج" : "Produce"}</span>
+                ) : detectedIntent === "script" ? (
+                  <span>📄 {activeLang === "AR" ? "اكتب" : "Write"}</span>
                 ) : (
-                  <span>{lang.btn}</span>
+                  <span>🎨 {activeLang === "AR" ? "صوّر" : "Generate"}</span>
                 )}
               </button>
             </div>
