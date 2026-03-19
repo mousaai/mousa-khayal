@@ -580,8 +580,22 @@ export class VideoProducer {
     let completed = 0;
     onProgress?.(`تحريك ${total} مشاهد بالتوازي... (0/${total})`, 40);
 
+    // تحقق سريع: إذا Runway غير متاح، تخطَّ مباشرة لـ Ken Burns
+    if (!this.runway.isAvailable()) {
+      console.log(`[Runway★] غير متاح — Ken Burns مباشرة لـ ${total} مشهد`);
+      onProgress?.(`Ken Burns (Runway غير متاح)`, 65);
+      return new Array(total).fill(null);
+    }
+
     const results = await Promise.allSettled(
       imagePaths.map(async (imgPath, i) => {
+        // تحقق من isAvailable قبل كل مشهد (قد يصبح غير متاح بعد 429)
+        if (!this.runway.isAvailable()) {
+          completed++;
+          onProgress?.(`Ken Burns مشهد ${i + 1} (${completed}/${total})`, Math.round(40 + (completed / total) * 25));
+          return null;
+        }
+
         // قراءة الصورة وتحويلها إلى base64 data URI مباشرة (بدون رفع إلى S3)
         const imgBuffer = await fs.readFile(imgPath);
 
@@ -1444,7 +1458,9 @@ export async function generateVideoScript(
   ]
 }`;
 
-  const response = await invokeLLM({
+  let response: any;
+  try {
+    response = await invokeLLM({
     messages: [
       { role: "system", content: systemPrompt },
       {
@@ -1500,4 +1516,30 @@ export async function generateVideoScript(
     characterDescription,
     referenceImageUrl,
   } as VideoScript;
+  } catch (llmErr: any) {
+    // فشل LLM (usage exhausted, 412, network) → استخدام سيناريو جاهز فوراً
+    console.warn(`[generateVideoScript] LLM فشل: ${llmErr.message} — استخدام سيناريو جاهز`);
+    const { findBestScript, prebuiltToVideoScript } = await import("./prebuiltScripts");
+    const prebuilt = findBestScript(userInput);
+    const fallbackScript = prebuiltToVideoScript(prebuilt, userInput.slice(0, 60));
+    return {
+      ...fallbackScript,
+      filmGenre,
+      characterDescription,
+      referenceImageUrl,
+      language: language as "ar" | "en",
+      voice: voice as any,
+      musicMood: "inspiring" as any,
+      narration: fallbackScript.scenes?.map((s: any) => s.narration).join(" ") ?? "",
+      scenes: (fallbackScript.scenes ?? []).map((s: any, i: number) => ({
+        imagePrompt: s.imagePrompt,
+        subtitle: s.title ?? `مشهد ${i + 1}`,
+        narration: s.narration,
+        duration: s.duration ?? 6,
+        zoom: s.motion ?? "zoom_in",
+        transition: s.transition ?? "fade",
+        sceneType: "b_roll",
+      })),
+    } as VideoScript;
+  }
 }

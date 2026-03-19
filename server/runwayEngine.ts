@@ -261,6 +261,10 @@ export class RunwayEngine {
       if (!createResponse.ok) {
         const errorText = await createResponse.text();
         console.warn(`[Runway] Create task failed (${createResponse.status}): ${errorText}`);
+        // تسجيل 429 لتجنب رفع الصور في المرات القادمة
+        if (createResponse.status === 429) {
+          this.markDailyLimitReached();
+        }
         return null;
       }
 

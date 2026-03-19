@@ -1799,10 +1799,10 @@ export default function Home() {
                       {videoJob.progress}%
                       {videoJob.progress > 5 && videoJob.progress < 95 && (
                         <span className="mr-2" style={{ color: "rgba(148,163,184,0.5)" }}>
-                          {videoJob.progress < 40 ? "≈ 3-5 دقائق" :
-                           videoJob.progress < 65 ? "≈ 2-4 دقائق (Runway)" :
-                           videoJob.progress < 80 ? "≈ 1-2 دقيقة" :
-                           "≈ أقل من دقيقة"}
+                          {videoJob.progress < 40 ? "≈ 2-3 دقائق (توليد صور)" :
+                           videoJob.progress < 65 ? "≈ 1-2 دقيقة (تحريك مشاهد)" :
+                           videoJob.progress < 80 ? "≈ دقيقة (دمج + صوت)" :
+                           "≈ ثواني (رفع الفيديو)"}
                         </span>
                       )}
                     </p>
