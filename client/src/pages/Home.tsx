@@ -306,6 +306,7 @@ export default function Home() {
 
   const autonomousProduceMutation = trpc.video.autonomousProduce.useMutation();
   const surpriseProduceMutation = trpc.video.surpriseProduce.useMutation();
+  const retryJobMutation = trpc.video.retryJob.useMutation();
   const memoryStatusQuery = trpc.video.getMemoryStatus.useQuery(undefined, {
     staleTime: 60_000, // تحديث كل دقيقة
   });
@@ -1830,32 +1831,45 @@ export default function Home() {
                       )}
                     </div>
                   )}
-                  {/* معلومات الطابور */}
+                  {/* معلومات الطابور + مؤشر الطاقة الحية */}
                   {(() => {
                     const qPos = (jobStatusQuery.data as any)?.queuePosition ?? 0;
                     const qWait = (jobStatusQuery.data as any)?.estimatedWaitSeconds ?? 0;
                     const qStats = (jobStatusQuery.data as any)?.queueStats;
-                    if (qPos > 0) {
-                      return (
-                        <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-                          <p className="text-xs" style={{ color: "#fbbf24", fontFamily: "'Tajawal', sans-serif" }}>
-                            أنت رقم <strong>{qPos}</strong> في الطابور — وقت متوقع: <strong>{qWait > 60 ? `${Math.ceil(qWait/60)} دقيقة` : `${qWait} ثانية`}</strong>
-                          </p>
-                        </div>
-                      );
-                    }
-                    if (qStats && qStats.queued > 0) {
-                      return (
-                        <div className="mt-1 flex items-center gap-1.5">
-                          <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
-                          <p className="text-xs" style={{ color: "rgba(52,211,153,0.7)", fontFamily: "'Tajawal', sans-serif" }}>
-                            يعمل الآن — {qStats.running}/{qStats.maxConcurrent} مهمة نشطة
-                          </p>
-                        </div>
-                      );
-                    }
-                    return null;
+                    const utilPct = qStats?.utilizationPercent ?? 0;
+                    const sysLoad = qStats?.systemLoadPercent ?? 0;
+                    const memMB = qStats?.availableMemoryMB ?? 0;
+                    const running = qStats?.running ?? 0;
+                    const effective = qStats?.effectiveConcurrent ?? 50;
+                    // لون مؤشر الطاقة بناءً على الحمل
+                    const loadColor = utilPct > 80 ? '#f87171' : utilPct > 50 ? '#fbbf24' : '#34d399';
+                    const loadLabel = utilPct > 80 ? 'مرتفع' : utilPct > 50 ? 'متوسط' : 'منخفض';
+                    return (
+                      <div className="mt-2 space-y-1.5">
+                        {/* مؤشر الطاقة الحية */}
+                        {qStats && (
+                          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                            <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: loadColor }} />
+                            <span className="text-xs" style={{ color: 'rgba(255,255,255,0.5)', fontFamily: "'Tajawal', sans-serif" }}>
+                              طاقة الخادم: <span style={{ color: loadColor }}>{loadLabel}</span>
+                              {' · '}{running}/{effective} مهمة نشطة
+                              {sysLoad > 0 && ` · CPU ${sysLoad}%`}
+                              {memMB > 0 && ` · RAM ${memMB}MB`}
+                            </span>
+                          </div>
+                        )}
+                        {/* موقع في الطابور */}
+                        {qPos > 0 && (
+                          <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg" style={{ background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                            <span className="text-xs" style={{ color: '#fbbf24', fontFamily: "'Tajawal', sans-serif" }}>
+                              أنت رقم <strong>{qPos}</strong> في الطابور
+                              {qWait > 0 && ` — انتظار: ${qWait > 60 ? `${Math.ceil(qWait/60)} دقيقة` : `${qWait} ثانية`}`}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    );
                   })()}
                 </>
               )}

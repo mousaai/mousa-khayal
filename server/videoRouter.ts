@@ -1000,4 +1000,35 @@ Be specific and objective. Use English for the description as it works best with
       preferredVoice: memory.preferredVoice,
     };
   }),
+
+  // ──────────────────────────────────────────────────────────
+  // retryJob — يُعيد ضبط retryCount ويُعيد الإنتاج من البداية
+  // ──────────────────────────────────────────────────────────
+  retryJob: publicProcedure
+    .input(z.object({ jobId: z.string() }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('DB unavailable');
+      const rows = await db.select().from(videoJobsTable).where(eq(videoJobsTable.id, input.jobId)).limit(1);
+      const job = rows[0];
+      if (!job) throw new Error('Job not found');
+      if (job.status !== 'failed') throw new Error('Job is not in failed state');
+      if (!job.scriptData) throw new Error('No script data to retry with');
+
+      // إعادة ضبط المحاولات والحالة
+      await updateJobInDB(input.jobId, {
+        status: 'pending',
+        progress: 0,
+        currentStep: 'إعادة المحاولة...',
+        retryCount: 0,
+        lastHeartbeat: new Date(),
+      });
+
+      // إعادة الإنتاج في الخلفية
+      setTimeout(() => {
+        runProductionJob(input.jobId, job.scriptData as any, job.optionsData as any);
+      }, 500);
+
+      return { success: true, jobId: input.jobId };
+    }),
 });

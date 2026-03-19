@@ -959,9 +959,10 @@ export class VideoProducer {
       // MOTION_EFFECTS تتضمن scale+format+crop بشكل كامل
       const fullFilter = motionFn(duration, dims.width, dims.height, CONFIG.fps);
 
-      const preset = quality === "pro" ? "medium" : "ultrafast";
-      const crf = quality === "pro" ? 18 : 23;
-      console.log(`[buildSceneVideo] imgPath=${imgPath} dims=${dims.width}x${dims.height} motion=${motion} quality=${quality}`);
+      // threads = 2 per job (6 cores / 3 concurrent jobs = 2 threads/job)
+      const threads = Math.max(1, Math.floor(os.cpus().length / 3));
+      const preset = quality === "pro" ? "fast" : "superfast";
+      const crf = quality === "pro" ? 20 : 26;
 
       ffmpeg()
         .input(imgPath)
@@ -970,7 +971,7 @@ export class VideoProducer {
         .duration(duration)
         .fps(CONFIG.fps)
         .videoCodec("libx264")
-        .outputOptions([`-preset ${preset}`, `-crf ${crf}`, "-pix_fmt yuv420p", "-threads 0"])
+        .outputOptions([`-preset ${preset}`, `-crf ${crf}`, "-pix_fmt yuv420p", `-threads ${threads}`, "-tune fastdecode"])
         .output(outputPath)
         .on("end", () => resolve())
         .on("error", (err: Error) => {
@@ -1117,13 +1118,14 @@ export class VideoProducer {
     return new Promise((resolve, reject) => {
       const finalPath = path.join(this.workDir, "with_audio.mp4");
 
+      const threads = Math.max(1, Math.floor(os.cpus().length / 3));
       ffmpeg()
         .input(mergedPath)
         .input(audioPath)
         .videoCodec("copy")
         .audioCodec("aac")
-        .audioBitrate("192k")
-        .outputOptions(["-shortest"])
+        .audioBitrate("128k")
+        .outputOptions(["-shortest", `-threads ${threads}`])
         .output(finalPath)
         .on("end", () => resolve(finalPath))
         .on("error", (err: Error) => reject(err))

@@ -96,33 +96,34 @@ async function startServer() {
 
   // ══ Compression: تقليل حجم الردود بـ 70-80% ════════════════════════════════════════════════
   app.use(compression({ level: 6, threshold: 1024 }));
-  // ══ Rate Limiting متعدد الطبقات ════════════════════════════════════════════════════════════════════════════════════════
-  // حد عام: 200 طلب/دقيقة (يمنع DDoS)
+  // ══ Rate Limiting متعدد الطبقات — محسّن لـ 500 مستخدم ════════════════════════════════
+  // حد عام: 500 طلب/دقيقة (يستوعب 500 مستخدم × polling كل 2 ثانية)
   const globalLimiter = rateLimit({
     windowMs: 60_000,
-    max: 200,
+    max: 500,
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => ipKeyGenerator(req.ip ?? req.socket?.remoteAddress ?? 'unknown'),
     validate: { xForwardedForHeader: false },
     message: { error: 'طلبات كثيرة جداً — حاول مرة أخرى بعد دقيقة' },
-    skip: (req) => req.path.startsWith('/api/oauth'),
+    skip: (req) => req.path.startsWith('/api/oauth') || req.path.startsWith('/api/sse'),
   });
   app.use(globalLimiter);
 
-  // حد مخصص: 5 طلبات إنتاج/دقيقة على endpoints الثقيلة
+  // حد مخصص: 10 طلبات إنتاج/دقيقة (رُفع من 5 → 10 لاستيعاب المستخدمين)
   const productionLimiter = rateLimit({
     windowMs: 60_000,
-    max: 5,
+    max: 10,
     standardHeaders: true,
     legacyHeaders: false,
     keyGenerator: (req) => ipKeyGenerator(req.ip ?? req.socket?.remoteAddress ?? 'unknown'),
     validate: { xForwardedForHeader: false },
-    message: { error: 'تجاوزت الحد المسموح (5 طلبات إنتاج/دقيقة). حاول بعد قليل' },
+    message: { error: 'تجاوزت الحد المسموح (10 طلبات إنتاج/دقيقة). حاول بعد قليل' },
   });
   app.use('/api/trpc/video.startProduction', productionLimiter);
   app.use('/api/trpc/video.quickProduce', productionLimiter);
   app.use('/api/trpc/video.autonomousProduce', productionLimiter);
+  app.use('/api/trpc/video.surpriseProduce', productionLimiter);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
