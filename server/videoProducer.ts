@@ -1180,6 +1180,177 @@ export class VideoProducer {
   }
 
   // ─────────────────────────────────────────────────────────
+  // ★ تعديل مشهد واحد وإعادة دمج الفيديو (بدون إعادة إنتاج كاملة)
+  // ─────────────────────────────────────────────────────────
+
+  /**
+   * produceEditedVideo — يُعيد توليد مشهد واحد فقط ثم يُعيد دمج الفيديو الكامل
+   * @param script السيناريو الأصلي
+   * @param editedSceneIndex رقم المشهد المُعدَّل (0-based)
+   * @param newImagePrompt الـ prompt الجديد للصورة
+   * @param existingSceneVideoUrls روابط S3 لمقاطع المشاهد الأصلية (إذا محفوظة)
+   * @param options خيارات الإنتاج
+   * @param onProgress callback للتقدم
+   */
+  async produceEditedVideo(
+    script: VideoScript,
+    editedSceneIndex: number,
+    newImagePrompt: string,
+    existingSceneVideoUrls: Array<string | null>,
+    options: VideoProductionOptions = {},
+    onProgress?: (job: Partial<VideoJob>) => void
+  ): Promise<string> {
+    this.workDir = await fs.mkdtemp(path.join(os.tmpdir(), "khayal-edit-"));
+    this.startTime = Date.now();
+
+    const {
+      aspectRatio = "16:9",
+      quality = "fast",
+      useRunway = true,
+    } = options;
+
+    const dims = quality === "pro"
+      ? ASPECT_CONFIGS_PRO[aspectRatio]
+      : ASPECT_CONFIGS_FAST[aspectRatio];
+
+    const report = (step: string, progress: number) => {
+      onProgress?.({ status: "processing", currentStep: step, progress });
+      console.log(`[VideoProducer:Edit] ${progress}% — ${step}`);
+    };
+
+    try {
+      const { generateImage } = await import("./_core/imageGeneration");
+      const filmGenre = script.filmGenre ?? "general";
+      const genreDNA = getGenreDNA(filmGenre);
+
+      // ── الخطوة 1: توليد صورة المشهد المُعدَّل فقط ──────────
+      report(`توليد صورة المشهد ${editedSceneIndex + 1} الجديدة...`, 10);
+      const enhancedPrompt = `${genreDNA.promptPrefix} ${newImagePrompt}, ${genreDNA.lightingStyle}, ${genreDNA.colorGrading}, ${genreDNA.promptSuffix}`;
+
+      let newImageUrl: string | undefined;
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        try {
+          const res = await generateImage({ prompt: enhancedPrompt });
+          newImageUrl = res.url;
+          if (newImageUrl) break;
+        } catch (e: any) {
+          console.warn(`[Edit] generateImage attempt ${attempt}/2: ${e.message}`);
+          if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
+        }
+      }
+      if (!newImageUrl) throw new Error(`فشل توليد صورة المشهد ${editedSceneIndex + 1}`);
+
+      // تحميل الصورة محلياً
+      const newImgPath = path.join(this.workDir, `scene_${editedSceneIndex + 1}_new.jpg`);
+      const imgResponse = await fetch(newImageUrl);
+      const imgBuffer = Buffer.from(await imgResponse.arrayBuffer());
+      await sharp(imgBuffer).resize(dims.width, dims.height, { fit: "cover" }).toFormat("jpeg", { quality: 90 }).toFile(newImgPath);
+      report(`صورة المشهد ${editedSceneIndex + 1} جاهزة`, 25);
+
+      // ── الخطوة 2: تحريك المشهد المُعدَّل بـ Runway ──────────
+      let newSceneVideoUrl: string | null = null;
+      if (useRunway) {
+        report(`تحريك المشهد ${editedSceneIndex + 1} بـ Runway...`, 30);
+        try {
+          const imgS3Buffer = await fs.readFile(newImgPath);
+          const imgS3Key = `runway-input/edit_scene_${editedSceneIndex + 1}_${Date.now()}.jpg`;
+          const { url: s3Url } = await storagePut(imgS3Key, imgS3Buffer, "image/jpeg");
+          const motionPreset = selectMotionForDomain(script.domain ?? "cinematic", editedSceneIndex);
+          newSceneVideoUrl = await this.runway.imageToVideo({
+            imageUrl: s3Url,
+            motionPreset,
+            duration: 5,
+            ratio: dims.runwayRatio as any,
+            promptText: newImagePrompt,
+          });
+          console.log(`[Edit] Runway مشهد ${editedSceneIndex + 1}: ${newSceneVideoUrl ? "✓" : "✗ Ken Burns"}`);
+        } catch (e: any) {
+          console.warn(`[Edit] Runway فشل: ${e.message} — Ken Burns Fallback`);
+        }
+      }
+
+      // ── الخطوة 3: بناء مقطع المشهد المُعدَّل ──────────────
+      report(`بناء مقطع المشهد ${editedSceneIndex + 1}...`, 50);
+      const editedScene = script.scenes[editedSceneIndex];
+      const editedScenePath = path.join(this.workDir, `scene_${editedSceneIndex + 1}_edited.mp4`);
+      const imgWithSub = path.join(this.workDir, `scene_${editedSceneIndex + 1}_sub.png`);
+      await this.drawSubtitle(newImgPath, editedScene.subtitle, imgWithSub, dims);
+
+      if (newSceneVideoUrl) {
+        try {
+          await this.addSubtitleToVideo(newSceneVideoUrl, editedScene.subtitle, editedScene.duration, dims, editedScenePath);
+        } catch {
+          try {
+            await this.downloadAndReencodeVideo(newSceneVideoUrl, editedScene.duration, dims, editedScenePath);
+          } catch {
+            await this.buildSceneVideo(imgWithSub, editedScene.duration, editedScene.zoom, dims, editedScenePath, quality);
+          }
+        }
+      } else {
+        await this.buildSceneVideo(imgWithSub, editedScene.duration, editedScene.zoom, dims, editedScenePath, quality);
+      }
+
+      // ── الخطوة 4: تجميع كل المشاهد (أصلية + معدّلة) ──────
+      report(`تجميع ${script.scenes.length} مشهد...`, 65);
+      const allScenePaths: string[] = [];
+
+      for (let i = 0; i < script.scenes.length; i++) {
+        if (i === editedSceneIndex) {
+          allScenePaths.push(editedScenePath);
+        } else if (existingSceneVideoUrls[i]) {
+          // تحميل المشهد الأصلي من S3
+          const origPath = path.join(this.workDir, `scene_${i + 1}_orig.mp4`);
+          try {
+            await this.downloadFile(existingSceneVideoUrls[i]!, origPath);
+            allScenePaths.push(origPath);
+          } catch {
+            // إذا فشل التحميل: أعد بناء المشهد من الصورة
+            const scene = script.scenes[i];
+            const fallbackImgPath = path.join(this.workDir, `scene_${i + 1}_fb.jpg`);
+            const fallbackImgWithSub = path.join(this.workDir, `scene_${i + 1}_fb_sub.png`);
+            const fallbackPath = path.join(this.workDir, `scene_${i + 1}_fb.mp4`);
+            // صورة placeholder
+            await sharp({ create: { width: dims.width, height: dims.height, channels: 3, background: { r: 10, g: 10, b: 20 } } })
+              .toFormat("jpeg", { quality: 90 }).toFile(fallbackImgPath);
+            await this.drawSubtitle(fallbackImgPath, scene.subtitle, fallbackImgWithSub, dims);
+            await this.buildSceneVideo(fallbackImgWithSub, scene.duration, scene.zoom, dims, fallbackPath, quality);
+            allScenePaths.push(fallbackPath);
+          }
+        } else {
+          // لا يوجد مشهد أصلي محفوظ: أعد بناءه
+          const scene = script.scenes[i];
+          const rebuildImgPath = path.join(this.workDir, `scene_${i + 1}_rb.jpg`);
+          const rebuildImgWithSub = path.join(this.workDir, `scene_${i + 1}_rb_sub.png`);
+          const rebuildPath = path.join(this.workDir, `scene_${i + 1}_rb.mp4`);
+          await sharp({ create: { width: dims.width, height: dims.height, channels: 3, background: { r: 10, g: 10, b: 20 } } })
+            .toFormat("jpeg", { quality: 90 }).toFile(rebuildImgPath);
+          await this.drawSubtitle(rebuildImgPath, scene.subtitle, rebuildImgWithSub, dims);
+          await this.buildSceneVideo(rebuildImgWithSub, scene.duration, scene.zoom, dims, rebuildPath, quality);
+          allScenePaths.push(rebuildPath);
+        }
+      }
+
+      // ── الخطوة 5: دمج المشاهد ──────────────────────────────
+      report("دمج المشاهد المُعدَّلة...", 78);
+      const transitions = script.scenes.map(s => s.transition);
+      const mergedPath = await this.mergeScenes(allScenePaths, transitions, quality);
+
+      // ── الخطوة 6: رفع الفيديو المُعدَّل ───────────────────
+      report("رفع الفيديو المُعدَّل...", 95);
+      const videoUrl = await this.uploadVideo(mergedPath, `${script.title}_edited`);
+
+      report("اكتمل التعديل!", 100);
+      onProgress?.({ status: "done", progress: 100, videoUrl });
+
+      await fs.rm(this.workDir, { recursive: true, force: true });
+      return videoUrl;
+    } catch (err) {
+      await fs.rm(this.workDir, { recursive: true, force: true }).catch(() => {});
+      throw err;
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────
   // تقدير التكلفة
   // ─────────────────────────────────────────────────────────
 

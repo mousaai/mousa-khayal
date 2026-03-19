@@ -1,8 +1,8 @@
 /**
  * MyFilms.tsx — صفحة "أفلامي"
- * تعرض تاريخ الإنتاجات المكتملة مع إمكانية المشاركة وإعادة المشاهدة
+ * تعرض تاريخ الإنتاجات المكتملة مع إمكانية المشاركة وإعادة المشاهدة وتعديل المشاهد
  */
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -18,6 +18,12 @@ import {
   Check,
   ArrowLeft,
   Clapperboard,
+  Pencil,
+  X,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  Layers,
 } from "lucide-react";
 
 interface ProductionItem {
@@ -26,6 +32,7 @@ interface ProductionItem {
   description: string;
   videoUrl: string;
   metrics: any;
+  scriptData?: any;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -47,6 +54,176 @@ function formatDuration(sec?: number) {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+// ─────────────────────────────────────────────────────────────
+// مكوّن متابعة تقدم مهمة التعديل
+// ─────────────────────────────────────────────────────────────
+function EditJobProgress({
+  editJobId,
+  onDone,
+}: {
+  editJobId: string;
+  onDone: (videoUrl: string) => void;
+}) {
+  const { data } = trpc.video.getEditJobStatus.useQuery(
+    { editJobId },
+    { refetchInterval: (q) => (q.state.data?.status === "done" || q.state.data?.status === "failed" ? false : 2000) }
+  );
+
+  useEffect(() => {
+    if (data?.status === "done" && data.videoUrl) {
+      onDone(data.videoUrl);
+    }
+  }, [data?.status, data?.videoUrl, onDone]);
+
+  if (!data) return null;
+
+  const isDone = data.status === "done";
+  const isFailed = data.status === "failed";
+  const progress = data.progress ?? 0;
+
+  return (
+    <div className="mt-3 p-3 bg-[#0a0f1a] border border-blue-500/20 rounded-lg">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs text-blue-300 font-mono">
+          {isFailed ? "❌ فشل التعديل" : isDone ? "✅ اكتمل التعديل" : "⚙️ جاري التعديل..."}
+        </span>
+        <span className="text-xs text-gray-500">{progress}%</span>
+      </div>
+      <div className="w-full bg-gray-800 rounded-full h-1.5 mb-2">
+        <div
+          className={`h-1.5 rounded-full transition-all duration-500 ${isFailed ? "bg-red-500" : "bg-blue-500"}`}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      {data.currentStep && (
+        <p className="text-xs text-gray-500 truncate">{data.currentStep}</p>
+      )}
+      {isFailed && data.error && (
+        <p className="text-xs text-red-400 mt-1">{data.error}</p>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// مكوّن تعديل مشهد واحد
+// ─────────────────────────────────────────────────────────────
+function SceneEditPanel({
+  jobId,
+  scenes,
+  onVideoUpdated,
+}: {
+  jobId: string;
+  scenes: Array<{ imagePrompt: string; subtitle: string; duration: number }>;
+  onVideoUpdated: (newVideoUrl: string) => void;
+}) {
+  const [selectedScene, setSelectedScene] = useState<number | null>(null);
+  const [newPrompt, setNewPrompt] = useState("");
+  const [editJobId, setEditJobId] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+
+  const editScene = trpc.video.editScene.useMutation({
+    onSuccess: (data) => {
+      setEditJobId(data.editJobId);
+      setIsEditing(true);
+      toast.success(`بدأ تعديل المشهد ${data.sceneIndex + 1}...`);
+    },
+    onError: (err) => {
+      toast.error(err.message);
+    },
+  });
+
+  const handleEdit = () => {
+    if (selectedScene === null) return;
+    if (!newPrompt.trim() || newPrompt.trim().length < 5) {
+      toast.error("أدخل وصفاً للمشهد (5 أحرف على الأقل)");
+      return;
+    }
+    editScene.mutate({
+      jobId,
+      sceneIndex: selectedScene,
+      newPrompt: newPrompt.trim(),
+    });
+  };
+
+  const handleDone = (videoUrl: string) => {
+    setIsEditing(false);
+    setEditJobId(null);
+    setSelectedScene(null);
+    setNewPrompt("");
+    onVideoUpdated(videoUrl);
+    toast.success("✅ تم تعديل المشهد وتحديث الفيديو!");
+  };
+
+  return (
+    <div className="border-t border-blue-500/20 pt-4 mt-4">
+      <h4 className="text-xs font-semibold text-blue-300 mb-3 flex items-center gap-2">
+        <Layers className="w-3.5 h-3.5" />
+        تعديل مشهد واحد
+      </h4>
+
+      {/* قائمة المشاهد */}
+      <div className="grid grid-cols-2 gap-2 mb-3">
+        {scenes.map((scene, i) => (
+          <button
+            key={i}
+            onClick={() => {
+              setSelectedScene(i === selectedScene ? null : i);
+              setNewPrompt(i === selectedScene ? "" : scene.imagePrompt);
+            }}
+            className={`text-right p-2 rounded-lg border text-xs transition-all ${
+              selectedScene === i
+                ? "border-blue-500 bg-blue-500/10 text-blue-200"
+                : "border-gray-700 bg-gray-900/50 text-gray-400 hover:border-gray-600"
+            }`}
+          >
+            <span className="font-mono text-blue-500 ml-1">#{i + 1}</span>
+            <span className="line-clamp-2">{scene.subtitle}</span>
+          </button>
+        ))}
+      </div>
+
+      {/* حقل التعديل */}
+      {selectedScene !== null && !isEditing && (
+        <div className="space-y-2">
+          <label className="text-xs text-gray-400">
+            وصف المشهد الجديد (بالإنجليزية أو العربية):
+          </label>
+          <textarea
+            value={newPrompt}
+            onChange={(e) => setNewPrompt(e.target.value)}
+            rows={3}
+            placeholder="مثال: A futuristic city at night with neon lights..."
+            className="w-full bg-[#0a0f1a] border border-gray-700 rounded-lg p-2 text-sm text-white placeholder-gray-600 focus:border-blue-500 focus:outline-none resize-none"
+            dir="auto"
+          />
+          <Button
+            size="sm"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            onClick={handleEdit}
+            disabled={editScene.isPending}
+          >
+            {editScene.isPending ? (
+              <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+            ) : (
+              <Pencil className="w-3.5 h-3.5 mr-2" />
+            )}
+            تعديل المشهد {selectedScene + 1}
+          </Button>
+        </div>
+      )}
+
+      {/* متابعة التقدم */}
+      {editJobId && isEditing && (
+        <EditJobProgress editJobId={editJobId} onDone={handleDone} />
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
+// مكوّن زر المشاركة
+// ─────────────────────────────────────────────────────────────
 function ShareButton({ item }: { item: ProductionItem }) {
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
@@ -109,9 +286,22 @@ function ShareButton({ item }: { item: ProductionItem }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// مكوّن بطاقة الفيلم
+// ─────────────────────────────────────────────────────────────
 function FilmCard({ item }: { item: ProductionItem }) {
   const [playing, setPlaying] = useState(false);
+  const [showEdit, setShowEdit] = useState(false);
+  const [currentVideoUrl, setCurrentVideoUrl] = useState(item.videoUrl);
   const metrics = item.metrics as any;
+  const scenes: Array<{ imagePrompt: string; subtitle: string; duration: number }> =
+    item.scriptData?.scenes ?? [];
+
+  const handleVideoUpdated = (newUrl: string) => {
+    setCurrentVideoUrl(newUrl);
+    setPlaying(false);
+    setShowEdit(false);
+  };
 
   return (
     <Card className="bg-[#0d1117] border border-blue-500/20 overflow-hidden hover:border-blue-500/40 transition-all group">
@@ -119,7 +309,7 @@ function FilmCard({ item }: { item: ProductionItem }) {
       <div className="relative aspect-video bg-[#08090f]">
         {playing ? (
           <video
-            src={item.videoUrl}
+            src={currentVideoUrl}
             controls
             autoPlay
             className="w-full h-full object-cover"
@@ -130,7 +320,7 @@ function FilmCard({ item }: { item: ProductionItem }) {
             <div
               className="absolute inset-0 bg-gradient-to-br from-blue-900/20 to-purple-900/20"
               style={{
-                backgroundImage: `url(${item.videoUrl}?thumbnail)`,
+                backgroundImage: `url(${currentVideoUrl}?thumbnail)`,
                 backgroundSize: "cover",
                 backgroundPosition: "center",
                 filter: "blur(2px)",
@@ -191,17 +381,44 @@ function FilmCard({ item }: { item: ProductionItem }) {
           </div>
         )}
 
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between mb-3">
           <span className="text-gray-600 text-xs">
             {formatDate(item.createdAt)}
           </span>
-          <ShareButton item={item} />
+          <div className="flex items-center gap-2">
+            {/* زر التعديل */}
+            {scenes.length > 0 && (
+              <Button
+                size="sm"
+                variant="outline"
+                className={`border-purple-500/40 text-purple-300 hover:bg-purple-500/10 ${showEdit ? "bg-purple-500/10" : ""}`}
+                onClick={() => setShowEdit(!showEdit)}
+              >
+                <Pencil className="w-3 h-3 mr-1" />
+                {showEdit ? "إخفاء" : "تعديل"}
+                {showEdit ? <ChevronUp className="w-3 h-3 ml-1" /> : <ChevronDown className="w-3 h-3 ml-1" />}
+              </Button>
+            )}
+            <ShareButton item={item} />
+          </div>
         </div>
+
+        {/* لوحة تعديل المشاهد */}
+        {showEdit && scenes.length > 0 && (
+          <SceneEditPanel
+            jobId={item.jobId}
+            scenes={scenes}
+            onVideoUpdated={handleVideoUpdated}
+          />
+        )}
       </div>
     </Card>
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// الصفحة الرئيسية
+// ─────────────────────────────────────────────────────────────
 export default function MyFilms() {
   const { data: history, isLoading } = trpc.video.getProductionHistory.useQuery({ limit: 20 });
 

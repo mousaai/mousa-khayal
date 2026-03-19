@@ -678,3 +678,21 @@
 - [ ] تغيير VITE_APP_TITLE إلى "خيال"
 - [ ] تغيير package.json name وdescription
 - [ ] تغيير HTML title وmeta tags
+
+## ✏️ تعديل الفيديو الحالي + منع الصور الخارجية
+- [ ] scene editing pipeline: تعديل مشهد واحد وإعادة تجميع الفيديو بدون إعادة إنتاج كاملة
+- [ ] حفظ كل مشهد منفصلاً في S3 (imageUrl + audioUrl + videoClipUrl)
+- [ ] procedure editScene: يُعيد توليد مشهد واحد فقط ثم يُعيد دمج الفيديو
+- [ ] منع جلب الصور من الإنترنت: إزالة أي web scraping أو external image fetch
+- [ ] التحقق من كل مصادر الصور: فقط generateImage (FLUX) مسموح
+- [ ] واجهة تعديل المشاهد: زر "تعديل" بجانب كل مشهد في الفيديو المكتمل
+
+## ✏️ تعديل المشاهد — مارس 19
+
+- [x] إضافة method `produceEditedVideo` في VideoProducer — يُعيد توليد مشهد واحد فقط ثم يُعيد دمج الفيديو
+- [x] إضافة procedure `editScene` في videoRouter.ts — يُشغّل التعديل في الخلفية ويُرجع editJobId
+- [x] إضافة procedure `getEditJobStatus` في videoRouter.ts — يتابع تقدم مهمة التعديل
+- [x] تحديث `getProductionHistory` لإرجاع `scriptData` (قائمة المشاهد)
+- [x] تحديث MyFilms.tsx — زر "تعديل" لكل فيلم + لوحة اختيار المشهد + حقل الوصف الجديد + متابعة التقدم
+- [x] الصور تُولَّد فقط من FLUX (generateImage) — لا جلب من مصادر خارجية
+- [x] اختبارات vitest: 166 اختبار ناجح

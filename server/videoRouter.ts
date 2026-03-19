@@ -460,6 +460,7 @@ export const videoRouter = router({
         description: r.description ?? "",
         videoUrl: r.videoUrl ?? "",
         metrics: r.metrics as any,
+        scriptData: r.scriptData as any,
         createdAt: r.createdAt,
         updatedAt: r.updatedAt,
       }));
@@ -1001,9 +1002,138 @@ Be specific and objective. Use English for the description as it works best with
     };
   }),
 
-  // ──────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
+  // ★ editScene — تعديل مشهد واحد وإعادة دمج الفيديو (بدون إعادة إنتاج كاملة)
+  // ────────────────────────────────────────────────────────
+  editScene: publicProcedure
+    .input(z.object({
+      jobId: z.string(),
+      sceneIndex: z.number().min(0),
+      newPrompt: z.string().min(5).max(1000),
+      revisionNote: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error('قاعدة البيانات غير متاحة');
+
+      // جلب بيانات المهمة الأصلية
+      const rows = await db.select().from(videoJobsTable).where(eq(videoJobsTable.id, input.jobId)).limit(1);
+      const job = rows[0];
+      if (!job) throw new Error('المهمة غير موجودة');
+      if (job.status !== 'done') throw new Error('لا يمكن تعديل فيديو غير مكتمل');
+      if (!job.scriptData) throw new Error('لا يوجد سيناريو محفوظ لهذه المهمة');
+
+      const script = job.scriptData as any;
+      if (input.sceneIndex >= (script.scenes?.length ?? 0)) {
+        throw new Error(`رقم المشهد ${input.sceneIndex} غير صحيح`);
+      }
+
+      // تحديث المهمة إلى حالة التعديل
+      const editJobId = `edit_${input.jobId}_s${input.sceneIndex}_${Date.now()}`;
+      await createJobInDB(editJobId, `تعديل مشهد ${input.sceneIndex + 1}: ${input.newPrompt.slice(0, 50)}`);
+      await updateJobInDB(editJobId, { status: 'pending', currentStep: 'جاري تحضير التعديل...', progress: 0 });
+
+      // جلب روابط مقاطع المشاهد الأصلية من sceneStates
+      const sceneStates = (job.sceneStates as Array<{ videoUrl?: string; imageUrl?: string; done?: boolean }> | null) ?? [];
+      const existingSceneVideoUrls: Array<string | null> = script.scenes.map((_: any, i: number) =>
+        sceneStates[i]?.videoUrl ?? null
+      );
+
+      // تشغيل التعديل في الخلفية
+      ;(async () => {
+        try {
+          const producer = new VideoProducer();
+          const newVideoUrl = await producer.produceEditedVideo(
+            script,
+            input.sceneIndex,
+            input.newPrompt,
+            existingSceneVideoUrls,
+            {
+              aspectRatio: (job.optionsData as any)?.aspectRatio ?? '16:9',
+              quality: (job.optionsData as any)?.quality ?? 'fast',
+              useRunway: (job.optionsData as any)?.useRunway ?? true,
+            },
+            async (update: Partial<VideoJob>) => {
+              await updateJobInDB(editJobId, {
+                status: update.status as any,
+                progress: update.progress,
+                currentStep: update.currentStep,
+                videoUrl: update.videoUrl,
+                error: update.error,
+              });
+            }
+          );
+
+          // تحديث المهمة الأصلية بالفيديو الجديد
+          await updateJobInDB(input.jobId, { videoUrl: newVideoUrl });
+          await updateJobInDB(editJobId, { status: 'done', progress: 100, currentStep: 'اكتمل التعديل!', videoUrl: newVideoUrl });
+
+          // حفظ سجل التعديل في sceneRevisions
+          const prevRevisions = await db.select().from(sceneRevisionsTable)
+            .where(eq(sceneRevisionsTable.jobId, input.jobId))
+            .limit(1);
+          const nextVersion = prevRevisions.length > 0 ? (prevRevisions[0].version ?? 1) + 1 : 1;
+
+          // أرشفة النسخ السابقة
+          await db.update(sceneRevisionsTable)
+            .set({ isActive: 0 })
+            .where(eq(sceneRevisionsTable.jobId, input.jobId));
+
+          // حفظ التعديل الجديد
+          await db.insert(sceneRevisionsTable).values({
+            jobId: input.jobId,
+            sceneIndex: input.sceneIndex,
+            imageUrl: newVideoUrl,
+            prompt: input.newPrompt,
+            revisionNote: input.revisionNote ?? null,
+            version: nextVersion,
+            isActive: 1,
+          } as any);
+
+          // تحديث السيناريو بالـ prompt الجديد
+          const updatedScript = { ...script };
+          updatedScript.scenes[input.sceneIndex].imagePrompt = input.newPrompt;
+          await db.update(videoJobsTable)
+            .set({ scriptData: updatedScript })
+            .where(eq(videoJobsTable.id, input.jobId));
+
+        } catch (err) {
+          await updateJobInDB(editJobId, {
+            status: 'failed',
+            error: err instanceof Error ? err.message : String(err),
+            currentStep: 'فشل التعديل',
+          });
+        }
+      })();
+
+      return { editJobId, sceneIndex: input.sceneIndex };
+    }),
+
+  // ────────────────────────────────────────────────────────
+  // ★ getEditJobStatus — جلب حالة مهمة التعديل
+  // ────────────────────────────────────────────────────────
+  getEditJobStatus: publicProcedure
+    .input(z.object({ editJobId: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const rows = await db.select().from(videoJobsTable)
+        .where(eq(videoJobsTable.id, input.editJobId))
+        .limit(1);
+      if (!rows[0]) return null;
+      const job = rows[0];
+      return {
+        status: job.status,
+        progress: job.progress,
+        currentStep: job.currentStep,
+        videoUrl: job.videoUrl,
+        error: job.error,
+      };
+    }),
+
+  // ────────────────────────────────────────────────────────
   // retryJob — يُعيد ضبط retryCount ويُعيد الإنتاج من البداية
-  // ──────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
   retryJob: publicProcedure
     .input(z.object({ jobId: z.string() }))
     .mutation(async ({ input }) => {
