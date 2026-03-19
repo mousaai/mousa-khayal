@@ -130,3 +130,44 @@ export const contentViolations = mysqlTable("content_violations", {
 
 export type ContentViolation = typeof contentViolations.$inferSelect;
 export type InsertContentViolation = typeof contentViolations.$inferInsert;
+
+// جدول روابط المشاركة — لكل فيديو رابط فريد قابل للمشاركة
+export const shareLinks = mysqlTable("share_links", {
+  id: varchar("id", { length: 32 }).primaryKey(), // رمز عشوائي 8 أحرف
+  jobId: varchar("jobId", { length: 64 }).notNull(), // ربط بـ video_jobs
+  videoUrl: text("videoUrl").notNull(),
+  title: varchar("title", { length: 255 }),
+  description: text("description"),
+  genre: varchar("genre", { length: 64 }),
+  genreLabel: varchar("genreLabel", { length: 64 }),
+  genreEmoji: varchar("genreEmoji", { length: 8 }),
+  thumbnailUrl: text("thumbnailUrl"),
+  viewCount: int("viewCount").default(0).notNull(),
+  userId: int("userId"),
+  expiresAt: timestamp("expiresAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ShareLink = typeof shareLinks.$inferSelect;
+export type InsertShareLink = typeof shareLinks.$inferInsert;
+
+// جدول تعديلات المشاهد — تتتبع كل نسخة من مشهد معدّل
+export const sceneRevisions = mysqlTable("scene_revisions", {
+  id: int("id").autoincrement().primaryKey(),
+  jobId: varchar("jobId", { length: 64 }).notNull(),
+  sceneIndex: int("sceneIndex").notNull(), // رقم المشهد (0-based)
+  imageUrl: text("imageUrl").notNull(),
+  prompt: text("prompt"),
+  revisionNote: text("revisionNote"), // سبب التعديل
+  version: int("version").default(1).notNull(),
+  isActive: int("isActive").default(1).notNull(), // 1=نشط, 0=مؤرشف
+  userId: int("userId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SceneRevision = typeof sceneRevisions.$inferSelect;
+export type InsertSceneRevision = typeof sceneRevisions.$inferInsert;
+
+// تحديث video_jobs لتخزين بيانات إضافية
+// ملاحظة: هذه الحقول ستُضاف عبر ترحيل قاعدة البيانات
+// للآن نخزّنها في metrics JSON الموجود بالفعل

@@ -13,8 +13,12 @@ import {
   type VideoJob,
 } from "./videoProducer";
 import { getDb } from "./db";
-import { videoJobs as videoJobsTable } from "../drizzle/schema";
-import { eq } from "drizzle-orm";
+import {
+  videoJobs as videoJobsTable,
+  shareLinks as shareLinksTable,
+  sceneRevisions as sceneRevisionsTable,
+} from "../drizzle/schema";
+import { eq, desc } from "drizzle-orm";
 import { notifyOwner } from "./_core/notification";
 // ═══════════════════════════════════════════════════════════
 // Zod schemas للمدخلاتت
@@ -330,9 +334,9 @@ export const videoRouter = router({
       return { jobId };
     }),
 
-  // ──────────────────────────────────────────────────────────
+  //  // ────────────────────────────────────────────────────────
   // جلب آخر job للمستخدم (للعودة بعد إغلاق المتصفح)
-  // ──────────────────────────────────────────────────────────
+  // ────────────────────────────────────────────────────────
   getMyLatestJob: publicProcedure
     .query(async () => {
       const db = await getDb();
@@ -351,5 +355,300 @@ export const videoRouter = router({
         return doneRows[0] ?? null;
       }
       return rows[0];
+    }),
+
+  // ────────────────────────────────────────────────────────
+  // تاريخ الإنتاجات — آخر 20 فيديو مكتمل
+  // ────────────────────────────────────────────────────────
+  getProductionHistory: publicProcedure
+    .input(z.object({
+      limit: z.number().min(1).max(50).default(20),
+    }).optional())
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      const rows = await db.select()
+        .from(videoJobsTable)
+        .where(eq(videoJobsTable.status, "done"))
+        .orderBy(desc(videoJobsTable.createdAt))
+        .limit(input?.limit ?? 20);
+      return rows.map(r => ({
+        jobId: r.id,
+        title: r.description?.slice(0, 80) ?? "فيديو",
+        description: r.description ?? "",
+        videoUrl: r.videoUrl ?? "",
+        metrics: r.metrics as any,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+      }));
+    }),
+
+  // ────────────────────────────────────────────────────────
+  // إنشاء رابط مشاركة لفيديو مكتمل
+  // ────────────────────────────────────────────────────────
+  createShareLink: publicProcedure
+    .input(z.object({
+      jobId: z.string(),
+      title: z.string().optional(),
+      description: z.string().optional(),
+      genre: z.string().optional(),
+      genreLabel: z.string().optional(),
+      genreEmoji: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("قاعدة البيانات غير متاحة");
+
+      // جلب بيانات الفيديو
+      const job = await getJobFromDB(input.jobId);
+      if (!job || !job.videoUrl) throw new Error("الفيديو غير موجود أو لم يكتمل بعد");
+
+      // إنشاء رمز فريد
+      const shareId = Math.random().toString(36).slice(2, 10).toUpperCase();
+
+      await db.insert(shareLinksTable).values({
+        id: shareId,
+        jobId: input.jobId,
+        videoUrl: job.videoUrl,
+        title: input.title ?? job.description?.slice(0, 80) ?? "فيديو خيال",
+        description: input.description ?? job.description ?? "",
+        genre: input.genre ?? null,
+        genreLabel: input.genreLabel ?? null,
+        genreEmoji: input.genreEmoji ?? null,
+      });
+
+      return {
+        shareId,
+        shareUrl: `/share/${shareId}`,
+        videoUrl: job.videoUrl,
+      };
+    }),
+
+  // ────────────────────────────────────────────────────────
+  // جلب بيانات رابط المشاركة (لصفحة المشاهدة العامة)
+  // ────────────────────────────────────────────────────────
+  getShareLink: publicProcedure
+    .input(z.object({ shareId: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return null;
+      const rows = await db.select()
+        .from(shareLinksTable)
+        .where(eq(shareLinksTable.id, input.shareId))
+        .limit(1);
+      if (!rows.length) return null;
+      const link = rows[0];
+      // زيادة عداد المشاهدات
+      await db.update(shareLinksTable)
+        .set({ viewCount: (link.viewCount ?? 0) + 1 })
+        .where(eq(shareLinksTable.id, input.shareId));
+      return link;
+    }),
+
+  // ────────────────────────────────────────────────────────
+  // تعديل مشهد واحد دون إعادة إنتاج الفيلم كاملاً
+  // ────────────────────────────────────────────────────────
+  reviseScene: publicProcedure
+    .input(z.object({
+      jobId: z.string(),
+      sceneIndex: z.number().min(0),
+      newPrompt: z.string().min(5),
+      revisionNote: z.string().optional(),
+      referenceImageUrl: z.string().url().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) throw new Error("قاعدة البيانات غير متاحة");
+
+      // توليد صورة جديدة للمشهد
+      const { generateImage } = await import("./_core/imageGeneration");
+      const genOptions: any = {
+        prompt: input.newPrompt + ", ultra photorealistic, 8K, cinematic lighting",
+      };
+      if (input.referenceImageUrl) {
+        genOptions.originalImages = [{ url: input.referenceImageUrl, mimeType: "image/jpeg" }];
+      }
+
+      const { url: newImageUrl } = await generateImage(genOptions);
+
+      // أرشفة النسخة السابقة
+      await db.update(sceneRevisionsTable)
+        .set({ isActive: 0 })
+        .where(eq(sceneRevisionsTable.jobId, input.jobId));
+
+      // حفظ النسخة الجديدة
+      const insertData: any = {
+        jobId: input.jobId,
+        sceneIndex: input.sceneIndex,
+        imageUrl: newImageUrl,
+        prompt: input.newPrompt ?? null,
+        revisionNote: input.revisionNote ?? null,
+        version: 1,
+        isActive: 1,
+      };
+      await db.insert(sceneRevisionsTable).values(insertData);
+
+      return {
+        sceneIndex: input.sceneIndex,
+        newImageUrl,
+        prompt: input.newPrompt,
+      };
+    }),
+
+  // ────────────────────────────────────────────────────────
+  // جلب تعديلات مشهد محدد
+  // ────────────────────────────────────────────────────────
+  getSceneRevisions: publicProcedure
+    .input(z.object({ jobId: z.string() }))
+    .query(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return [];
+      return db.select()
+        .from(sceneRevisionsTable)
+        .where(eq(sceneRevisionsTable.jobId, input.jobId))
+        .orderBy(desc(sceneRevisionsTable.createdAt));
+    }),
+
+  // ────────────────────────────────────────────────────────
+  // كشف نوع الفيلم من الوصف (للعرض في الواجهة)
+  // ────────────────────────────────────────────────────────
+  detectGenre: publicProcedure
+    .input(z.object({
+      description: z.string().min(2),
+      hasReferenceImage: z.boolean().default(false),
+    }))
+    .mutation(async ({ input }) => {
+      const { detectFilmGenre, getGenreDNA } = await import("./filmGenreEngine");
+      const genre = detectFilmGenre(input.description, input.hasReferenceImage);
+      const dna = getGenreDNA(genre);
+      return {
+        genre,
+        labelAr: dna.labelAr,
+        labelEn: dna.labelEn,
+        emoji: dna.emoji,
+        color: dna.color,
+        musicStyle: dna.musicStyle,
+        narratorTone: dna.narratorTone,
+      };
+    }),
+
+  // ────────────────────────────────────────────────────────
+  // تحليل صورة المستخدم لاستخراج وصف الشخصية
+  // ────────────────────────────────────────────────────────
+  analyzeCharacter: publicProcedure
+    .input(z.object({
+      imageUrl: z.string().url(),
+    }))
+    .mutation(async ({ input }) => {
+      const { invokeLLM } = await import("./_core/llm");
+      const result = await invokeLLM({
+        messages: [
+          {
+            role: "system",
+            content: `You are an expert at analyzing human portraits and describing physical features for AI image generation.
+Your task: analyze the person in the image and provide a detailed description of their physical appearance that can be used to maintain character consistency across multiple AI-generated scenes.
+Focus on: face shape, skin tone, hair color/style/length, eye color, distinctive features, approximate age, build.
+Be specific and objective. Use English for the description as it works best with image generation models.`,
+          },
+          {
+            role: "user",
+            content: [
+              { type: "text", text: "Describe this person's physical appearance in detail for character consistency:" },
+              { type: "image_url", image_url: { url: input.imageUrl, detail: "high" } },
+            ],
+          },
+        ],
+        maxTokens: 500,
+      });
+      const description = typeof result.choices[0].message.content === "string"
+        ? result.choices[0].message.content
+        : "";
+      return { characterDescription: description };
+    }),
+
+  // ────────────────────────────────────────────────────────
+  // إنتاج سريع مع Character Consistency
+  // ────────────────────────────────────────────────────────
+  quickProduceWithCharacter: publicProcedure
+    .input(z.object({
+      description: z.string().min(2).max(2000),
+      language: z.enum(["ar", "en"]).default("ar"),
+      voice: voiceEnum.default("ar_male"),
+      sceneCount: z.number().min(3).max(8).default(5),
+      options: productionOptionsSchema.optional(),
+      referenceImageUrl: z.string().url().optional(),
+      characterDescription: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      const jobId = `char_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+
+      await createJobInDB(jobId, input.description);
+
+      (async () => {
+        try {
+          await updateJobInDB(jobId, { status: "processing", currentStep: "تحليل المحتوى وكتابة السيناريو...", progress: 3 });
+
+          const script = await generateVideoScript(
+            input.description,
+            input.language,
+            input.voice,
+            input.sceneCount,
+            input.characterDescription,
+            input.referenceImageUrl
+          );
+
+          // حفظ بيانات الشخصية في السيناريو
+          script.characterDescription = input.characterDescription;
+          script.referenceImageUrl = input.referenceImageUrl;
+
+          await updateJobInDB(jobId, {
+            currentStep: `السيناريو جاهز: "${script.title}"`,
+            progress: 8,
+          });
+
+          const producer = new VideoProducer();
+          const videoUrl = await producer.produce(
+            script,
+            {
+              aspectRatio: input.options?.aspectRatio ?? "16:9",
+              mode: input.options?.mode ?? "production",
+              musicVolume: input.options?.musicVolume ?? 0.12,
+              useRunway: input.options?.useRunway ?? true,
+              useElevenLabs: input.options?.useElevenLabs ?? true,
+              quality: input.options?.quality ?? "fast",
+              enableCharacterConsistency: !!input.characterDescription,
+            },
+            async (update: Partial<VideoJob>) => {
+              await updateJobInDB(jobId, {
+                status: update.status as any,
+                progress: update.progress,
+                currentStep: update.currentStep,
+                videoUrl: update.videoUrl,
+                error: update.error,
+                metrics: update.metrics,
+              });
+            }
+          );
+
+          await updateJobInDB(jobId, { status: "done", progress: 100, currentStep: "اكتمل الإنتاج!", videoUrl });
+
+          try {
+            await notifyOwner({
+              title: "✨ خيال — اكتمل الإنتاج!",
+              content: `فيديوك جاهز للمشاهدة والتحميل.\nرابط الفيديو: ${videoUrl}`,
+            });
+          } catch { /* الإشعار اختياري */ }
+
+        } catch (err) {
+          await updateJobInDB(jobId, {
+            status: "failed",
+            progress: 0,
+            currentStep: "فشل الإنتاج",
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      })();
+
+      return { jobId };
     }),
 });

@@ -5,6 +5,7 @@
  */
 import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
+import { Link } from "wouter";
 import KhayalCinematicViewer from "@/components/KhayalCinematicViewer";
 import ImmersiveViewer from "@/components/ImmersiveViewer";
 import type { GenerationResult, DocumentAnalysis, ImmersiveResult } from "@/types/khayal";
@@ -114,6 +115,60 @@ interface VideoJobState {
 
 // ── نوع القصد المكتشف ─────────────────────────────────────────────────────────
 type DetectedIntentType = "image" | "video" | "script" | "thinking" | null;
+
+// ── مكوّن مشاركة الفيديو ─────────────────────────────────────────────────────
+function ShareVideoButton({ jobId, description }: { jobId: string; description: string }) {
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  const createShare = trpc.video.createShareLink.useMutation({
+    onSuccess: (data) => {
+      const fullUrl = `${window.location.origin}/share/${data.shareId}`;
+      setShareUrl(fullUrl);
+      navigator.clipboard.writeText(fullUrl).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      });
+    },
+  });
+
+  const handleShare = () => {
+    if (shareUrl) {
+      navigator.clipboard.writeText(shareUrl).then(() => {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      });
+      return;
+    }
+    createShare.mutate({ jobId, title: description.slice(0, 80), description });
+  };
+
+  return (
+    <button
+      onClick={handleShare}
+      disabled={createShare.isPending}
+      className="flex items-center justify-center gap-1.5 px-4 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105 active:scale-95 disabled:opacity-50"
+      style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.3)", color: "#a78bfa", fontFamily: "'Tajawal', sans-serif" }}
+    >
+      {copied ? (
+        <>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          تم النسخ
+        </>
+      ) : createShare.isPending ? (
+        <div className="w-3 h-3 border border-purple-400/30 border-t-purple-400 rounded-full animate-spin" />
+      ) : (
+        <>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+            <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+          </svg>
+          مشاركة
+        </>
+      )}
+    </button>
+  );
+}
 
 export default function Home() {
   const [prompt, setPrompt] = useState("");
@@ -897,6 +952,25 @@ export default function Home() {
         ))}
       </div>
 
+      {/* ═══ MY FILMS BUTTON ═══ */}
+      <div className="absolute top-4 right-4 z-30">
+        <Link href="/my-films">
+          <button
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
+            style={{ background: "rgba(96,165,250,0.12)", border: "1px solid rgba(96,165,250,0.25)", color: "#60a5fa", fontFamily: "'Tajawal', sans-serif" }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"/>
+              <line x1="7" y1="2" x2="7" y2="22"/><line x1="17" y1="2" x2="17" y2="22"/>
+              <line x1="2" y1="12" x2="22" y2="12"/><line x1="2" y1="7" x2="7" y2="7"/>
+              <line x1="2" y1="17" x2="7" y2="17"/><line x1="17" y1="17" x2="22" y2="17"/>
+              <line x1="17" y1="7" x2="22" y2="7"/>
+            </svg>
+            <span>أفلامي</span>
+          </button>
+        </Link>
+      </div>
+
       {/* ═══ LANGUAGE SELECTOR ═══ */}
       <div className="absolute top-4 left-4 z-30" onClick={e => e.stopPropagation()}>
         <div className="relative">
@@ -1396,6 +1470,7 @@ export default function Home() {
                       </svg>
                       {activeLang === "AR" ? "تحميل" : "Download"}
                     </a>
+                    <ShareVideoButton jobId={videoJob.jobId} description={prompt} />
                     <a
                       href={videoJob.videoUrl}
                       target="_blank"

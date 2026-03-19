@@ -43,6 +43,13 @@
       "when": 1773869099739,
       "tag": "0005_living_warbird",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1773893668564,
+      "tag": "0006_past_nightshade",
+      "breakpoints": true
     }
   ]
 }
