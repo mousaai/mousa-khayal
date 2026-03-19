@@ -5,6 +5,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
+import KnowledgeBar from "./components/KnowledgeBar";
 import MyFilms from "./pages/MyFilms";
 import SharePage from "./pages/SharePage";
 
@@ -37,6 +38,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <Router />
+          <KnowledgeBar />
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

@@ -1458,6 +1458,39 @@ export async function generateVideoScript(
   ]
 }`;
 
+  // ═══ الطبقة 1: البحث في DB (مجاني، فوري) ═══
+  try {
+    const { getScript: hybridGetScript } = await import("./hybridScriptEngine");
+    const hybridResult = await hybridGetScript(userInput, sceneCount);
+    if (hybridResult.source === "db" && hybridResult.confidence >= 50) {
+      console.log(`[generateVideoScript] ✓ DB hit (${hybridResult.confidence}% confidence)`);
+      const hs = hybridResult.script;
+      return {
+        title: hs.title,
+        language: language as "ar" | "en",
+        voice: voice as any,
+        narration: hs.narration ?? hs.scenes?.map((s: any) => s.caption).join(" ") ?? "",
+        domain: hs.genre ?? "general",
+        musicMood: (hs.musicMood ?? "ambient") as any,
+        filmGenre,
+        characterDescription,
+        referenceImageUrl,
+        scenes: (hs.scenes ?? []).map((s: any, i: number) => ({
+          imagePrompt: s.prompt ?? s.imagePrompt ?? `Cinematic scene ${i + 1}`,
+          subtitle: s.caption ?? s.label ?? `مشهد ${i + 1}`,
+          narration: s.caption ?? s.narration ?? "",
+          duration: s.duration ?? 6,
+          zoom: "zoom_in" as any,
+          transition: "fade" as any,
+          sceneType: "b_roll" as any,
+        })),
+      } as VideoScript;
+    }
+  } catch (dbErr: any) {
+    console.warn("[generateVideoScript] DB search failed:", dbErr.message?.slice(0, 60));
+  }
+
+  // ═══ الطبقة 2: LLM خارجي ═══
   let response: any;
   try {
     response = await invokeLLM({

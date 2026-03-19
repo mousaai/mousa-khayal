@@ -765,3 +765,31 @@
 - [x] إصلاح runwayEngine: تسجيل 429 في markDailyLimitReached عند فشل createResponse
 - [x] تحسين رسائل الوقت المتبقي في شريط التقدم (دقيق ومفصّل)
 - [x] اختبار إنتاج فيديو كامل: status=done progress=100% videoUrl=CloudFront ✓
+
+## 🧠 نظام Self-Learning Hybrid — مارس 19
+
+- [x] schema DB: جدول script_library لحفظ السيناريوهات
+- [x] HybridScriptEngine: بحث ذكي في DB → LLM خارجي → توليد محلي + حفظ كل نتيجة
+- [x] دمج HybridScriptEngine في videoProducer بدلاً من generateVideoScript المباشر
+- [x] مؤشر KnowledgeBar في الواجهة (عدد السيناريوهات + نسبة الاستقلالية)
+- [x] اختبارات vitest لـ HybridEngine: 196 اختبار ناجح
+
+## 📚 مكتبة سيناريوهات ضخمة 10,000+ — مارس 19
+
+- [x] schema DB: جدول script_library (id, domain, genre, keywords, title, scenes JSON, quality_score, useCount)
+- [x] ScriptGenerator.ts: مولّد ضخم من مصفوفة متغيرات (20 مجال × 15 نوع × 10 أسلوب × 3 مستوى = 9,000+ سيناريو)
+- [x] SmartSearch: بحث دلالي بالكلمات المفتاحية + fuzzy match + تصنيف بالنقاط
+- [x] دمج SmartSearch في videoProducer: يبحث في DB أولاً قبل LLM
+- [x] نظام التعلم: كل إنتاج ناجح يُحفظ في script_library تلقائياً
+- [x] واجهة KnowledgeBar: مؤشر المكتبة الحية في الواجهة
+- [x] اختبارات vitest: 196 اختبار ناجح
+
+## 🌐 ScriptHarvester — سحب أسبوعي من مصادر متعددة
+
+- [x] ScriptHarvester.ts: سحب من Wikipedia + TMDB + Open Library
+- [x] محوّل ذكي: تحويل المقالات إلى مشاهد سينمائية
+- [x] ScriptGenerator.ts: توليد 9,000+ سيناريو محلياً (20 مجال × 15 نوع × 10 أسلوب × 3 مستوى)
+- [x] SmartSearch: بحث دلالي + fuzzy match مدمج في HybridScriptEngine
+- [x] جدولة أسبوعية: كل أحد الساعة 3 صباحاً يسحب 10,000 سيناريو جديد
+- [x] واجهة KnowledgeBar: مؤشر المكتبة الحية في الواجهة
+- [x] endpoints إدارة المعرفة (getLibraryStats, triggerHarvest) في videoRouter

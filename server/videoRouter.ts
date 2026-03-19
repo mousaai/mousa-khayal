@@ -1274,4 +1274,28 @@ Be specific and objective. Use English for the description as it works best with
 
       return { success: true, jobId: input.jobId };
     }),
+
+  // ═══ إحصاءات المكتبة الحية ═══
+  getLibraryStats: publicProcedure.query(async () => {
+    const { getLibraryStats } = await import("./hybridScriptEngine");
+    return await getLibraryStats();
+  }),
+
+  // ═══ تشغيل الحصاد الأسبوعي يدوياً ═══
+  triggerHarvest: publicProcedure.mutation(async () => {
+    const { runWeeklyHarvest } = await import("./scriptHarvester");
+    runWeeklyHarvest().then((result) => {
+      console.log(`[Harvest] Done: +${result.total} scripts, library: ${result.librarySize}`);
+    }).catch((err) => {
+      console.error("[Harvest] Failed:", err);
+    });
+    return { started: true, message: "تم تشغيل الحصاد في الخلفية" };
+  }),
+
+  // ═══ بذر المكتبة المحلية (تشغيل مرة واحدة) ═══
+  seedLibrary: publicProcedure.mutation(async () => {
+    const { runWeeklyHarvest } = await import("./scriptHarvester");
+    runWeeklyHarvest().catch(console.error);
+    return { started: true, message: "تم بدء بذر المكتبة" };
+  }),
 });

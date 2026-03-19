@@ -1,0 +1,43 @@
+CREATE TABLE `production_memory` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`jobId` varchar(64) NOT NULL,
+	`userInput` text NOT NULL,
+	`normalizedInput` text,
+	`detectedDomain` varchar(64),
+	`detectedGenre` varchar(64),
+	`scriptUsed` json,
+	`scriptSource` enum('db','llm','prebuilt') NOT NULL DEFAULT 'prebuilt',
+	`scriptLibraryId` int,
+	`imagePrompts` json,
+	`imageUrls` json,
+	`audioUrls` json,
+	`videoUrl` text,
+	`success` int NOT NULL DEFAULT 0,
+	`durationMs` int,
+	`userId` int,
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	CONSTRAINT `production_memory_id` PRIMARY KEY(`id`)
+);
+--> statement-breakpoint
+CREATE TABLE `script_library` (
+	`id` int AUTO_INCREMENT NOT NULL,
+	`domain` varchar(64) NOT NULL,
+	`genre` varchar(64) NOT NULL,
+	`style` varchar(64),
+	`level` varchar(32),
+	`language` varchar(8) NOT NULL DEFAULT 'ar',
+	`title` varchar(255) NOT NULL,
+	`titleEn` varchar(255),
+	`keywords` text NOT NULL,
+	`scenes` json NOT NULL,
+	`narration` text,
+	`musicMood` varchar(64),
+	`qualityScore` int NOT NULL DEFAULT 70,
+	`useCount` int NOT NULL DEFAULT 0,
+	`successRate` int NOT NULL DEFAULT 100,
+	`source` enum('generated','llm','user','seed') NOT NULL DEFAULT 'seed',
+	`sourceJobId` varchar(64),
+	`createdAt` timestamp NOT NULL DEFAULT (now()),
+	`updatedAt` timestamp NOT NULL DEFAULT (now()) ON UPDATE CURRENT_TIMESTAMP,
+	CONSTRAINT `script_library_id` PRIMARY KEY(`id`)
+);

@@ -204,3 +204,61 @@ export const userPreferences = mysqlTable("user_preferences", {
 
 export type UserPreferences = typeof userPreferences.$inferSelect;
 export type InsertUserPreferences = typeof userPreferences.$inferInsert;
+
+// ══════════════════════════════════════════════════════════════
+// مكتبة السيناريوهات الضخمة — 10,000+ سيناريو ذاتي التعلم
+// ══════════════════════════════════════════════════════════════
+export const scriptLibrary = mysqlTable("script_library", {
+  id: int("id").autoincrement().primaryKey(),
+  // التصنيف
+  domain: varchar("domain", { length: 64 }).notNull(),       // nature, architecture, science...
+  genre: varchar("genre", { length: 64 }).notNull(),         // documentary, cinematic, educational...
+  style: varchar("style", { length: 64 }),                   // dramatic, calm, energetic...
+  level: varchar("level", { length: 32 }),                   // simple, medium, advanced
+  language: varchar("language", { length: 8 }).default("ar").notNull(),
+  // المحتوى
+  title: varchar("title", { length: 255 }).notNull(),
+  titleEn: varchar("titleEn", { length: 255 }),
+  keywords: text("keywords").notNull(),                      // كلمات مفتاحية مفصولة بفاصلة
+  scenes: json("scenes").notNull(),                          // VideoScene[]
+  narration: text("narration"),                              // التعليق الصوتي الكامل
+  musicMood: varchar("musicMood", { length: 64 }),
+  // الجودة والاستخدام
+  qualityScore: int("qualityScore").default(70).notNull(),   // 0-100
+  useCount: int("useCount").default(0).notNull(),            // عدد مرات الاستخدام
+  successRate: int("successRate").default(100).notNull(),    // نسبة نجاح الإنتاج
+  // المصدر
+  source: mysqlEnum("source", ["generated", "llm", "user", "seed"]).default("seed").notNull(),
+  sourceJobId: varchar("sourceJobId", { length: 64 }),       // من أي إنتاج جاء
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ScriptLibraryEntry = typeof scriptLibrary.$inferSelect;
+export type InsertScriptLibraryEntry = typeof scriptLibrary.$inferInsert;
+
+// ══════════════════════════════════════════════════════════════
+// ذاكرة الإنتاج — تخزين كل طلب ونتيجته للتعلم
+// ══════════════════════════════════════════════════════════════
+export const productionMemory = mysqlTable("production_memory", {
+  id: int("id").autoincrement().primaryKey(),
+  jobId: varchar("jobId", { length: 64 }).notNull(),
+  userInput: text("userInput").notNull(),                    // الوصف الأصلي
+  normalizedInput: text("normalizedInput"),                  // بعد التنظيف
+  detectedDomain: varchar("detectedDomain", { length: 64 }),
+  detectedGenre: varchar("detectedGenre", { length: 64 }),
+  scriptUsed: json("scriptUsed"),                           // السيناريو المستخدم
+  scriptSource: mysqlEnum("scriptSource", ["db", "llm", "prebuilt"]).default("prebuilt").notNull(),
+  scriptLibraryId: int("scriptLibraryId"),                  // إذا جاء من المكتبة
+  imagePrompts: json("imagePrompts"),                       // prompts الصور المستخدمة
+  imageUrls: json("imageUrls"),                             // روابط الصور المولدة
+  audioUrls: json("audioUrls"),                             // روابط الصوت
+  videoUrl: text("videoUrl"),                               // رابط الفيديو النهائي
+  success: int("success").default(0).notNull(),             // 1=نجح, 0=فشل
+  durationMs: int("durationMs"),                            // وقت الإنتاج بالملليثاني
+  userId: int("userId"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type ProductionMemory = typeof productionMemory.$inferSelect;
+export type InsertProductionMemory = typeof productionMemory.$inferInsert;
