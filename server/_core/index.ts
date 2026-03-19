@@ -9,7 +9,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import mediaRoutes from "../mediaRoutes";
 import compression from "compression";
-import rateLimit from "express-rate-limit";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -102,12 +102,7 @@ async function startServer() {
     max: 200,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => {
-      // استخدام ipKeyGenerator من express-rate-limit v8 بشكل صحيح
-      const { ipKeyGenerator: ikGen } = require('express-rate-limit');
-      const ip = req.ip ?? req.socket?.remoteAddress ?? 'unknown';
-      return typeof ikGen === 'function' ? ikGen(ip) : ip.replace(/^::ffff:/, '');
-    },
+    keyGenerator: (req) => ipKeyGenerator(req.ip ?? req.socket?.remoteAddress ?? 'unknown'),
     validate: { xForwardedForHeader: false },
     message: { error: 'طلبات كثيرة جداً — حاول مرة أخرى بعد دقيقة' },
     skip: (req) => req.path.startsWith('/api/oauth'),
@@ -120,11 +115,7 @@ async function startServer() {
     max: 5,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: (req) => {
-      const { ipKeyGenerator: ikGen } = require('express-rate-limit');
-      const ip = req.ip ?? req.socket?.remoteAddress ?? 'unknown';
-      return typeof ikGen === 'function' ? ikGen(ip) : ip.replace(/^::ffff:/, '');
-    },
+    keyGenerator: (req) => ipKeyGenerator(req.ip ?? req.socket?.remoteAddress ?? 'unknown'),
     validate: { xForwardedForHeader: false },
     message: { error: 'تجاوزت الحد المسموح (5 طلبات إنتاج/دقيقة). حاول بعد قليل' },
   });
