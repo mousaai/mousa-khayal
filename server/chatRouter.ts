@@ -73,34 +73,47 @@ export async function detectIntent(
     .map((m) => `${m.role === "user" ? "المستخدم" : "خيال"}: ${m.content}`)
     .join("\n");
 
-  const systemPrompt = `أنت محلل قصد لمنصة "خيال" — منصة تحويل أي فكرة إلى مرئيات سينمائية بلا أزرار.
+  const hasImage = conversationHistory.slice(-2).some(m => m.data?.attachedImageUrl);
+  const hasBlueprint = conversationHistory.slice(-2).some(m => m.data?.attachedDocumentUrl);
+
+  const systemPrompt = `أنت محلل قصد خبير لمنصة "خيال" — منصة تحويل أي فكرة إلى مرئيات سينمائية بلا حدود.
+
+مبدأ أساسي: الخيال بلا حدود — أي وصف يُكتب يستحق إنتاجاً بصرياً. لا تطلب توضيحاً إلا إذا كان الطلب حرفياً كلمة واحدة لا معنى لها.
 
 حلّل رسالة المستخدم وحدد:
 1. القصد (type):
-   - image: يريد صورة واحدة أو وصف بسيط قصير
-   - video: يريد فيديو كامل متعدد المشاهد
-   - immersive: يصف مكاناً يريد التواجد داخله (أنا في / داخل / بداخل / أتخيل نفسي / لو كنت)
+   - image: لحظة بصرية واحدة ثابتة، وصف قصير، تحويل شخصي/زمني بصورة مرفقة
+   - video: فيه تسلسل زمني أو قصة أو مراحل أو حدث متطور أو "من...إلى" أو "ثم" أو "فجأة" أو "يحكي" أو "ينمو" أو "رحلة"
+   - immersive: المستخدم يريد أن يكون داخل البيئة (أنا في / داخل / تخيل نفسي / لو كنت)
    - script: يريد سيناريو فقط بدون إنتاج
    - edit_scene: يريد تعديل مشهد موجود
    - question: سؤال عام
    - greeting: تحية
-   - clarify: غامض جداً
+   - clarify: غامض جداً (نادراً جداً)
 
-2. وضع الإنتاج (outputMode) — اختر تلقائياً:
-   - "images": وصف بسيط أو طلب صورة واحدة
-   - "fast": فيديو قصير أو متوسط أو غير محدد
-   - "pro": مشروع كبير / مبنى / وثائقي / تسويقي / علمي / تعليمي تفصيلي
+2. وضع الإنتاج (outputMode):
+   - "images": صورة واحدة أو لحظة ثابتة أو تحويل شخصي (تخيلني شاباً / طفلاً)
+   - "fast": فيديو قصير أو قصة بسيطة أو حدث واحد
+   - "pro": تسلسل زمني طويل / مشروع معماري / وثائقي / تعليمي / "من الصفر إلى" / "كيف ينمو" / "رحلة الحديد"
    - "immersive": وضع "أنا هناك" — جولة 360° داخل بيئة
 
-قواعد اختيار outputMode:
-- "صورة مسجد" → images
-- "فيديو عن المدينة" → fast
-- "فيلم عن مشروع معماري" → pro
-- "أنا في جحر نملة" → immersive
-- "تخيل نفسي داخل صدفة" → immersive
-- "لو كنت ذرة كربون" → immersive
-- "فيلم تسويقي" → pro
-- "فيلم تعليمي عن الفيزياء" → pro
+${hasImage ? 'ملاحظة: المستخدم رفع صورة. إذا طلب تحويلاً (تخيلني / بعد X سنة / كيف سيبدو) فهذا image-to-image.' : ''}
+${hasBlueprint ? 'ملاحظة: المستخدم رفع مخططاً معمارياً. إذا طلب تصوراً (كيف سيبدو / بعد التشطيب) فهذا blueprint-to-visual.' : ''}
+
+أمثلة شاملة:
+- "نملة تطير" → image, images (لحظة خيالية ثابتة)
+- "تخيل أنا أركب النملة كالخيل" → image, images (لحظة خيالية)
+- "أنا أطير وتسقط الطيور من الصدمة" → video, fast (قصة بها حدث ونهاية)
+- "الحديد يحكي دورة في المبنى" → video, pro (رحلة تسلسلية وثائقية)
+- "أرني كيف المبنى ينمو من الصفر للتشطيب" → video, pro (مراحل تسلسلية)
+- "صورة شارع + تخيل شكله بعد 50 سنة" → image, images (image-to-image تحويل زمني)
+- "صورتي + تخيلني شاباً" → image, images (image-to-image تحويل شخصي)
+- "مخطط بيتي + شكله بعد التشطيب" → image, pro (blueprint-to-visual)
+- "أنا في جحر نملة" → immersive, immersive
+- "تخيل نفسي داخل صدفة" → immersive, immersive
+- "لو كنت ذرة كربون" → immersive, immersive
+- "فيلم تسويقي عن المشروع" → video, pro
+- "فيلم تعليمي عن الفيزياء" → video, pro
 
 أجب بـ JSON فقط بهذا الشكل:
 {
@@ -211,7 +224,7 @@ function quickIntentDetect(msg: string): DetectedIntent {
     };
   }
 
-  // وضع "أنا هناك" — الغمر الكامل
+  // ── وضع "أنا هناك" — الغمر الكامل ──
   const immersiveKeywords = [
     "أنا في ", "أنا داخل", "أنا بداخل", "أتخيل نفسي", "تخيل نفسي",
     "لو كنت", "لو كنت في", "داخل ", "بداخل ", "من داخل",
@@ -228,29 +241,41 @@ function quickIntentDetect(msg: string): DetectedIntent {
     };
   }
 
-  // فيديو
-  const videoKeywords = [
-    "فيديو",
-    "فلم",
-    "فيلم",
-    "مقطع",
-    "video",
-    "movie",
-    "film",
-    "أنتج",
-    "اصنع فيديو",
-    "اعمل فيديو",
-    "مشاهد",
+  // ── كشف التسلسل الزمني والقصة المتطورة → فيديو ──
+  // "الحديد يحكي" / "مبنى ينمو" / "أنا أطير وتسقط" / "من الصفر للتشطيب"
+  const sequencePatterns = [
+    /ينمو|يتطور|يتحول|يتغير|ينهار|يُبنى|يُشيَّد/,
+    /من الصفر|من البداية|من الأساس/,
+    /إلى التشطيب|إلى النهاية|إلى الاكتمال/,
+    /يحكي|يروي|يسرد|قصة|رحلة/,
+    /مراحل|خطوات|دورة حياة/,
+    /ثم.{0,30}(يسقط|يتحول|يتغير|يصل)/,
+    /فجأة.{0,30}(يسقط|يتحول|يصطدم)/,
+    /وبعدين|وبعد ذلك|ثم بعد/,
+    /من المنجم|من الأرض|من الطبيعة/,
+    /time.?lapse|timelapse|time lapse/i,
+    /before.{0,10}after|قبل.{0,10}بعد/i,
   ];
-  if (videoKeywords.some((k) => arabic.includes(k))) {
+  const hasSequence = sequencePatterns.some(p => p.test(arabic));
+
+  // كشف الفيديو الصريح
+  const videoKeywords = ["فيديو", "فلم", "فيلم", "مقطع", "video", "movie", "film", "أنتج", "اصنع فيديو", "اعمل فيديو", "مشاهد"];
+  const hasVideoKeyword = videoKeywords.some((k) => arabic.includes(k));
+
+  // محتوى pro: مشاريع كبيرة وتسلسلية
+  const isProContent = [
+    "مشروع", "معماري", "وثائقي", "تسويقي", "تعليمي", "علمي", "صحي", "تاريخي",
+    "documentary", "marketing", "educational", "scientific",
+    "من الصفر", "دورة حياة", "مراحل البناء", "رحلة",
+  ].some(k => arabic.includes(k));
+
+  if (hasVideoKeyword || hasSequence) {
     const sceneMatch = arabic.match(/(\d+)\s*(مشهد|مشاهد|scenes?)/i);
     const langMatch = lower.includes("english") || lower.includes("إنجليزي") ? "en" : "ar";
-    // تحديد outputMode حسب المحتوى
-    const isProContent = ["مشروع", "معماري", "وثائقي", "تسويقي", "تعليمي", "علمي", "صحي", "تاريخي", "documentary", "marketing", "educational", "scientific"].some(k => arabic.includes(k));
     return {
       type: "video",
-      outputMode: isProContent ? "pro" : "fast",
-      confidence: 0.92,
+      outputMode: (isProContent || hasSequence) ? "pro" : "fast",
+      confidence: hasVideoKeyword ? 0.92 : 0.85,
       params: {
         description: msg,
         language: langMatch,
@@ -259,17 +284,28 @@ function quickIntentDetect(msg: string): DetectedIntent {
     };
   }
 
-  // صورة
-  const imageKeywords = [
-    "صورة",
-    "صوّر",
-    "ارسم",
-    "image",
-    "picture",
-    "draw",
-    "generate image",
-    "مشهد واحد",
+  // ── كشف تحويل الهوية الشخصية (image-to-image) ──
+  // "تخيلني شاباً" / "تخيلني طفلاً" / "حوّلني" / "كيف أكون بعد 30 سنة"
+  const personalTransformPatterns = [
+    /تخيلني|تخيل\s*لي|تخيل\s*نفسي/,
+    /حوّلني|حولني|اجعلني/,
+    /كيف\s*(أكون|سأكون|أبدو|سأبدو)/,
+    /لو\s*كنت\s*(شاب|طفل|صغير|كبير|رياضي|فنان|ملك)/,
+    /بعد\s*\d+\s*سن/,
+    /imagine me|transform me|make me look/i,
   ];
+  if (personalTransformPatterns.some(p => p.test(arabic))) {
+    return {
+      type: "image",
+      outputMode: "images",
+      confidence: 0.9,
+      params: { description: msg },
+      suggestedReply: "🪄 سأحوّل الصورة وفق طلبك...",
+    };
+  }
+
+  // ── صورة صريحة ──
+  const imageKeywords = ["صورة", "صوّر", "ارسم", "image", "picture", "draw", "generate image", "مشهد واحد"];
   if (imageKeywords.some((k) => arabic.includes(k))) {
     return {
       type: "image",
@@ -279,16 +315,8 @@ function quickIntentDetect(msg: string): DetectedIntent {
     };
   }
 
-  // سيناريو
-  const scriptKeywords = [
-    "سيناريو",
-    "script",
-    "اكتب",
-    "خطة",
-    "مخطط",
-    "بدون إنتاج",
-    "فقط الكتابة",
-  ];
+  // ── سيناريو ──
+  const scriptKeywords = ["سيناريو", "script", "اكتب", "بدون إنتاج", "فقط الكتابة"];
   if (scriptKeywords.some((k) => arabic.includes(k))) {
     return {
       type: "script",
@@ -298,19 +326,8 @@ function quickIntentDetect(msg: string): DetectedIntent {
     };
   }
 
-  // تعديل
-  const editKeywords = [
-    "عدّل",
-    "غيّر",
-    "بدّل",
-    "أضف",
-    "احذف",
-    "edit",
-    "change",
-    "modify",
-    "المشهد",
-    "scene",
-  ];
+  // ── تعديل ──
+  const editKeywords = ["عدّل", "غيّر", "بدّل", "أضف", "احذف", "edit", "change", "modify", "المشهد", "scene"];
   if (editKeywords.some((k) => arabic.includes(k))) {
     const sceneMatch = arabic.match(/المشهد\s*(\d+)|scene\s*(\d+)/i);
     return {
@@ -323,8 +340,23 @@ function quickIntentDetect(msg: string): DetectedIntent {
     };
   }
 
-  // سؤال
-  const questionKeywords = ["ما هو", "كيف", "لماذا", "متى", "أين", "هل", "what", "how", "why", "when", "?", "؟"];
+  // ── سؤال — لكن "كيف" + وصف بصري ليس سؤالاً! ──
+  // "كيف شكله بعد 50 سنة" → صورة، ليس سؤالاً
+  const visualHowPatterns = [
+    /كيف\s*(شكل|يبدو|سيبدو|يكون|سيكون)/,
+    /how\s*(does|will|would|it look)/i,
+  ];
+  if (visualHowPatterns.some(p => p.test(arabic))) {
+    // هذا طلب بصري وليس سؤالاً
+    return {
+      type: "image",
+      outputMode: isProContent ? "pro" : "images",
+      confidence: 0.82,
+      params: { description: msg },
+    };
+  }
+
+  const questionKeywords = ["ما هو", "لماذا", "متى", "أين", "هل", "what", "how", "why", "when", "?", "؟"];
   if (questionKeywords.some((k) => arabic.includes(k))) {
     return {
       type: "question",
@@ -333,23 +365,31 @@ function quickIntentDetect(msg: string): DetectedIntent {
     };
   }
 
-  // افتراضي ذكي: أي وصف إبداعي أو خيالي → صورة أو فيديو حسب الطول
-  // نملة تطير / قطة تقود سيارة / مدينة في السماء → يجب أن تُنتج!
+  // ── طلبات التخيل والخيال الإبداعي ──
+  const imagineKeywords = ["تخيل", "تصوّر", "imagine", "picture this", "envision"];
+  if (imagineKeywords.some(k => arabic.includes(k))) {
+    return {
+      type: "image",
+      outputMode: "images",
+      confidence: 0.82,
+      params: { description: msg },
+    };
+  }
+
+  // ── افتراضي ذكي: أي وصف = إنتاج فوري ──
   if (msg.length > 0) {
-    // وصف قصير (< 25 حرف) → صورة سينمائية
-    if (msg.length <= 25) {
+    if (msg.length <= 30) {
       return {
         type: "image",
         outputMode: "images",
-        confidence: 0.65,
+        confidence: 0.7,
         params: { description: msg },
       };
     }
-    // وصف متوسط أو طويل → فيديو سريع
     return {
       type: "video",
-      outputMode: "fast",
-      confidence: 0.6,
+      outputMode: isProContent ? "pro" : "fast",
+      confidence: 0.65,
       params: { description: msg, language: "ar", sceneCount: 6 },
     };
   }

@@ -444,23 +444,54 @@ export default function Home() {
       if (immersiveKw.some(k => arabic.toLowerCase().includes(k.toLowerCase())))
         return { type: "image", outputMode: "immersive", label: activeLang === "AR" ? "🌍 أنا هناك — جولة 360°" : "🌍 I'm There — 360° Tour" };
 
-      const videoKw = ["فيديو", "فلم", "فيلم", "مقطع", "video", "movie", "film", "أنتج", "اصنع فيديو", "اعمل فيديو", "مشاهد متعددة", "تصوير", "رحلة", "جولة"];
-      if (videoKw.some(k => arabic.includes(k))) {
-        const isProKw = ["مشروع", "معماري", "وثائقي", "تسويقي", "تعليمي", "علمي", "تاريخي", "documentary", "marketing", "educational"].some(k => arabic.includes(k));
-        return { type: "video", outputMode: isProKw ? "pro" : "fast", label: activeLang === "AR" ? (isProKw ? "✨ فيديو احترافي" : "⚡ فيديو سريع") : (isProKw ? "✨ Pro Video" : "⚡ Fast Video") };
+      // كشف التسلسل الزمني والقصة المتطورة → فيديو
+      const sequencePatterns = [
+        /ينمو|يتطور|يتحول|يتغير|ينهار|يُبنى|يُشيَّد/,
+        /من الصفر|من البداية|من الأساس/,
+        /إلى التشطيب|إلى النهاية|إلى الاكتمال/,
+        /يحكي|يروي|يسرد|رحلة/,
+        /مراحل|خطوات|دورة حياة/,
+        /ثم.{0,30}(يسقط|يتحول|يتغير|يصل)/,
+        /فجأة.{0,30}(يسقط|يتحول|يصطدم)/,
+        /وبعدين|وبعد ذلك|ثم بعد/,
+        /time.?lapse|timelapse/i,
+        /before.{0,10}after|قبل.{0,10}بعد/i,
+      ];
+      const hasSequence = sequencePatterns.some(p => p.test(arabic));
+
+      // كشف تحويل الهوية الشخصية (image-to-image)
+      const personalTransformPatterns = [
+        /تخيلني|تخيل\s*لي|تخيل\s*نفسي/,
+        /حوّلني|حولني|اجعلني/,
+        /كيف\s*(أكون|سأكون|أبدو|سأبدو)/,
+        /لو\s*كنت\s*(شاب|طفل|صغير|كبير|رياضي|فنان|ملك)/,
+        /بعد\s*\d+\s*سن/,
+        /imagine me|transform me|make me look/i,
+      ];
+      if (personalTransformPatterns.some(p => p.test(arabic)))
+        return { type: "image", outputMode: "images", label: activeLang === "AR" ? "🪄 تحويل شخصي" : "🪄 Personal Transform" };
+
+      const videoKw = ["فيديو", "فلم", "فيلم", "مقطع", "video", "movie", "film", "أنتج", "اصنع فيديو", "اعمل فيديو", "مشاهد متعددة", "تصوير"];
+      const hasVideoKw = videoKw.some(k => arabic.includes(k));
+      const isProKw = ["مشروع", "معماري", "وثائقي", "تسويقي", "تعليمي", "علمي", "تاريخي", "documentary", "marketing", "educational", "من الصفر", "دورة حياة", "مراحل البناء"].some(k => arabic.includes(k));
+
+      if (hasVideoKw || hasSequence) {
+        const isPro = isProKw || hasSequence;
+        return { type: "video", outputMode: isPro ? "pro" : "fast", label: activeLang === "AR" ? (isPro ? "✨ فيديو احترافي" : "⚡ فيديو سريع") : (isPro ? "✨ Pro Video" : "⚡ Fast Video") };
       }
 
-      const scriptKw = ["سيناريو", "script", "اكتب", "خطة", "مخطط", "بدون إنتاج", "فقط الكتابة", "قصة", "حوار"];
+      const scriptKw = ["سيناريو", "script", "اكتب", "بدون إنتاج", "فقط الكتابة"];
       if (scriptKw.some(k => arabic.includes(k)))
         return { type: "script", outputMode: "fast", label: activeLang === "AR" ? "📄 سيناريو" : "📄 Script" };
 
-      const imageKw = ["صورة", "صوّر", "ارسم", "image", "picture", "draw", "مشهد", "منظر", "لوحة", "تصميم"];
+      const imageKw = ["صورة", "صوّر", "ارسم", "image", "picture", "draw", "مشهد", "منظر", "لوحة", "تصميم", "تخيل", "تخيّل"];
       if (imageKw.some(k => arabic.includes(k)))
         return { type: "image", outputMode: "images", label: activeLang === "AR" ? "🎨 صورة سينمائية" : "🎨 Cinematic Image" };
 
-      // افتراضي: فيديو إذا كان النص طويلاً
-      if (text.length > 30) return { type: "video", outputMode: "fast", label: activeLang === "AR" ? "🎬 فيديو سينمائي" : "🎬 Cinematic Video" };
+      // افتراضي: أي وصف = إنتاج فوري
+      if (text.length > 30) return { type: "video", outputMode: isProKw ? "pro" : "fast", label: activeLang === "AR" ? "🎬 فيديو سينمائي" : "🎬 Cinematic Video" };
 
+      // وصف قصير = صورة
       return { type: "image", outputMode: "images", label: activeLang === "AR" ? "🎨 صورة سينمائية" : "🎨 Cinematic Image" };
     };
 
