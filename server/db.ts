@@ -1,15 +1,34 @@
 import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
+import mysql from "mysql2/promise";
 import { InsertUser, users } from "../drizzle/schema";
 import { ENV } from './_core/env';
 
 let _db: ReturnType<typeof drizzle> | null = null;
+let _pool: mysql.Pool | null = null;
 
-// Lazily create the drizzle instance so local tooling can run without a DB.
+/**
+ * Connection Pool محسّن لدعم 500 مستخدم متزامن
+ * - connectionLimit=20: أقصى 20 اتصال متزامن بـ DB
+ * - waitForConnections=true: الطلبات تنتظر بدلاً من الفشل
+ * - queueLimit=0: طابور انتظار غير محدود
+ * - enableKeepAlive: يمنع انقطاع الاتصالات الخاملة
+ */
 export async function getDb() {
   if (!_db && process.env.DATABASE_URL) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _pool = mysql.createPool({
+        uri: process.env.DATABASE_URL,
+        connectionLimit: 20,
+        waitForConnections: true,
+        queueLimit: 0,
+        enableKeepAlive: true,
+        keepAliveInitialDelay: 10_000,
+        connectTimeout: 10_000,
+        idleTimeout: 60_000,
+      });
+      _db = drizzle(_pool);
+      console.log("[Database] Connection pool initialized (limit=20)");
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;

@@ -1495,6 +1495,7 @@ export default function Home() {
 
               {videoJob.status !== "done" && videoJob.status !== "failed" && (
                 <>
+                  {/* شريط التقدم */}
                   <div className="w-full bg-white/10 rounded-full h-2 mb-2 overflow-hidden">
                     <div className="h-full rounded-full transition-all duration-500"
                       style={{ width: `${videoJob.progress}%`, background: "linear-gradient(90deg, #3b82f6, #0ea5e9)" }} />
@@ -1502,6 +1503,33 @@ export default function Home() {
                   <p className="text-xs" style={{ color: "rgba(148,163,184,0.6)", fontFamily: "'Tajawal', sans-serif" }}>
                     {videoJob.currentStep} — {videoJob.progress}%
                   </p>
+                  {/* معلومات الطابور */}
+                  {(() => {
+                    const qPos = (jobStatusQuery.data as any)?.queuePosition ?? 0;
+                    const qWait = (jobStatusQuery.data as any)?.estimatedWaitSeconds ?? 0;
+                    const qStats = (jobStatusQuery.data as any)?.queueStats;
+                    if (qPos > 0) {
+                      return (
+                        <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-xl" style={{ background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.2)" }}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+                          <p className="text-xs" style={{ color: "#fbbf24", fontFamily: "'Tajawal', sans-serif" }}>
+                            أنت رقم <strong>{qPos}</strong> في الطابور — وقت متوقع: <strong>{qWait > 60 ? `${Math.ceil(qWait/60)} دقيقة` : `${qWait} ثانية`}</strong>
+                          </p>
+                        </div>
+                      );
+                    }
+                    if (qStats && qStats.queued > 0) {
+                      return (
+                        <div className="mt-1 flex items-center gap-1.5">
+                          <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                          <p className="text-xs" style={{ color: "rgba(52,211,153,0.7)", fontFamily: "'Tajawal', sans-serif" }}>
+                            يعمل الآن — {qStats.running}/{qStats.maxConcurrent} مهمة نشطة
+                          </p>
+                        </div>
+                      );
+                    }
+                    return null;
+                  })()}
                 </>
               )}
 

@@ -8,6 +8,8 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import mediaRoutes from "../mediaRoutes";
+import compression from "compression";
+import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
 function isPortAvailable(port: number): Promise<boolean> {
   return new Promise(resolve => {
@@ -90,6 +92,36 @@ async function startServer() {
   const server = createServer(app);
   // تنظيف الـ jobs العالقة بعد 10 ثواني من بدء السيرفر (لضمان استقرار اتصال DB)
   setTimeout(() => cleanupStuckJobs().catch(e => console.warn("[Startup] cleanupStuckJobs deferred error:", e)), 10_000);
+
+  // ══ Compression: تقليل حجم الردود بـ 70-80% ════════════════════════════════════════════════
+  app.use(compression({ level: 6, threshold: 1024 }));
+
+  // ══ Rate Limiting متعدد الطبقات ════════════════════════════════════════════════════════════════════════
+  // حد عام: 200 طلب/دقيقة لكل IP (يمنع DDoS بسيط) — ipKeyGenerator يتعامل مع IPv4 و IPv6
+  const globalLimiter = rateLimit({
+    windowMs: 60_000,
+    max: 200,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'طلبات كثيرة جداً — حاول مرة أخرى بعد دقيقة' },
+    keyGenerator: ipKeyGenerator,
+    skip: (req) => req.path.startsWith('/api/oauth'),
+  });
+  app.use(globalLimiter);
+
+  // حد مخصص: 5 طلبات إنتاج/دقيقة لكل IP على endpoints الثقيلة
+  const productionLimiter = rateLimit({
+    windowMs: 60_000,
+    max: 5,
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'تجاوزت الحد المسموح (5 طلبات إنتاج/دقيقة). حاول بعد قليل' },
+    keyGenerator: ipKeyGenerator,
+  });
+  // تطبيق على مسارات الإنتاج فقط
+  app.use('/api/trpc/video.startProduction', productionLimiter);
+  app.use('/api/trpc/video.quickProduce', productionLimiter);
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));

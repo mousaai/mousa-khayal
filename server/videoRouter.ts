@@ -20,6 +20,7 @@ import {
 } from "../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
 import { notifyOwner } from "./_core/notification";
+import { jobQueue } from "./jobQueue";
 // ═══════════════════════════════════════════════════════════
 // Zod schemas للمدخلاتت
 // ═══════════════════════════════════════════════════════════
@@ -298,8 +299,26 @@ export const videoRouter = router({
       };
       await createJobInDB(jobId, input.description, scriptData, input.options ?? {});
 
-      // تشغيل مع heartbeat — يستمر حتى لو أغلق المتصفح
-      runProductionJob(jobId, scriptData, input.options ?? {});
+      // إضافة إلى الطابور الذكي — يدعم 500 مستخدم متزامن
+      const userId = `anon_${Math.random().toString(36).slice(2, 8)}`;
+      try {
+        const { position, waitSeconds } = await new Promise<{ position: number; waitSeconds: number }>((resolve) => {
+          jobQueue.enqueue(jobId, userId, () => runProductionJob(jobId, scriptData, input.options ?? {}))
+            .then(resolve)
+            .catch(async (err: Error) => {
+              const msg = err.message.includes(':') ? err.message.split(':')[1] : err.message;
+              await updateJobInDB(jobId, { status: 'failed', error: msg, currentStep: msg });
+              resolve({ position: -1, waitSeconds: 0 });
+            });
+        });
+        if (position > 0) {
+          await updateJobInDB(jobId, {
+            status: 'pending',
+            currentStep: `في الطابور — رقم ${position} (وقت متوقع: ${waitSeconds} ثانية)`,
+            progress: 0,
+          });
+        }
+      } catch (_) { /* تم التعامل مع الخطأ أعلاه */ }
 
       return { jobId };
     }),
@@ -311,6 +330,10 @@ export const videoRouter = router({
     .input(z.object({ jobId: z.string() }))
     .query(async ({ input }) => {
       const job = await getJobFromDB(input.jobId);
+      // إحصاءات الطابور الحالية
+      const qStats = jobQueue.stats();
+      const queuePosition = jobQueue.getQueuePosition(input.jobId);
+      const estimatedWaitSeconds = queuePosition > 0 ? jobQueue.estimatedWaitSeconds(queuePosition) : 0;
       if (!job) {
         return {
           status: "not_found" as const,
@@ -319,6 +342,9 @@ export const videoRouter = router({
           videoUrl: undefined as string | undefined,
           error: undefined as string | undefined,
           metrics: undefined as VideoJob["metrics"] | undefined,
+          queuePosition: 0,
+          estimatedWaitSeconds: 0,
+          queueStats: qStats,
         };
       }
       return {
@@ -328,6 +354,9 @@ export const videoRouter = router({
         videoUrl: job.videoUrl ?? undefined,
         error: job.error ?? undefined,
         metrics: job.metrics as VideoJob["metrics"] | undefined,
+        queuePosition,
+        estimatedWaitSeconds,
+        queueStats: qStats,
       };
     }),
 
@@ -354,8 +383,22 @@ export const videoRouter = router({
       };
       await createJobInDB(jobId, input.description, scriptData, input.options ?? {});
 
-      // تشغيل مع heartbeat — يستمر حتى لو أغلق المتصفح
-      runProductionJob(jobId, scriptData, input.options ?? {});
+      // إضافة إلى الطابور الذكي — يدعم 500 مستخدم متزامن
+      const qUserId = `anon_${Math.random().toString(36).slice(2, 8)}`;
+      jobQueue.enqueue(jobId, qUserId, () => runProductionJob(jobId, scriptData, input.options ?? {}))
+        .then(async ({ position, waitSeconds }) => {
+          if (position > 0) {
+            await updateJobInDB(jobId, {
+              status: 'pending',
+              currentStep: `في الطابور — رقم ${position} (وقت متوقع: ${waitSeconds} ثانية)`,
+              progress: 0,
+            });
+          }
+        })
+        .catch(async (err: Error) => {
+          const msg = err.message.includes(':') ? err.message.split(':')[1] : err.message;
+          await updateJobInDB(jobId, { status: 'failed', error: msg, currentStep: msg });
+        });
 
       return { jobId };
     }),
