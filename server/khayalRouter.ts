@@ -471,7 +471,7 @@ export const khayalRouter = router({
             title: input.title || analysis.title || input.description.slice(0, 80),
             description: input.description,
             inputType: input.referenceImageUrl ? "mixed" : "text",
-            scenarioType: (analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine") || "imagine",
+            scenarioType: (analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine" | "transform" | "fantasy" | "historical" | "nature") || "imagine",
             inputData: {
               description: input.description,
               referenceImageUrl: input.referenceImageUrl,
@@ -587,7 +587,7 @@ export const khayalRouter = router({
           title: analysis.title || input.description.slice(0, 80),
           description: input.description,
           inputType: input.referenceImageUrl ? "mixed" : "text",
-          scenarioType: (analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine") || "imagine",
+          scenarioType: (analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine" | "transform" | "fantasy" | "historical" | "nature") || "imagine",
           inputData: {
             description: input.description,
             durationMinutes: input.durationMinutes,
