@@ -858,9 +858,7 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
       <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/10 to-black/50 pointer-events-none" />
       <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-transparent to-black/20 pointer-events-none" />
 
-      {/* Letterbox bars */}
-      <div className="absolute top-0 left-0 right-0 h-10 bg-black pointer-events-none" style={{ zIndex: 5 }} />
-      <div className="absolute bottom-0 left-0 right-0 h-10 bg-black pointer-events-none" style={{ zIndex: 5 }} />
+      {/* Letterbox bars removed — full cinematic view */}
 
       {/* Fade to black */}
       <div className="absolute inset-0 bg-black pointer-events-none" style={{ opacity: fadeOpacity, transition: "opacity 0.6s ease-in-out", zIndex: 10 }} />
