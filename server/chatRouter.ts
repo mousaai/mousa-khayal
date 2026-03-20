@@ -274,7 +274,7 @@ function quickIntentDetect(msg: string): DetectedIntent {
     const langMatch = lower.includes("english") || lower.includes("إنجليزي") ? "en" : "ar";
     return {
       type: "video",
-      outputMode: (isProContent || hasSequence) ? "pro" : "fast",
+      outputMode: "images" /* 🔒 frozen */,
       confidence: hasVideoKeyword ? 0.92 : 0.85,
       params: {
         description: msg,
@@ -320,7 +320,7 @@ function quickIntentDetect(msg: string): DetectedIntent {
   if (scriptKeywords.some((k) => arabic.includes(k))) {
     return {
       type: "script",
-      outputMode: "fast",
+      outputMode: "images" /* 🔒 frozen: was "fast" */,
       confidence: 0.88,
       params: { description: msg },
     };
@@ -350,7 +350,7 @@ function quickIntentDetect(msg: string): DetectedIntent {
     // هذا طلب بصري وليس سؤالاً
     return {
       type: "image",
-      outputMode: isProContent ? "pro" : "images",
+      outputMode: "images" /* 🔒 frozen */,
       confidence: 0.82,
       params: { description: msg },
     };
@@ -388,7 +388,7 @@ function quickIntentDetect(msg: string): DetectedIntent {
     }
     return {
       type: "video",
-      outputMode: isProContent ? "pro" : "fast",
+      outputMode: "images" /* 🔒 frozen */,
       confidence: 0.65,
       params: { description: msg, language: "ar", sceneCount: 6 },
     };

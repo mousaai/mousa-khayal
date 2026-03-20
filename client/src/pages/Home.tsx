@@ -726,15 +726,16 @@ export default function Home() {
         setIsThinking(true);
         const result = await detectIntentMutation.mutateAsync({ message: prompt });
         const intentType = result.intent.type as DetectedIntentType;
-        const aiOutputMode = (result.intent as any).outputMode as "images" | "fast" | "pro" | "immersive" | undefined;
-
+         const rawAiOutputMode = (result.intent as any).outputMode as "images" | "fast" | "pro" | "immersive" | undefined;
+        // 🔒 الفيديو مجمّد — تحويل fast/pro إلى images دائماً
+        const aiOutputMode = (rawAiOutputMode === "fast" || rawAiOutputMode === "pro") ? "images" : rawAiOutputMode;
         // تحديث outputMode من الذكاء فقط إذا لم يختر المستخدم يدوياً
         if (aiOutputMode && !manualMode) setOutputMode(aiOutputMode);
 
         const modeLabels: Record<string, Record<string, string>> = {
           images: { AR: "🎨 صورة سينمائية", EN: "🎨 Cinematic Image" },
-          fast: { AR: "⚡ فيديو سريع", EN: "⚡ Fast Video" },
-          pro: { AR: "✨ فيديو احترافي", EN: "✨ Pro Video" },
+          fast: { AR: "🎨 مشاهد سينمائية", EN: "🎨 Cinematic Scenes" },
+          pro: { AR: "🎨 مشاهد سينمائية", EN: "🎨 Cinematic Scenes" },
           immersive: { AR: "🌍 أنا هناك — 360°", EN: "🌍 I'm There — 360°" },
         };
         if (!manualMode) {
@@ -1708,12 +1709,6 @@ export default function Home() {
                   <span className="relative z-10">🧠 {activeLang === "AR" ? "خيال تقرر" : "Khayal Decides"}</span>
                 ) : outputMode === "immersive" ? (
                   <span className="relative z-10">🌍 {activeLang === "AR" ? "انقلني هناك" : "Take Me There"}</span>
-                ) : outputMode === "pro" ? (
-                  <span className="relative z-10">✨ {activeLang === "AR" ? "إنتاج احترافي" : "Pro Produce"}</span>
-                ) : outputMode === "fast" ? (
-                  <span className="relative z-10">⚡ {activeLang === "AR" ? "إنتاج سريع" : "Quick Produce"}</span>
-                ) : detectedIntent === "video" ? (
-                  <span className="relative z-10">🎬 {activeLang === "AR" ? "أنتج" : "Produce"}</span>
                 ) : detectedIntent === "script" ? (
                   <span className="relative z-10">📄 {activeLang === "AR" ? "اكتب" : "Write"}</span>
                 ) : (
