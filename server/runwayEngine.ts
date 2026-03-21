@@ -64,24 +64,66 @@ const MOTION_PROMPTS: Record<RunwayMotionPreset, string> = {
 export function selectMotionForDomain(domain: string, sceneIndex: number): RunwayMotionPreset {
   const domainLower = domain.toLowerCase();
 
+  // أكشن — حركة سريعة مكثفة
   if (domainLower.includes("action") || domainLower.includes("أكشن")) {
     return sceneIndex % 2 === 0 ? "action_shake" : "dramatic_push";
   }
+  // وثائقي — حركة مراقبة هادئة
   if (domainLower.includes("documentary") || domainLower.includes("وثائقي")) {
     return sceneIndex % 2 === 0 ? "documentary_drift" : "cinematic_pan";
   }
+  // سينمائي — تنويع درامي
   if (domainLower.includes("cinematic") || domainLower.includes("سينمائي")) {
     const presets: RunwayMotionPreset[] = ["cinematic_pan", "dramatic_push", "zoom_in_slow", "zoom_out_reveal"];
     return presets[sceneIndex % presets.length];
   }
+  // تعليمي — تكبير توضيحي
   if (domainLower.includes("educational") || domainLower.includes("تعليمي")) {
     return sceneIndex % 2 === 0 ? "zoom_in_slow" : "documentary_drift";
   }
+  // دراما — حركة عاطفية
   if (domainLower.includes("drama") || domainLower.includes("دراما")) {
     return sceneIndex % 2 === 0 ? "floating_gentle" : "dramatic_push";
   }
+  // طبيعي/بيئي — حركة ناعمة تحاكي الطبيعة
   if (domainLower.includes("nature") || domainLower.includes("طبيعي")) {
-    return sceneIndex % 2 === 0 ? "floating_gentle" : "orbit_slow";
+    const presets: RunwayMotionPreset[] = ["floating_gentle", "orbit_slow", "documentary_drift", "zoom_out_reveal"];
+    return presets[sceneIndex % presets.length];
+  }
+  // ثقافي/تراثي — حركة استكشافية
+  if (domainLower.includes("cultural") || domainLower.includes("ثقافي")) {
+    return sceneIndex % 2 === 0 ? "documentary_drift" : "zoom_in_slow";
+  }
+  // فني/إبداعي — حركة تعبيرية
+  if (domainLower.includes("artistic") || domainLower.includes("فني")) {
+    const presets: RunwayMotionPreset[] = ["orbit_slow", "zoom_in_slow", "floating_gentle", "cinematic_pan"];
+    return presets[sceneIndex % presets.length];
+  }
+  // هندسي/تقني — حركة تكشف البنية
+  if (domainLower.includes("engineering") || domainLower.includes("هندسي")) {
+    return sceneIndex % 2 === 0 ? "zoom_out_reveal" : "cinematic_pan";
+  }
+  // مجهري/علمي — تكبير تدريجي
+  if (domainLower.includes("microscopic") || domainLower.includes("مجهري")) {
+    const presets: RunwayMotionPreset[] = ["zoom_in_slow", "orbit_slow", "floating_gentle"];
+    return presets[sceneIndex % presets.length];
+  }
+  // تاريخي — حركة ملحمية
+  if (domainLower.includes("historical") || domainLower.includes("تاريخي")) {
+    return sceneIndex % 2 === 0 ? "cinematic_pan" : "zoom_out_reveal";
+  }
+  // روحاني — حركة تأملية هادئة
+  if (domainLower.includes("spiritual") || domainLower.includes("روحاني")) {
+    return sceneIndex % 2 === 0 ? "floating_gentle" : "zoom_in_slow";
+  }
+  // طبي/صحي — حركة دقيقة
+  if (domainLower.includes("medical") || domainLower.includes("طبي")) {
+    return sceneIndex % 2 === 0 ? "zoom_in_slow" : "orbit_slow";
+  }
+  // فضائي/كوني — حركة كونية
+  if (domainLower.includes("scifi") || domainLower.includes("فضائي")) {
+    const presets: RunwayMotionPreset[] = ["zoom_out_reveal", "orbit_slow", "dramatic_push", "cinematic_pan"];
+    return presets[sceneIndex % presets.length];
   }
 
   // افتراضي: تنويع بين الحركات السينمائية

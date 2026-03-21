@@ -2,18 +2,26 @@
  * filmGenreEngine.ts — محرك الأنواع السينمائية
  * ─────────────────────────────────────────────────────────────
  * يكشف نوع الفيلم تلقائياً ويوفر DNA مخصص لكل نوع:
- * 1. سينمائي (Cinematic)
- * 2. وثائقي (Documentary)
- * 3. تعليمي (Educational)
- * 4. تاريخي (Historical)
- * 5. خيال علمي (Sci-Fi)
- * 6. أكشن (Action)
- * 7. دراما (Drama)
- * 8. تسويقي (Marketing)
- * 9. صحي/طبي (Medical)
+ * 1.  سينمائي (Cinematic)
+ * 2.  وثائقي (Documentary)
+ * 3.  تعليمي (Educational)
+ * 4.  تاريخي (Historical)
+ * 5.  خيال علمي (Sci-Fi)
+ * 6.  أكشن (Action)
+ * 7.  دراما (Drama)
+ * 8.  تسويقي (Marketing)
+ * 9.  صحي/طبي (Medical)
  * 10. رعب (Horror)
  * 11. كوميدي (Comedy)
  * 12. ديني/روحاني (Spiritual)
+ * 13. معماري (Architectural)
+ * 14. تحويل شخصي (Personal Transformation)
+ * 15. ثقافي/تراثي (Cultural) — جديد
+ * 16. فني/إبداعي (Artistic) — جديد
+ * 17. طبيعي/بيئي (Nature) — جديد
+ * 18. هندسي/تقني (Engineering) — جديد
+ * 19. مجهري/علمي (Microscopic) — جديد
+ * 20. عام (General)
  */
 
 export type FilmGenre =
@@ -31,6 +39,11 @@ export type FilmGenre =
   | "spiritual"
   | "architectural"
   | "personal_transformation"
+  | "cultural"
+  | "artistic"
+  | "nature"
+  | "engineering"
+  | "microscopic"
   | "general";
 
 export interface FilmGenreDNA {
@@ -95,8 +108,8 @@ const GENRE_DNA: Record<FilmGenre, FilmGenreDNA> = {
     lightingStyle: "bright even lighting, no harsh shadows, clear visibility",
     colorGrading: "bright vivid colors, clean look, high clarity",
     narratorTone: "clear, friendly, educational, step-by-step",
-    promptPrefix: "Educational illustration, clear and informative visual,",
-    promptSuffix: "bright lighting, clean composition, educational infographic style, clear details",
+    promptPrefix: "Educational scientific illustration, clear and informative visual, textbook quality,",
+    promptSuffix: "bright clean lighting, educational clarity, detailed labels, scientific accuracy, infographic style",
     paceDescription: "clear step-by-step pacing",
     musicStyle: "upbeat educational background music",
   },
@@ -191,8 +204,8 @@ const GENRE_DNA: Record<FilmGenre, FilmGenreDNA> = {
     lightingStyle: "clinical white lighting, sterile bright, medical grade clarity",
     colorGrading: "clean clinical look, slight blue-white tone, high clarity",
     narratorTone: "professional, clear, medical authority",
-    promptPrefix: "Medical illustration, clinical photography, health education visual,",
-    promptSuffix: "clinical lighting, sterile environment, medical precision, educational clarity",
+    promptPrefix: "Medical illustration, clinical photography, health education visual, anatomical precision,",
+    promptSuffix: "clinical lighting, sterile environment, medical precision, educational clarity, anatomical detail",
     paceDescription: "clear methodical pacing",
     musicStyle: "calm clinical background, minimal ambient",
   },
@@ -239,8 +252,8 @@ const GENRE_DNA: Record<FilmGenre, FilmGenreDNA> = {
     lightingStyle: "soft divine light, golden rays, peaceful glow, dawn/dusk",
     colorGrading: "warm golden tones, soft ethereal look, peaceful atmosphere",
     narratorTone: "peaceful, reverent, contemplative",
-    promptPrefix: "Spiritual photography, sacred atmosphere, divine light,",
-    promptSuffix: "soft golden light, peaceful atmosphere, spiritual composition, ethereal quality",
+    promptPrefix: "Spiritual photography, sacred atmosphere, divine light, reverent composition,",
+    promptSuffix: "soft golden light, peaceful atmosphere, spiritual composition, ethereal quality, sacred beauty",
     paceDescription: "slow meditative pacing",
     musicStyle: "peaceful ambient, spiritual music, oud or flute",
   },
@@ -277,6 +290,88 @@ const GENRE_DNA: Record<FilmGenre, FilmGenreDNA> = {
     musicStyle: "personal emotional score",
   },
 
+  // ─── المجالات الجديدة ───────────────────────────────────────
+
+  cultural: {
+    genre: "cultural",
+    labelAr: "ثقافي/تراثي",
+    labelEn: "Cultural",
+    emoji: "🏺",
+    color: "bg-amber-800",
+    cameraStyle: "immersive wide shots, detail close-ups, anthropological framing",
+    lightingStyle: "warm natural light, market lanterns, golden afternoon sun, authentic atmosphere",
+    colorGrading: "rich warm tones, earthy colors, vibrant cultural palette, authentic look",
+    narratorTone: "respectful, curious, culturally sensitive, storytelling",
+    promptPrefix: "Cultural heritage photography, National Geographic quality, authentic cultural scene,",
+    promptSuffix: "warm natural lighting, rich cultural details, traditional atmosphere, vibrant colors, authentic environment",
+    paceDescription: "immersive cultural pacing",
+    musicStyle: "traditional folk music, regional instruments, cultural soundscape",
+  },
+
+  artistic: {
+    genre: "artistic",
+    labelAr: "فني/إبداعي",
+    labelEn: "Artistic",
+    emoji: "🎨",
+    color: "bg-pink-600",
+    cameraStyle: "artistic composition, rule of thirds, abstract framing, creative angles",
+    lightingStyle: "dramatic artistic lighting, chiaroscuro, colorful studio lights, creative shadows",
+    colorGrading: "vibrant artistic colors, painterly look, expressive color palette, high saturation",
+    narratorTone: "creative, expressive, artistic, poetic",
+    promptPrefix: "Fine art photography, museum quality artwork, artistic masterpiece,",
+    promptSuffix: "dramatic artistic lighting, expressive composition, painterly quality, gallery-worthy, creative vision",
+    paceDescription: "expressive artistic pacing",
+    musicStyle: "classical music, jazz, contemporary art score",
+  },
+
+  nature: {
+    genre: "nature",
+    labelAr: "طبيعي/بيئي",
+    labelEn: "Nature",
+    emoji: "🌿",
+    color: "bg-green-700",
+    cameraStyle: "wide landscape shots, wildlife photography, macro nature details, aerial views",
+    lightingStyle: "golden hour sunlight, dappled forest light, blue hour, natural atmospheric light",
+    colorGrading: "lush natural greens, vivid blues, earthy tones, National Geographic color grade",
+    narratorTone: "awe-inspiring, peaceful, environmental, David Attenborough style",
+    promptPrefix: "Nature photography masterpiece, National Geographic quality, breathtaking natural scene,",
+    promptSuffix: "golden natural light, lush environment, atmospheric depth, wildlife photography quality, pristine nature",
+    paceDescription: "peaceful natural pacing",
+    musicStyle: "nature ambient sounds, peaceful orchestral, environmental score",
+  },
+
+  engineering: {
+    genre: "engineering",
+    labelAr: "هندسي/تقني",
+    labelEn: "Engineering",
+    emoji: "⚙️",
+    color: "bg-gray-600",
+    cameraStyle: "technical precision shots, structural angles, scale-revealing composition",
+    lightingStyle: "industrial lighting, dramatic structural shadows, technical clarity",
+    colorGrading: "industrial color grade, steel blues and grays, technical precision look",
+    narratorTone: "technical, precise, informative, engineering authority",
+    promptPrefix: "Engineering photography, technical precision, industrial masterpiece,",
+    promptSuffix: "dramatic industrial lighting, structural details, engineering precision, scale and power, technical excellence",
+    paceDescription: "methodical technical pacing",
+    musicStyle: "industrial ambient, technical score, mechanical rhythm",
+  },
+
+  microscopic: {
+    genre: "microscopic",
+    labelAr: "مجهري/علمي",
+    labelEn: "Microscopic",
+    emoji: "🔬",
+    color: "bg-indigo-700",
+    cameraStyle: "extreme macro, electron microscopy style, molecular visualization",
+    lightingStyle: "bioluminescent glow, fluorescent microscopy colors, inner light sources",
+    colorGrading: "fluorescent colors, scientific visualization palette, glowing cellular tones",
+    narratorTone: "scientific, precise, awe-inspiring, discovery-focused",
+    promptPrefix: "Electron microscopy visualization, scientific macro photography, molecular world,",
+    promptSuffix: "fluorescent microscopy colors, bioluminescent glow, extreme detail, scientific precision, molecular scale",
+    paceDescription: "slow discovery pacing",
+    musicStyle: "ambient electronic, scientific discovery score",
+  },
+
   general: {
     genre: "general",
     labelAr: "عام",
@@ -304,10 +399,10 @@ export function detectFilmGenre(
 ): FilmGenre {
   const text = description.toLowerCase();
 
-  // معماري
+  // معماري — يجب أن يكون قبل الروحاني لأن "مسجد" قد يتعارض
   if (
     hasDocument ||
-    /مبن|بيت|فيلا|برج|مسجد|مدرسة|مستشفى|مكتب|واجهة|تصميم معماري|مخطط|طابق|building|villa|tower|mosque|facade|architectural|floor plan|شقة|عمارة|منزل|دار/.test(text)
+    /مبن|بيت|فيلا|برج|مدرسة|مستشفى|مكتب|واجهة|تصميم معماري|مخطط|طابق|building|villa|tower|school|hospital|facade|architectural|floor plan|شقة|عمارة|منزل|دار/.test(text)
   ) {
     return "architectural";
   }
@@ -320,6 +415,27 @@ export function detectFilmGenre(
     return "personal_transformation";
   }
 
+  // ديني/روحاني — قبل الوثائقي لأن "رحلة" قد تكون رحلة حج
+  if (
+    /صلاة|قرآن|دعاء|روحاني|إيمان|حج|عمرة|كعبة|مكة|مدينة منورة|نبي|رسول|prayer|quran|spiritual|faith|divine|holy|pilgrimage|mecca|medina/.test(text)
+  ) {
+    return "spiritual";
+  }
+
+  // طبي/صحي — قبل التعليمي لأن "كيف يعمل الجسم" قد يكون طبياً
+  if (
+    /طبي|صحة|علاج|تشريح|جراح|دم|قلب|مخ|عظم|عضلة|خلية حيوانية|medical|health|treatment|anatomy|surgery|hospital|blood|heart|brain|bone|muscle|organ|disease|virus|bacteria/.test(text)
+  ) {
+    return "medical";
+  }
+
+  // مجهري/علمي — قبل التعليمي
+  if (
+    /مجهر|خلية|جين|dna|rna|جزيء|ذرة|بروتين|فيروس|بكتيريا|microscope|cell|gene|molecule|atom|protein|virus|bacteria|microscopic|nano|quantum particle/.test(text)
+  ) {
+    return "microscopic";
+  }
+
   // وثائقي
   if (
     /وثائقي|يحكي|يروي|دورة|رحلة.*من.*إلى|كيف يعمل|كيف يُصنع|كيف تُبنى|تاريخ.*حقيقي|documentary|how it.*made|how.*works|journey of|lifecycle|story of/.test(text)
@@ -329,16 +445,44 @@ export function detectFilmGenre(
 
   // تاريخي
   if (
-    /تاريخ|قديم|حرب|معركة|فرسان|حضارة|عصر|قرن|خليفة|سلطان|ملك|history|ancient|war|battle|knight|civilization|century|medieval|empire/.test(text)
+    /تاريخ|قديم|حرب|معركة|فرسان|حضارة|عصر|قرن|خليفة|سلطان|ملك|فرعون|روماني|إغريقي|history|ancient|war|battle|knight|civilization|century|medieval|empire|pharaoh|roman|greek/.test(text)
   ) {
     return "historical";
   }
 
-  // خيال علمي
+  // ثقافي/تراثي — قبل الخيال العلمي
   if (
-    /فضاء|مستقبل|روبوت|ذكاء اصطناعي|كوكب|مجرة|تقنية|هولوغرام|space|future|robot|ai|planet|galaxy|technology|hologram|cyberpunk|sci-fi/.test(text)
+    /ثقافة|تراث|عادات|تقاليد|أزياء تقليدية|سوق|قبيلة|شعب|فولكلور|موروث|culture|heritage|tradition|customs|folk|tribal|ethnic|traditional market|souk|bazaar|cultural/.test(text)
+  ) {
+    return "cultural";
+  }
+
+  // خيال علمي — بعد الهندسي لأن "تقنية" قد تكون هندسية
+  if (
+    /فضاء|مستقبل|روبوت|ذكاء اصطناعي|كوكب|مجرة|ثقب أسود|نجم|هولوغرام|space|future|robot|ai|planet|galaxy|black hole|star|hologram|cyberpunk|sci-fi|cosmos|nebula/.test(text)
   ) {
     return "scifi";
+  }
+
+  // هندسي/تقني
+  if (
+    /هندسة|جسر|سد|نفق|طريق|بنية تحتية|آلة|محرك|مصنع|توربين|engineering|bridge|dam|tunnel|road|infrastructure|machine|engine|factory|turbine|mechanical|industrial|construction/.test(text)
+  ) {
+    return "engineering";
+  }
+
+  // طبيعي/بيئي
+  if (
+    /غابة|بحر|نهر|جبل|صحراء|سماء|حيوان|نبات|بيئة|مناخ|محيط|forest|ocean|mountain|desert|sky|animal|plant|environment|climate|wildlife|landscape|nature|ecosystem/.test(text)
+  ) {
+    return "nature";
+  }
+
+  // فني/إبداعي
+  if (
+    /فن|لوحة|نحت|رسم|موسيقى|رقص|مسرح|أداء|تصوير فوتوغرافي|art|painting|sculpture|drawing|music|dance|theater|performance|photography|creative|abstract|artistic/.test(text)
+  ) {
+    return "artistic";
   }
 
   // رعب
@@ -376,25 +520,11 @@ export function detectFilmGenre(
     return "marketing";
   }
 
-  // صحي/طبي
-  if (
-    /طبي|صحة|علاج|جسم|تشريح|medical|health|treatment|body|anatomy|surgery|hospital/.test(text)
-  ) {
-    return "medical";
-  }
-
   // تعليمي
   if (
     /تعليم|درس|شرح|كيف|لماذا|تعلم|educational|lesson|explain|how to|why|learn|science|biology/.test(text)
   ) {
     return "educational";
-  }
-
-  // ديني/روحاني
-  if (
-    /صلاة|مسجد|قرآن|دعاء|روحاني|إيمان|prayer|mosque|quran|spiritual|faith|divine|holy/.test(text)
-  ) {
-    return "spiritual";
   }
 
   // سينمائي (افتراضي للطلبات الخيالية والإبداعية)
