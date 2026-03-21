@@ -11,6 +11,7 @@
  */
 
 import { ENV } from "./_core/env";
+import { trackElevenLabs } from "./costTracker";
 
 // ═══════════════════════════════════════════════════════════
 // الأنواع
@@ -322,6 +323,13 @@ export class ElevenLabsEngine {
 
       const arrayBuffer = await response.arrayBuffer();
       const buffer = Buffer.from(arrayBuffer);
+      // تسجيل تكلفة ElevenLabs
+      trackElevenLabs({
+        operation: "generateSpeech",
+        charCount: options.text.length,
+        voice: options.voice,
+        model,
+      }).catch(() => {});
       console.log(`  ✓ [ElevenLabs] صوت جاهز: ${voiceConfig.name} — ${buffer.length} bytes`);
       return buffer;
     } catch (err) {

@@ -9,6 +9,7 @@
  */
 
 import { ENV } from "./_core/env";
+import { trackRunway } from "./costTracker";
 
 // ═══════════════════════════════════════════════════════════
 // الأنواع
@@ -280,6 +281,8 @@ export class RunwayEngine {
       }
 
       const task = await createResponse.json() as RunwayTask;
+      // تسجيل تكلفة Runway بعد نجاح إنشاء المهمة
+      trackRunway({ operation: "image_to_video", durationSec: duration as 5 | 10, motionPreset }).catch(() => {});
       console.log(`  [Runway] مهمة أُنشئت: ${task.id}`);
 
       // الانتظار حتى اكتمال المهمة (polling)

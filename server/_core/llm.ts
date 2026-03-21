@@ -1,4 +1,5 @@
 import { ENV } from "./env";
+import { trackLLM } from "../costTracker";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -328,5 +329,15 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     );
   }
 
-  return (await response.json()) as InvokeResult;
+  const result = (await response.json()) as InvokeResult;
+  // تسجيل تكلفة LLM بعد كل استدعاء ناجح
+  if (result.usage) {
+    trackLLM({
+      operation: "invokeLLM",
+      inputTokens: result.usage.prompt_tokens,
+      outputTokens: result.usage.completion_tokens,
+      model: result.model || "gemini-2.5-flash",
+    }).catch(() => {}); // لا نوقف التطبيق بسبب خطأ في التتبع
+  }
+  return result;
 }

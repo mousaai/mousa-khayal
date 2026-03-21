@@ -204,3 +204,35 @@ export const userPreferences = mysqlTable("user_preferences", {
 
 export type UserPreferences = typeof userPreferences.$inferSelect;
 export type InsertUserPreferences = typeof userPreferences.$inferInsert;
+
+// ══════════════════════════════════════════════════════════════
+// جدول تتبع التكاليف — يُسجّل كل استدعاء API مدفوع
+// ══════════════════════════════════════════════════════════════
+export const costEvents = mysqlTable("cost_events", {
+  id: int("id").autoincrement().primaryKey(),
+  // مصدر التكلفة
+  provider: mysqlEnum("provider", [
+    "llm",        // Manus LLM (GPT-4o)
+    "image_gen",  // Manus Image Generation
+    "runway",     // Runway ML (Image-to-Video)
+    "elevenlabs", // ElevenLabs TTS
+    "storage",    // Cloudflare R2 Storage
+    "other",
+  ]).notNull(),
+  // نوع العملية
+  operation: varchar("operation", { length: 128 }).notNull(), // e.g. "generateScene", "tts", "video"
+  // بيانات الاستهلاك
+  units: int("units").default(1).notNull(),           // عدد الوحدات (tokens, chars, seconds, MB)
+  unitType: varchar("unitType", { length: 32 }).notNull(), // "tokens", "characters", "seconds", "mb"
+  costUsd: varchar("costUsd", { length: 20 }).notNull(),   // التكلفة بالدولار (string لتجنب float errors)
+  // السياق
+  userId: int("userId"),           // المستخدم (null = زائر)
+  jobId: varchar("jobId", { length: 64 }),  // ربط بـ video_jobs
+  projectId: int("projectId"),     // ربط بـ khayal_projects
+  metadata: json("metadata"),      // بيانات إضافية (model, voice, duration...)
+  // الوقت
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CostEvent = typeof costEvents.$inferSelect;
+export type InsertCostEvent = typeof costEvents.$inferInsert;

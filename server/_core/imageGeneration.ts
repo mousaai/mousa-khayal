@@ -17,6 +17,7 @@
  */
 import { storagePut } from "server/storage";
 import { ENV } from "./env";
+import { trackImageGen } from "../costTracker";
 
 export type GenerateImageOptions = {
   prompt: string;
@@ -86,6 +87,13 @@ export async function generateImage(
     buffer,
     result.image.mimeType
   );
+  // تسجيل تكلفة توليد الصورة
+  const isEditing = options.originalImages && options.originalImages.length > 0;
+  trackImageGen({
+    operation: isEditing ? "editImage" : "generateImage",
+    count: 1,
+    prompt: options.prompt.substring(0, 200),
+  }).catch(() => {});
   return {
     url,
   };

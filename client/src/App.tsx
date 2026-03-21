@@ -7,6 +7,7 @@ import { ThemeProvider } from "./contexts/ThemeContext";
 import Home from "./pages/Home";
 import MyFilms from "./pages/MyFilms";
 import SharePage from "./pages/SharePage";
+import AdminCosts from "./pages/AdminCosts";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -15,6 +16,7 @@ function Router() {
       <Route path={"/"} component={Home} />
       <Route path={"/my-films"} component={MyFilms} />
       <Route path={"/share/:shareId"} component={SharePage} />
+      <Route path={"/admin/costs"} component={AdminCosts} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />
