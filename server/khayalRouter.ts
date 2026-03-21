@@ -125,6 +125,54 @@ function buildGeometricConstraint(
 }
 
 // ═══════════════════════════════════════════════════════════════
+// FACE ANALYSIS — استخراج وصف دقيق لملامح الشخص من صورته
+// ═══════════════════════════════════════════════════════════════
+async function analyzeFaceFeatures(imageUrl: string): Promise<string> {
+  try {
+    const result = await invokeLLM({
+      messages: [
+        {
+          role: "system",
+          content: `You are a professional portrait photographer and casting director.
+Analyze the person's photo and produce a precise, detailed description of their physical appearance for use in AI image generation prompts.
+Focus ONLY on observable physical features — never guess age, nationality, or identity.
+Respond in English only with a single paragraph of 50-80 words.`,
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: { url: imageUrl, detail: "high" },
+            },
+            {
+              type: "text",
+              text: `Describe this person's physical appearance as a prompt fragment. Include: gender, face shape, skin tone, hair color and style, eye color and shape, eyebrow shape, nose shape, lip shape, any distinctive features (beard, freckles, dimples, glasses, etc.). Start with gender. Example: "a man with olive skin, dark brown wavy hair, deep-set brown eyes, strong jawline, short beard, prominent nose"`,
+            },
+          ],
+        },
+      ],
+    });
+    const content = result.choices[0]?.message?.content;
+    if (typeof content === "string" && content.trim().length > 20) {
+      console.log("[KhayalRouter] Face features extracted:", content.trim().slice(0, 120));
+      return content.trim();
+    }
+    return "";
+  } catch (err) {
+    console.error("[KhayalRouter] Face analysis failed:", err);
+    return "";
+  }
+}
+
+// Helper: كشف ما إذا كانت الصورة المرفوعة تحتوي على شخص
+function isPersonImage(description: string, imageUrl?: string): boolean {
+  // إذا كان الوصف يشير صراحةً لشخص أو تحويل شخصي
+  const personalKeywords = /تخيلني|تخيل نفسي|حولني|اجعلني|كيف أكون|صورتي|شخصيتي|imagine me|transform me|my photo|my picture|my face|portrait of me/i;
+  return personalKeywords.test(description);
+}
+
+// ═══════════════════════════════════════════════════════════════
 // DEEP AI ANALYSIS — تحليل عميق + فكرة واحدة من زوايا متعددة
 // ═══════════════════════════════════════════════════════════════
 async function deepAnalyzeDescription(
@@ -132,7 +180,8 @@ async function deepAnalyzeDescription(
   referenceImageUrl?: string,
   previousFeedback?: string,
   documentAnalysis?: DocumentAnalysisResult,
-  sceneCount: number = 5
+  sceneCount: number = 5,
+  faceDescription?: string  // وصف ملامح الشخص المستخرج من الصورة
 ): Promise<{
   title: string;
   culturalContext: string;
@@ -186,14 +235,18 @@ ${geometricConstraint ? geometricConstraint + "\n" : ""}
 For each scene, use EXACTLY this camera angle:
 ${selectedAngles.map((a, i) => `Scene ${i + 1}: ${a.camera} | Lighting: ${LIGHTING_MOODS[i % LIGHTING_MOODS.length]}`).join("\n")}`;
     promptStartRule = `Start each prompt with: "Ultra photorealistic architectural visualization, award-winning photography,"`;
-  } else if (isPersonal) {
+  } else if (isPersonal || faceDescription) {
     // تحويل شخصي: حافظ على ملامح الشخص مع تطبيق التحويل
-    contentTypeGuidance = `PERSONAL TRANSFORMATION MODE:
-- The subject is a REAL PERSON — preserve their facial features, eye color, face shape
-- Apply the requested transformation (age, style, role) while keeping identity recognizable
+    const faceConstraint = faceDescription
+      ? `FACE IDENTITY LOCK — CRITICAL:\n- The subject is: ${faceDescription}\n- EVERY scene MUST feature this EXACT person with these EXACT features\n- Do NOT change face shape, eye color, hair color, or any distinctive features\n- The face must be recognizable as the same person across ALL scenes`
+      : `PERSONAL TRANSFORMATION MODE:\n- The subject is a REAL PERSON — preserve their facial features, eye color, face shape`;
+    contentTypeGuidance = `${faceConstraint}
+- Apply the requested transformation (age, style, role, environment) while keeping identity recognizable
 - Generate ${sceneCount} variations: different angles, expressions, lighting
-- High-quality portrait photography style`;
-    promptStartRule = `Start each prompt with: "Ultra photorealistic portrait photography, cinematic lighting,"`;
+- High-quality portrait photography style, cinematic quality`;
+    promptStartRule = faceDescription
+      ? `Start each prompt with: "Ultra photorealistic portrait photography, ${faceDescription},${""}"` 
+      : `Start each prompt with: "Ultra photorealistic portrait photography, cinematic lighting,"`;
   } else if (isFantasy) {
     // خيال إبداعي: حرية كاملة، لا قيود
     contentTypeGuidance = `CREATIVE FANTASY MODE — NO LIMITS:
@@ -452,12 +505,23 @@ export const khayalRouter = router({
     .mutation(async ({ input }) => {
       const db = await getDb();
 
+      // ━━ كشف وجه الشخص إذا كانت الصورة تحتوي على شخص ━━
+      let faceDescription: string | undefined;
+      if (input.referenceImageUrl && isPersonImage(input.description, input.referenceImageUrl)) {
+        console.log("[generateScene] Detecting face features from reference image...");
+        faceDescription = await analyzeFaceFeatures(input.referenceImageUrl) || undefined;
+        if (faceDescription) {
+          console.log("[generateScene] Face locked:", faceDescription.slice(0, 80));
+        }
+      }
+
       const analysis = await deepAnalyzeDescription(
         input.description,
         input.referenceImageUrl,
         input.previousFeedback,
         input.documentAnalysis as DocumentAnalysisResult | undefined,
-        input.sceneCount
+        input.sceneCount,
+        faceDescription
       );
 
       let projectId: number | null = input.projectId || null;
@@ -571,13 +635,21 @@ export const khayalRouter = router({
         return { scenes: [], isComplete: true, projectId: input.projectId };
       }
 
+      // ━━ كشف وجه الشخص في الدفعة الأولى فقط ━━
+      let faceDescription: string | undefined;
+      if (input.referenceImageUrl && input.batchIndex === 0 && isPersonImage(input.description, input.referenceImageUrl)) {
+        faceDescription = await analyzeFaceFeatures(input.referenceImageUrl) || undefined;
+        if (faceDescription) console.log("[generateFilm] Face locked:", faceDescription.slice(0, 80));
+      }
+
       // توليد الـ prompts للدفعة الحالية
       const analysis = await deepAnalyzeDescription(
         input.description,
         input.referenceImageUrl,
         undefined,
         input.documentAnalysis as DocumentAnalysisResult | undefined,
-        batchSceneCount
+        batchSceneCount,
+        faceDescription
       );
 
       // إنشاء/تحديث المشروع
@@ -919,6 +991,13 @@ Respond ONLY with valid JSON:
       visualMode: z.enum(["free", "cinematic", "realistic", "precise"]).default("cinematic"),
     }))
     .mutation(async ({ input }) => {
+      // ━━ كشف وجه الشخص إذا كانت الصورة تحتوي على شخص ━━
+      let faceDescription: string | undefined;
+      if (input.referenceImageUrl && isPersonImage(input.description, input.referenceImageUrl)) {
+        faceDescription = await analyzeFaceFeatures(input.referenceImageUrl) || undefined;
+        if (faceDescription) console.log("[generateWithDomainEngine] Face locked:", faceDescription.slice(0, 80));
+      }
+
       // المقوم 1: تحليل المحتوى
       const analysis = await analyzeDomain(input.description);
 
@@ -927,6 +1006,10 @@ Respond ONLY with valid JSON:
 
       // المقوم 3: بناء prompts الصور المخصصة
       const unifiedConcept = input.description;
+      // إذا كان هناك وصف وجه، أضفه كقيد ثابت في بداية كل prompt
+      const facePrefix = faceDescription
+        ? `Ultra photorealistic portrait photography, ${faceDescription}, same person in every scene, consistent facial features,`
+        : "";
 
       // توليد الصور بشكل متوازٍ
       const generatedScenes = await Promise.allSettled(
@@ -946,7 +1029,9 @@ Respond ONLY with valid JSON:
             precise: "architectural precision, exact proportions, technical accuracy,",
           }[input.visualMode];
 
-          const finalPrompt = `${domainPrompt} ${modeConstraint}`.trim();
+          const finalPrompt = facePrefix
+            ? `${facePrefix} ${domainPrompt} ${modeConstraint}`.trim()
+            : `${domainPrompt} ${modeConstraint}`.trim();
 
           const { url } = await generateImage({
             prompt: finalPrompt,

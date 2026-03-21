@@ -719,3 +719,9 @@
 - [x] تحديث mocks في apiKeys.test.ts لتتوافق مع البنية الجديدة (3 خطوات بدلاً من 4)
 - [x] جميع 166 اختبار ناجحة (11 ملف اختبار)
 - [ ] اختبار Runway مع API حقيقي (ينتظر إعادة تعيين الحد اليومي أو تفعيل Autobilling)
+
+- [x] إضافة نظام كشف الشخص في الصورة المرفوعة (Face Detection) — analyzeFaceFeatures() + isPersonImage()
+- [x] إضافة face analysis prompt لاستخراج وصف دقيق للملامح من الصورة عبر LLM Vision
+- [x] تضمين وصف الملامح في كل scene prompt لضمان الاتساق — FACE IDENTITY LOCK في deepAnalyzeDescription
+- [x] إضافة مؤشر ملامحك محفوظة في الواجهة عند كتابة كلمات التحويل + رفع صورة
+- [x] تحديث isPersonal detection ليشمل حالة رفع صورة شخص — isPersonImage() helper في khayalRouter.ts

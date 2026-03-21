@@ -1336,6 +1336,27 @@ export default function Home() {
                     style={{ background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.25)", color: "#60a5fa" }}>
                     <img src={uploadedImageUrl} alt="" className="w-5 h-5 rounded object-cover" />
                     <span>{uploadedFileName || "صورة"}</span>
+                    {/* مؤشر الحفاظ على الهوية — يظهر عند كتابة كلمات التحويل الشخصي */}
+                    {/تخيلني|تخيل لي|تخيل نفسي|حولني|اجعلني|كيف أكون|imagine me|transform me/i.test(prompt) && (
+                      <span
+                        title="سيتم الحفاظ على ملامحك في جميع الصور"
+                        style={{
+                          background: "rgba(251,191,36,0.15)",
+                          border: "1px solid rgba(251,191,36,0.4)",
+                          color: "#fbbf24",
+                          borderRadius: "4px",
+                          padding: "1px 6px",
+                          fontSize: "10px",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "3px",
+                          whiteSpace: "nowrap",
+                        }}
+                      >
+                        <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a5 5 0 100 10A5 5 0 0012 2zm0 12c-5.33 0-8 2.67-8 4v2h16v-2c0-1.33-2.67-4-8-4z"/></svg>
+                        ملامحك محفوظة
+                      </span>
+                    )}
                     <button onClick={() => { setUploadedImageUrl(null); setUploadedFileName(null); }} className="opacity-50 hover:opacity-100">✕</button>
                   </div>
                 )}
