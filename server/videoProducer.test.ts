@@ -93,6 +93,8 @@ vi.mock("sharp", () => {
   const sharpMock = vi.fn().mockReturnValue({
     resize: vi.fn().mockReturnThis(),
     png: vi.fn().mockReturnThis(),
+    jpeg: vi.fn().mockReturnThis(),
+    toFormat: vi.fn().mockReturnThis(),
     composite: vi.fn().mockReturnThis(),
     toFile: vi.fn().mockResolvedValue({}),
     toBuffer: vi.fn().mockResolvedValue(Buffer.from("fake-image-data")),

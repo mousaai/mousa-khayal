@@ -1,0 +1,115 @@
+{
+  "query": "SELECT table_name, table_rows, ROUND(data_length/1024/1024, 2) AS data_mb, ROUND(index_length/1024/1024, 2) AS index_mb, ROUND((data_length+index_length)/1024/1024, 2) AS total_mb FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY total_mb DESC;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.59f06284f1f2 --database BXEkPAJgGiqWs3v7muUPfr --execute SELECT table_name, table_rows, ROUND(data_length/1024/1024, 2) AS data_mb, ROUND(index_length/1024/1024, 2) AS index_mb, ROUND((data_length+index_length)/1024/1024, 2) AS total_mb FROM information_schema.tables WHERE table_schema = DATABASE() ORDER BY total_mb DESC;",
+  "rows": [
+    {
+      "table_name": "khayal_scenes",
+      "table_rows": "892",
+      "data_mb": "0.03",
+      "index_mb": "0.00",
+      "total_mb": "0.03"
+    },
+    {
+      "table_name": "khayal_projects",
+      "table_rows": "201",
+      "data_mb": "0.01",
+      "index_mb": "0.00",
+      "total_mb": "0.01"
+    },
+    {
+      "table_name": "video_jobs",
+      "table_rows": "161",
+      "data_mb": "0.01",
+      "index_mb": "0.00",
+      "total_mb": "0.01"
+    },
+    {
+      "table_name": "__drizzle_migrations",
+      "table_rows": "13",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "total_mb": "0.00"
+    },
+    {
+      "table_name": "share_links",
+      "table_rows": "0",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "total_mb": "0.00"
+    },
+    {
+      "table_name": "image_cache",
+      "table_rows": "28",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "total_mb": "0.00"
+    },
+    {
+      "table_name": "script_library",
+      "table_rows": "7",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "total_mb": "0.00"
+    },
+    {
+      "table_name": "content_violations",
+      "table_rows": "40",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "total_mb": "0.00"
+    },
+    {
+      "table_name": "users",
+      "table_rows": "1",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "total_mb": "0.00"
+    },
+    {
+      "table_name": "user_preferences",
+      "table_rows": "0",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "total_mb": "0.00"
+    },
+    {
+      "table_name": "khayal_failures",
+      "table_rows": "2",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "total_mb": "0.00"
+    },
+    {
+      "table_name": "prompt_improvements",
+      "table_rows": "0",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "total_mb": "0.00"
+    },
+    {
+      "table_name": "geo_knowledge",
+      "table_rows": "0",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "total_mb": "0.00"
+    },
+    {
+      "table_name": "scene_revisions",
+      "table_rows": "0",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "total_mb": "0.00"
+    },
+    {
+      "table_name": "production_memory",
+      "table_rows": "0",
+      "data_mb": "0.00",
+      "index_mb": "0.00",
+      "total_mb": "0.00"
+    }
+  ],
+  "messages": [],
+  "stdout": "table_name\ttable_rows\tdata_mb\tindex_mb\ttotal_mb\nkhayal_scenes\t892\t0.03\t0.00\t0.03\nkhayal_projects\t201\t0.01\t0.00\t0.01\nvideo_jobs\t161\t0.01\t0.00\t0.01\n__drizzle_migrations\t13\t0.00\t0.00\t0.00\nshare_links\t0\t0.00\t0.00\t0.00\nimage_cache\t28\t0.00\t0.00\t0.00\nscript_library\t7\t0.00\t0.00\t0.00\ncontent_violations\t40\t0.00\t0.00\t0.00\nusers\t1\t0.00\t0.00\t0.00\nuser_preferences\t0\t0.00\t0.00\t0.00\nkhayal_failures\t2\t0.00\t0.00\t0.00\nprompt_improvements\t0\t0.00\t0.00\t0.00\ngeo_knowledge\t0\t0.00\t0.00\t0.00\nscene_revisions\t0\t0.00\t0.00\t0.00\nproduction_memory\t0\t0.00\t0.00\t0.00\n",
+  "stderr": "",
+  "execution_time_ms": 1627
+}

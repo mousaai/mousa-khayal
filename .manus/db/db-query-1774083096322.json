@@ -1,0 +1,21 @@
+{
+  "query": "SELECT COUNT(*) as total_projects, COUNT(CASE WHEN status='done' THEN 1 END) as done, COUNT(CASE WHEN status='processing' THEN 1 END) as processing, COUNT(CASE WHEN status='failed' THEN 1 END) as failed FROM khayal_projects; SELECT COUNT(*) as total_scenes, COUNT(CASE WHEN imageUrl != '' THEN 1 END) as with_image FROM khayal_scenes; SELECT COUNT(*) as stuck_jobs FROM video_jobs WHERE status IN ('pending','processing') AND lastHeartbeat < DATE_SUB(NOW(), INTERVAL 30 MINUTE);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.59f06284f1f2 --database BXEkPAJgGiqWs3v7muUPfr --execute SELECT COUNT(*) as total_projects, COUNT(CASE WHEN status='done' THEN 1 END) as done, COUNT(CASE WHEN status='processing' THEN 1 END) as processing, COUNT(CASE WHEN status='failed' THEN 1 END) as failed FROM khayal_projects; SELECT COUNT(*) as total_scenes, COUNT(CASE WHEN imageUrl != '' THEN 1 END) as with_image FROM khayal_scenes; SELECT COUNT(*) as stuck_jobs FROM video_jobs WHERE status IN ('pending','processing') AND lastHeartbeat < DATE_SUB(NOW(), INTERVAL 30 MINUTE);",
+  "rows": [
+    {
+      "total_projects": "201",
+      "done": "173",
+      "processing": "28",
+      "failed": "0"
+    }
+  ],
+  "messages": [
+    "total_scenes\twith_image",
+    "892\t892",
+    "stuck_jobs",
+    "0"
+  ],
+  "stdout": "total_projects\tdone\tprocessing\tfailed\n201\t173\t28\t0\ntotal_scenes\twith_image\n892\t892\nstuck_jobs\n0\n",
+  "stderr": "",
+  "execution_time_ms": 1980
+}

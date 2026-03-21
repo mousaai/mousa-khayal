@@ -1,0 +1,80 @@
+{
+  "query": "SELECT id, status, createdAt, updatedAt, TIMESTAMPDIFF(MINUTE, updatedAt, NOW()) as minutes_since_update FROM khayal_projects WHERE status = 'processing' ORDER BY updatedAt ASC LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.59f06284f1f2 --database BXEkPAJgGiqWs3v7muUPfr --execute SELECT id, status, createdAt, updatedAt, TIMESTAMPDIFF(MINUTE, updatedAt, NOW()) as minutes_since_update FROM khayal_projects WHERE status = 'processing' ORDER BY updatedAt ASC LIMIT 10;",
+  "rows": [
+    {
+      "id": "30001",
+      "status": "processing",
+      "createdAt": "2026-03-17 20:15:41",
+      "updatedAt": "2026-03-17 20:15:41",
+      "minutes_since_update": "5076"
+    },
+    {
+      "id": "420001",
+      "status": "processing",
+      "createdAt": "2026-03-19 09:08:29",
+      "updatedAt": "2026-03-19 09:08:29",
+      "minutes_since_update": "2863"
+    },
+    {
+      "id": "420002",
+      "status": "processing",
+      "createdAt": "2026-03-19 09:08:30",
+      "updatedAt": "2026-03-19 09:08:30",
+      "minutes_since_update": "2863"
+    },
+    {
+      "id": "420010",
+      "status": "processing",
+      "createdAt": "2026-03-19 15:31:25",
+      "updatedAt": "2026-03-19 15:31:25",
+      "minutes_since_update": "2480"
+    },
+    {
+      "id": "450010",
+      "status": "processing",
+      "createdAt": "2026-03-19 17:05:04",
+      "updatedAt": "2026-03-19 17:05:04",
+      "minutes_since_update": "2386"
+    },
+    {
+      "id": "450009",
+      "status": "processing",
+      "createdAt": "2026-03-19 17:05:04",
+      "updatedAt": "2026-03-19 17:05:04",
+      "minutes_since_update": "2386"
+    },
+    {
+      "id": "450008",
+      "status": "processing",
+      "createdAt": "2026-03-19 17:05:04",
+      "updatedAt": "2026-03-19 17:05:04",
+      "minutes_since_update": "2386"
+    },
+    {
+      "id": "450014",
+      "status": "processing",
+      "createdAt": "2026-03-19 17:05:05",
+      "updatedAt": "2026-03-19 17:05:05",
+      "minutes_since_update": "2386"
+    },
+    {
+      "id": "450013",
+      "status": "processing",
+      "createdAt": "2026-03-19 17:05:05",
+      "updatedAt": "2026-03-19 17:05:05",
+      "minutes_since_update": "2386"
+    },
+    {
+      "id": "450012",
+      "status": "processing",
+      "createdAt": "2026-03-19 17:05:05",
+      "updatedAt": "2026-03-19 17:05:05",
+      "minutes_since_update": "2386"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tstatus\tcreatedAt\tupdatedAt\tminutes_since_update\n30001\tprocessing\t2026-03-17 20:15:41\t2026-03-17 20:15:41\t5076\n420001\tprocessing\t2026-03-19 09:08:29\t2026-03-19 09:08:29\t2863\n420002\tprocessing\t2026-03-19 09:08:30\t2026-03-19 09:08:30\t2863\n420010\tprocessing\t2026-03-19 15:31:25\t2026-03-19 15:31:25\t2480\n450010\tprocessing\t2026-03-19 17:05:04\t2026-03-19 17:05:04\t2386\n450009\tprocessing\t2026-03-19 17:05:04\t2026-03-19 17:05:04\t2386\n450008\tprocessing\t2026-03-19 17:05:04\t2026-03-19 17:05:04\t2386\n450014\tprocessing\t2026-03-19 17:05:05\t2026-03-19 17:05:05\t2386\n450013\tprocessing\t2026-03-19 17:05:05\t2026-03-19 17:05:05\t2386\n450012\tprocessing\t2026-03-19 17:05:05\t2026-03-19 17:05:05\t2386\n",
+  "stderr": "",
+  "execution_time_ms": 1696
+}

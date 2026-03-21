@@ -1,0 +1,124 @@
+{
+  "query": "SELECT table_name, index_name, column_name, non_unique FROM information_schema.statistics WHERE table_schema = DATABASE() ORDER BY table_name, index_name;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.59f06284f1f2 --database BXEkPAJgGiqWs3v7muUPfr --execute SELECT table_name, index_name, column_name, non_unique FROM information_schema.statistics WHERE table_schema = DATABASE() ORDER BY table_name, index_name;",
+  "rows": [
+    {
+      "table_name": "__drizzle_migrations",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "__drizzle_migrations",
+      "index_name": "id",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "content_violations",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "geo_knowledge",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "image_cache",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "image_cache",
+      "index_name": "image_cache_promptHash_unique",
+      "column_name": "promptHash",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "khayal_failures",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "khayal_projects",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "khayal_scenes",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "production_memory",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "prompt_improvements",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "scene_revisions",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "script_library",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "share_links",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "user_preferences",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "user_preferences",
+      "index_name": "user_preferences_userId_unique",
+      "column_name": "userId",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "users",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "users",
+      "index_name": "users_openId_unique",
+      "column_name": "openId",
+      "non_unique": "0"
+    },
+    {
+      "table_name": "video_jobs",
+      "index_name": "PRIMARY",
+      "column_name": "id",
+      "non_unique": "0"
+    }
+  ],
+  "messages": [],
+  "stdout": "table_name\tindex_name\tcolumn_name\tnon_unique\n__drizzle_migrations\tPRIMARY\tid\t0\n__drizzle_migrations\tid\tid\t0\ncontent_violations\tPRIMARY\tid\t0\ngeo_knowledge\tPRIMARY\tid\t0\nimage_cache\tPRIMARY\tid\t0\nimage_cache\timage_cache_promptHash_unique\tpromptHash\t0\nkhayal_failures\tPRIMARY\tid\t0\nkhayal_projects\tPRIMARY\tid\t0\nkhayal_scenes\tPRIMARY\tid\t0\nproduction_memory\tPRIMARY\tid\t0\nprompt_improvements\tPRIMARY\tid\t0\nscene_revisions\tPRIMARY\tid\t0\nscript_library\tPRIMARY\tid\t0\nshare_links\tPRIMARY\tid\t0\nuser_preferences\tPRIMARY\tid\t0\nuser_preferences\tuser_preferences_userId_unique\tuserId\t0\nusers\tPRIMARY\tid\t0\nusers\tusers_openId_unique\topenId\t0\nvideo_jobs\tPRIMARY\tid\t0\n",
+  "stderr": "",
+  "execution_time_ms": 1572
+}
