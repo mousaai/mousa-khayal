@@ -8,6 +8,7 @@ import { trpc } from "@/lib/trpc";
 import { Link } from "wouter";
 import KhayalCinematicViewer from "@/components/KhayalCinematicViewer";
 import ImmersiveViewer from "@/components/ImmersiveViewer";
+import CreditsWidget from "@/components/CreditsWidget";
 import type { GenerationResult, DocumentAnalysis, ImmersiveResult } from "@/types/khayal";
 import { musicEngine, selectMusicMood } from "@/lib/musicEngine";
 
@@ -1158,6 +1159,11 @@ export default function Home() {
             boxShadow: `0 0 ${p.size * 3}px ${p.size}px ${p.id % 3 === 0 ? "rgba(167,139,250,0.4)" : "rgba(96,165,250,0.3)"}`,
           }} />
         ))}
+      </div>
+
+      {/* ═══ CREDITS WIDGET ═══ */}
+      <div className="absolute top-4 right-28 z-30">
+        <CreditsWidget compact className="" />
       </div>
 
       {/* ═══ MY FILMS BUTTON ═══ */}

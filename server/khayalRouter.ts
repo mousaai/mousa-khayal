@@ -21,6 +21,7 @@ import { checkContent, SAFE_CONTENT_DIRECTIVE } from "./contentFilter";
 import { analyzeDomain, buildDomainPrompt, quickDetectDomain } from "./domainEngine";
 import type { DomainAnalysis } from "./domainEngine";
 import { generateScript } from "./scriptEngine";
+import { guardMousaBalance, deductMousaCredits, isMousaEnabled } from "./mousaCreditsService";
 
 // ═══════════════════════════════════════════════════════════════
 // CAMERA ANGLES — زوايا الكاميرا المحددة لكتلة واحدة
@@ -502,8 +503,20 @@ export const khayalRouter = router({
         confidence: z.number(),
       }).optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }: any) => {
       const db = await getDb();
+
+      // ━━ فحص رصيد MOUSA.AI قبل التوليد ━━
+      if (isMousaEnabled() && ctx?.user?.id) {
+        const guard = await guardMousaBalance(ctx.user.id);
+        if (!guard.allowed) {
+          throw new Error(JSON.stringify({
+            code: "INSUFFICIENT_CREDITS",
+            balance: guard.balance ?? 0,
+            upgradeUrl: guard.upgradeUrl ?? "https://www.mousa.ai/pricing?ref=khayal",
+          }));
+        }
+      }
 
       // ━━ كشف وجه الشخص إذا كانت الصورة تحتوي على شخص ━━
       let faceDescription: string | undefined;
@@ -595,6 +608,14 @@ export const khayalRouter = router({
       const successfulScenes = generatedScenes
         .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
         .map(r => r.value);
+
+      // ━━ خصم كريدتس MOUSA.AI بعد نجاح التوليد ━━
+      if (isMousaEnabled() && (ctx as any)?.user?.id && successfulScenes.length > 0) {
+        await deductMousaCredits(
+          (ctx as any).user.id,
+          `خيال — توليد ${successfulScenes.length} مشهد: ${input.description.slice(0, 60)}`
+        );
+      }
 
       return {
         projectId,
@@ -990,7 +1011,19 @@ Respond ONLY with valid JSON:
       referenceImageUrl: z.string().url().optional(),
       visualMode: z.enum(["free", "cinematic", "realistic", "precise"]).default("cinematic"),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }: any) => {
+      // ━━ فحص رصيد MOUSA.AI قبل التوليد ━━
+      if (isMousaEnabled() && ctx?.user?.id) {
+        const guard = await guardMousaBalance(ctx.user.id);
+        if (!guard.allowed) {
+          throw new Error(JSON.stringify({
+            code: "INSUFFICIENT_CREDITS",
+            balance: guard.balance ?? 0,
+            upgradeUrl: guard.upgradeUrl ?? "https://www.mousa.ai/pricing?ref=khayal",
+          }));
+        }
+      }
+
       // ━━ كشف وجه الشخص إذا كانت الصورة تحتوي على شخص ━━
       let faceDescription: string | undefined;
       if (input.referenceImageUrl && isPersonImage(input.description, input.referenceImageUrl)) {
@@ -1022,12 +1055,13 @@ Respond ONLY with valid JSON:
           const domainPrompt = buildDomainPrompt(sceneOutline, analysis, unifiedConcept);
 
           // إضافة قيود الوضع البصري
-          const modeConstraint = {
+          const modeConstraints: Record<string, string> = {
             free: "",
             cinematic: "cinematic color grading, dramatic lighting, film quality,",
             realistic: "photorealistic, true-to-life, accurate proportions,",
             precise: "architectural precision, exact proportions, technical accuracy,",
-          }[input.visualMode];
+          };
+          const modeConstraint = modeConstraints[input.visualMode] ?? "";
 
           const finalPrompt = facePrefix
             ? `${facePrefix} ${domainPrompt} ${modeConstraint}`.trim()
@@ -1062,6 +1096,14 @@ Respond ONLY with valid JSON:
       const successfulScenes = generatedScenes
         .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
         .map(r => r.value);
+
+      // ━━ خصم كريدتس MOUSA.AI بعد نجاح التوليد ━━
+      if (isMousaEnabled() && (ctx as any)?.user?.id && successfulScenes.length > 0) {
+        await deductMousaCredits(
+          (ctx as any).user.id,
+          `خيال — توليد بالمحرك المتقدم: ${input.description.slice(0, 60)}`
+        );
+      }
 
       return {
         scenes: successfulScenes,

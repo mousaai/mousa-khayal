@@ -7,6 +7,7 @@ import { videoRouter } from "./videoRouter";
 import { chatRouter } from "./chatRouter";
 import { exportRouter } from "./exportRouter";
 import { costRouter } from "./costRouter";
+import { creditsRouter } from "./creditsRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -25,6 +26,7 @@ export const appRouter = router({
   chat: chatRouter,
   export: exportRouter,
   costs: costRouter,
+  credits: creditsRouter,
 });
 
 export type AppRouter = typeof appRouter;
