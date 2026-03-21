@@ -498,22 +498,82 @@ export default function KhayalCinematicViewer({ result, onBack, onRefine, musicM
       }
 
       // مرحلة الترميز
-      setVideoExport(prev => prev ? { ...prev, phase: "encoding", progressPct: 90 } : null);
+      setVideoExport(prev => prev ? { ...prev, phase: "encoding", progressPct: 88 } : null);
       recorder.stop();
       await new Promise<void>(resolve => { recorder.onstop = () => resolve(); });
+      const webmBlob = new Blob(chunks, { type: "video/webm" });
+      const safeTitle = (result.title || "khayal").replace(/\s+/g, "_").slice(0, 60);
 
-      const blob = new Blob(chunks, { type: "video/webm" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `khayal_${(result.title || "cinematic").replace(/\s+/g, "_")}.webm`;
-      a.click();
-      URL.revokeObjectURL(url);
-      // اكتمل — عرض 100% لثانية ثم إغلاق الشاشة
+      // ── تحويل إلى MP4 H.264 عبر الخادم (مدعوم على iOS/Android) ──
+      setVideoExport(prev => prev ? { ...prev, phase: "encoding", progressPct: 92 } : null);
+      const formData = new FormData();
+      formData.append("video", webmBlob, `${safeTitle}.webm`);
+      formData.append("title", safeTitle);
+
+      let mp4Blob: Blob | null = null;
+      let mp4ObjectUrl: string | null = null;
+      try {
+        const convertRes = await fetch("/api/convert-video", {
+          method: "POST",
+          body: formData,
+          credentials: "include",
+        });
+        if (convertRes.ok) {
+          mp4Blob = await convertRes.blob();
+          mp4ObjectUrl = URL.createObjectURL(mp4Blob);
+        }
+      } catch (convErr) {
+        console.warn("[Video] MP4 conversion failed, falling back to WebM", convErr);
+      }
+
       setVideoExport(prev => prev ? { ...prev, phase: "done", progressPct: 100 } : null);
+
+      if (mp4ObjectUrl && mp4Blob) {
+        // ── تحميل MP4 ──
+        const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+        if (isMobile && typeof navigator.share === "function" && mp4Blob) {
+          // على iOS/Android: استخدام Share Sheet لحفظ الفيديو في المكتبة
+          try {
+            const file = new File([mp4Blob], `${safeTitle}.mp4`, { type: "video/mp4" });
+            if (navigator.canShare && navigator.canShare({ files: [file] })) {
+              await navigator.share({ files: [file], title: safeTitle });
+            } else {
+              throw new Error("canShare returned false");
+            }
+          } catch {
+            // fallback: فتح رابط مباشر
+            const a = document.createElement("a");
+            a.href = mp4ObjectUrl;
+            a.download = `${safeTitle}.mp4`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+          }
+        } else {
+          const a = document.createElement("a");
+          a.href = mp4ObjectUrl;
+          a.download = `${safeTitle}.mp4`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+        }
+        URL.revokeObjectURL(mp4ObjectUrl);
+        toast.success(`✅ فيديو MP4 جاهز (${estimatedTotalSec} ثانية) — يعمل على جميع الأجهزة!`);
+      } else {
+        // fallback: WebM للمتصفحات التي تدعمه
+        const webmUrl = URL.createObjectURL(webmBlob);
+        const a = document.createElement("a");
+        a.href = webmUrl;
+        a.download = `${safeTitle}.webm`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(webmUrl);
+        toast.success(`✅ تم إنشاء الفيديو (${estimatedTotalSec} ثانية)`);
+      }
+
       await new Promise(r => setTimeout(r, 1500));
       setVideoExport(null);
-      toast.success(`✅ تم إنشاء فيديو ${estimatedTotalSec} ثانية بنجاح!`);
     } catch (err) {
       console.error("Video recording failed:", err);
       setVideoExport(null);

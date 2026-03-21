@@ -1,20 +1,28 @@
 /**
  * mediaRoutes.ts — endpoints لرفع الملفات وتحويل الصوت إلى نص
- * POST /api/transcribe — يقبل ملف صوتي ويعيد النص
- * POST /api/upload    — يقبل صورة أو مستند ويعيد URL
+ * POST /api/transcribe      — يقبل ملف صوتي ويعيد النص
+ * POST /api/upload          — يقبل صورة أو مستند ويعيد URL
+ * POST /api/convert-video   — يحوّل WebM إلى MP4 H.264 (مدعوم على iOS/Android)
  */
 import { Router } from "express";
 import multer from "multer";
 import { storagePut } from "./storage";
 import { transcribeAudio } from "./_core/voiceTranscription";
 import { nanoid } from "nanoid";
+import ffmpeg from "fluent-ffmpeg";
+import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
+import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+
+ffmpeg.setFfmpegPath(ffmpegInstaller.path);
 
 const router = Router();
 
 // multer في الذاكرة (بدون حفظ على القرص)
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 16 * 1024 * 1024 }, // 16MB
+  limits: { fileSize: 200 * 1024 * 1024 }, // 200MB للفيديو
 });
 
 // ===== تحويل الصوت إلى نص =====
@@ -63,6 +71,65 @@ router.post("/api/upload", upload.single("file"), async (req, res) => {
   } catch (err: any) {
     console.error("[Upload] Error:", err);
     return res.status(500).json({ error: "فشل رفع الملف", details: err?.message });
+  }
+});
+
+// ===== تحويل WebM إلى MP4 H.264 (مدعوم على iOS/Android) =====
+// يستقبل ملف WebM ويُعيد MP4 H.264 يعمل على جميع الأجهزة
+router.post("/api/convert-video", upload.single("video"), async (req, res) => {
+  const tmpDir = os.tmpdir();
+  const inputPath = path.join(tmpDir, `khayal_input_${nanoid()}.webm`);
+  const outputPath = path.join(tmpDir, `khayal_output_${nanoid()}.mp4`);
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ error: "لم يتم إرسال ملف فيديو" });
+    }
+
+    // حفظ WebM مؤقتاً على القرص
+    fs.writeFileSync(inputPath, req.file.buffer);
+
+    // تحويل إلى MP4 H.264 باستخدام ffmpeg
+    await new Promise<void>((resolve, reject) => {
+      ffmpeg(inputPath)
+        .videoCodec("libx264")
+        .audioCodec("aac")
+        .outputOptions([
+          "-preset fast",        // سرعة تحويل جيدة
+          "-crf 23",             // جودة متوازنة
+          "-movflags +faststart", // يُمكّن التشغيل التدريجي على الموبايل
+          "-pix_fmt yuv420p",    // متوافق مع iOS/Android
+          "-vf scale=trunc(iw/2)*2:trunc(ih/2)*2", // ضمان أبعاد زوجية
+        ])
+        .output(outputPath)
+        .on("end", () => resolve())
+        .on("error", (err) => reject(err))
+        .run();
+    });
+
+    // قراءة الملف المُحوَّل
+    const mp4Buffer = fs.readFileSync(outputPath);
+    const title = (req.body?.title as string) || "khayal";
+    const safeTitle = title.replace(/[^a-zA-Z0-9\u0600-\u06FF_-]/g, "_").slice(0, 60);
+
+    // رفع إلى S3 للتخزين الدائم
+    const key = `videos/${safeTitle}_${nanoid(8)}.mp4`;
+    const { url } = await storagePut(key, mp4Buffer, "video/mp4");
+
+    // إرسال الملف مباشرة للمتصفح مع header التحميل
+    res.set("Content-Type", "video/mp4");
+    res.set("Content-Disposition", `attachment; filename="${safeTitle}.mp4"`);
+    res.set("Content-Length", String(mp4Buffer.length));
+    res.set("X-Video-URL", url); // رابط S3 للتخزين
+    return res.send(mp4Buffer);
+
+  } catch (err: any) {
+    console.error("[ConvertVideo] Error:", err?.message);
+    return res.status(500).json({ error: "فشل تحويل الفيديو", details: err?.message });
+  } finally {
+    // تنظيف الملفات المؤقتة
+    try { if (fs.existsSync(inputPath)) fs.unlinkSync(inputPath); } catch {}
+    try { if (fs.existsSync(outputPath)) fs.unlinkSync(outputPath); } catch {}
   }
 });
 

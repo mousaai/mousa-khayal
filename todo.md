@@ -725,3 +725,8 @@
 - [x] تضمين وصف الملامح في كل scene prompt لضمان الاتساق — FACE IDENTITY LOCK في deepAnalyzeDescription
 - [x] إضافة مؤشر ملامحك محفوظة في الواجهة عند كتابة كلمات التحويل + رفع صورة
 - [x] تحديث isPersonal detection ليشمل حالة رفع صورة شخص — isPersonImage() helper في khayalRouter.ts
+
+## 📱 دعم الموبايل — إصلاح الفيديو
+- [x] إضافة endpoint /api/convert-video لتحويل WebM إلى MP4 H.264 عبر ffmpeg في الخادم
+- [x] تحديث downloadVideoMP4 لرفع WebM للخادم وتحميل MP4 المُحوَّل (يعمل على iOS/Android)
+- [x] إضافة دعم تحميل الفيديو لمكتبة الصور على iOS/Android — Share Sheet API + fallback تحميل مباشر
