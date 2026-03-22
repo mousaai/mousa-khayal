@@ -789,3 +789,11 @@
 - [ ] إضافة منطق حساب الكريدت حسب مدة الفيلم وعدد المشاهد
 - [ ] تحديث الواجهة لعرض مستوى Standard وCinema مع عدد الكريدت قبل التوليد
 - [ ] تحديث الاختبارات لتعكس التسعيرة الجديدة
+
+## 💰 Pricing Webhook — مارس 2026
+- [x] بناء دالة notifyMousaPricing في mousaCreditsService.ts
+- [x] تصدير SESSION_COSTS وKHAYAL_SERVICES من mousaCreditsService.ts
+- [x] إضافة procedure developer.syncPricing في developerRouter.ts
+- [x] إضافة زر "مزامنة التسعيرة" في صفحة /developer (يظهر للمستخدمين المسجلين فقط)
+- [x] تحديث بطاقات التسعيرة في DeveloperPage لعرض التسعيرة المعتمدة (مارس 2026)
+- [x] اختبارات vitest لـ SESSION_COSTS وKHAYAL_SERVICES وnotifyMousaPricing (220 اختبار ناجح)

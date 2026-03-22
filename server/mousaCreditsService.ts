@@ -294,7 +294,88 @@ export async function guardMousaBalance(
   return { allowed: true, balance: balanceData.balance };
 }
 
-// ─── 5. Utility Exports ───────────────────────────────────────────────────────
+// ─── 5. Notify Mousa.ai — Pricing Webhook ───────────────────────────────────
+
+/**
+ * قائمة خدمات خيال مع تكاليفها للإرسال لـ Mousa.ai
+ * يجب تحديثها عند تغيير التسعيرة
+ */
+export const KHAYAL_SERVICES = [
+  { name: "scene",       cost: SESSION_COSTS.scene },
+  { name: "script_only", cost: SESSION_COSTS.script_only },
+  { name: "film_short",  cost: SESSION_COSTS.film_short },
+  { name: "film_medium", cost: SESSION_COSTS.film_medium },
+  { name: "film_long",   cost: SESSION_COSTS.film_long },
+  { name: "autonomous",  cost: SESSION_COSTS.autonomous },
+  { name: "surprise",    cost: SESSION_COSTS.surprise },
+] as const;
+
+/** نتيجة pricing-webhook */
+export interface MousaPricingWebhookResult {
+  success: boolean;
+  platform?: string;
+  updated?: {
+    minCost: number;
+    maxCost: number;
+    baseCost: number;
+    services: Array<{ name: string; cost: number }>;
+  };
+  updatedAt?: string;
+  error?: string;
+  status?: number;
+}
+
+/**
+ * يُرسل التسعيرة المحدّثة لـ Mousa.ai عبر pricing-webhook.
+ * استدعِه عند أي تغيير في SESSION_COSTS.
+ *
+ * POST https://www.mousa.ai/api/platform/pricing-webhook
+ * Authorization: Bearer khayal@mousa30
+ * X-Platform-ID: khayal
+ */
+export async function notifyMousaPricing(): Promise<MousaPricingWebhookResult> {
+  const url = `${MOUSA_BASE_URL}/api/platform/pricing-webhook`;
+
+  const body = {
+    services: KHAYAL_SERVICES.map((s) => ({ name: s.name, cost: s.cost })),
+    minCost: SESSION_COSTS.script_only,   // 5 — أقل عملية ممكنة
+    maxCost: SESSION_COSTS.film_long,     // 3200 — أعلى عملية ممكنة
+    baseCost: SESSION_COSTS.scene,        // 30 — التكلفة الافتراضية
+    description:
+      "خيال — منصة الإنتاج السينمائي بالذكاء الاصطناعي. " +
+      "سيناريو: 5 | مشهد: 30 | فيلم قصير: 450 | متوسط: 1100 | طويل: 3200 | تلقائي: 400",
+  };
+
+  try {
+    const res = await fetch(url, {
+      method: "POST",
+      headers: MOUSA_HEADERS,
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+
+    if (!res.ok) {
+      console.error(`[MousaPricing] pricing-webhook failed: ${res.status}`, data);
+      return {
+        success: false,
+        error: data.error ?? `HTTP ${res.status}`,
+        status: res.status,
+      };
+    }
+
+    console.log(`[MousaPricing] Pricing updated successfully at ${data.updatedAt}`);
+    return data as MousaPricingWebhookResult;
+  } catch (err) {
+    console.error("[MousaPricing] pricing-webhook network error:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
+// ─── 6. Utility Exports ───────────────────────────────────────────────────────
 
 export function getCreditsPerSession(): number {
   return SESSION_COSTS.default;

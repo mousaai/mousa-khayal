@@ -21,17 +21,32 @@ import {
   ChevronRight,
   Layers,
   TrendingUp,
+  RefreshCw,
+  Send,
 } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
+import { useAuth } from "@/_core/hooks/useAuth";
 
-// ─── تسعيرة خيال المتدرجة ────────────────────────────────────────────────────
+// ─── التسعيرة المتدرجة لخيال (معتمدة مارس 2026) ───────────────────────
 
 const PRICING_TIERS = [
   {
+    id: "script_only",
+    nameAr: "سيناريو نصي",
+    nameEn: "Text Scenario",
+    descAr: "توليد سيناريو نصي فقط بدون صور أو فيديو",
+    descEn: "Text-only scenario, no images or video",
+    cost: 5,
+    unit: "كريدت/جلسة",
+    color: "gray",
+    icon: "📝",
+    features: ["سيناريو كامل بالعربية", "تحليل ذكي للوصف", "بدون صور أو فيديو"],
+  },
+  {
     id: "scene",
-    nameAr: "مشهد واحد",
-    nameEn: "Single Scene",
+    nameAr: "مشهد سينمائي",
+    nameEn: "Cinematic Scene",
     descAr: "توليد 3–8 صور سينمائية لمشهد واحد",
     descEn: "Generate 3–8 cinematic images for one scene",
     cost: 30,
@@ -44,38 +59,50 @@ const PRICING_TIERS = [
     id: "film_short",
     nameAr: "فيلم قصير",
     nameEn: "Short Film",
-    descAr: "فيلم مدته 15–60 ثانية (3–12 مشهد)",
-    descEn: "15–60 second film (3–12 scenes)",
-    cost: 50,
+    descAr: "فيلم مدته 15–60 ثانية (6 مشاهد)",
+    descEn: "15–60 second film (6 scenes)",
+    cost: 450,
     unit: "كريدت/جلسة",
     color: "purple",
     icon: "🎬",
-    features: ["3–12 مشهد متتابع", "موسيقى تصويرية", "تعليق صوتي AI", "تصدير فيديو"],
+    features: ["6 مشاهد متتابعة", "موسيقى تصويرية", "تعليق صوتي AI", "تصدير فيديو"],
     recommended: true,
+  },
+  {
+    id: "film_medium",
+    nameAr: "فيلم متوسط",
+    nameEn: "Medium Film",
+    descAr: "فيلم مدته 1–3 دقائق (15 مشهد)",
+    descEn: "1–3 minute film (15 scenes)",
+    cost: 1100,
+    unit: "كريدت/جلسة",
+    color: "gold",
+    icon: "🎥",
+    features: ["15 مشهد", "توليد على دفعات", "جودة إنتاجية عالية", "أولوية في المعالجة"],
   },
   {
     id: "film_long",
     nameAr: "فيلم طويل",
     nameEn: "Long Film",
-    descAr: "فيلم مدته 1–5 دقائق (12–37 مشهد)",
-    descEn: "1–5 minute film (12–37 scenes)",
-    cost: 100,
-    unit: "كريدت/جلسة",
-    color: "gold",
-    icon: "🎥",
-    features: ["12–37 مشهد", "توليد على دفعات", "جودة إنتاجية عالية", "أولوية في المعالجة"],
-  },
-  {
-    id: "film_epic",
-    nameAr: "فيلم ملحمي",
-    nameEn: "Epic Film",
-    descAr: "فيلم مدته 5–30 دقيقة (37+ مشهد)",
-    descEn: "5–30 minute film (37+ scenes)",
-    cost: 200,
+    descAr: "فيلم مدته 3–10 دقائق (45 مشهد)",
+    descEn: "3–10 minute film (45 scenes)",
+    cost: 3200,
     unit: "كريدت/جلسة",
     color: "red",
     icon: "🏆",
-    features: ["37+ مشهد", "معالجة موزعة", "جودة سينمائية احترافية", "دعم مخصص"],
+    features: ["45 مشهد", "معالجة موزعة", "جودة سينمائية احترافية", "دعم مخصص"],
+  },
+  {
+    id: "autonomous",
+    nameAr: "خيال تقرر / فاجئني",
+    nameEn: "Auto / Surprise",
+    descAr: "إنتاج تلقائي ذكي (5 مشاهد)",
+    descEn: "AI-driven autonomous production (5 scenes)",
+    cost: 400,
+    unit: "كريدت/جلسة",
+    color: "teal",
+    icon: "✨",
+    features: ["5 مشاهد تلقائية", "ذكاء اصطناعي كامل", "بدون تدخل بشري"],
   },
 ];
 
@@ -94,8 +121,14 @@ const PLATFORM_COMPARISON = [
 
 export default function DeveloperPage() {
   const { t } = useLanguage();
+  const { user } = useAuth();
   const [copied, setCopied] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"pricing" | "integration" | "api">("pricing");
+  const [syncResult, setSyncResult] = useState<{
+    success: boolean;
+    message: string;
+    updatedAt?: string;
+  } | null>(null);
 
   const { data: status, isLoading } = trpc.credits.getStatus.useQuery(undefined, {
     staleTime: 30_000,
@@ -103,6 +136,26 @@ export default function DeveloperPage() {
 
   const { data: platformInfo } = trpc.developer.getPlatformInfo.useQuery(undefined, {
     staleTime: 60_000,
+  });
+
+  const syncPricingMutation = trpc.developer.syncPricing.useMutation({
+    onSuccess: (data) => {
+      setSyncResult({
+        success: data.success,
+        message: data.success
+          ? `تم تحديث التسعيرة بنجاح في Mousa.ai`
+          : `فشل التحديث: ${data.error ?? "HTTP " + data.status}`,
+        updatedAt: data.updatedAt,
+      });
+      setTimeout(() => setSyncResult(null), 8000);
+    },
+    onError: (err) => {
+      setSyncResult({
+        success: false,
+        message: `خطأ: ${err.message}`,
+      });
+      setTimeout(() => setSyncResult(null), 8000);
+    },
   });
 
   const copyToClipboard = (text: string, key: string) => {
@@ -141,6 +194,22 @@ export default function DeveloperPage() {
                 غير متصل
               </Badge>
             )}
+            {user && (
+              <Button
+                size="sm"
+                variant="outline"
+                className="text-xs border-blue-500/40 text-blue-300 hover:text-blue-200 hover:border-blue-400/60 gap-1.5"
+                onClick={() => syncPricingMutation.mutate()}
+                disabled={syncPricingMutation.isPending}
+              >
+                {syncPricingMutation.isPending ? (
+                  <RefreshCw className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Send className="w-3 h-3" />
+                )}
+                مزامنة التسعيرة
+              </Button>
+            )}
             <Button
               size="sm"
               variant="outline"
@@ -155,6 +224,31 @@ export default function DeveloperPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
+        {/* ─── نتيجة المزامنة ─── */}
+        {syncResult && (
+          <div
+            className={`mb-4 flex items-center gap-3 px-4 py-3 rounded-xl border text-sm ${
+              syncResult.success
+                ? "bg-green-500/10 border-green-500/30 text-green-300"
+                : "bg-red-500/10 border-red-500/30 text-red-300"
+            }`}
+          >
+            {syncResult.success ? (
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            ) : (
+              <XCircle className="w-4 h-4 shrink-0" />
+            )}
+            <div>
+              <p className="font-medium">{syncResult.message}</p>
+              {syncResult.updatedAt && (
+                <p className="text-xs opacity-70 mt-0.5">
+                  تاريخ التحديث: {new Date(syncResult.updatedAt).toLocaleString("ar-AE")}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ─── بطاقات الحالة الرئيسية ─── */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
           {[
@@ -238,18 +332,33 @@ export default function DeveloperPage() {
         {/* ─── Tab: التسعيرة ─── */}
         {activeTab === "pricing" && (
           <div className="space-y-8">
-            {/* تحذير التناقض */}
-            <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-start gap-3">
-              <Info className="w-5 h-5 text-yellow-400 mt-0.5 shrink-0" />
-              <div>
-                <p className="text-sm font-semibold text-yellow-300 mb-1">
-                  ملاحظة: التسعيرة الحالية المسجلة في Mousa.ai هي 30 كريدت/جلسة (مشهد واحد)
+            {/* بطاقة حالة التسعيرة */}
+            <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-green-400 mt-0.5 shrink-0" />
+              <div className="flex-1">
+                <p className="text-sm font-semibold text-green-300 mb-1">
+                  التسعيرة المعتمدة مطبقة في الكود — مارس 2026
                 </p>
-                <p className="text-xs text-yellow-300/70">
-                  التسعيرة المتدرجة أدناه مقترحة لتحسين الإيرادات وتشجيع الاستخدام المكثف.
-                  يمكن تفعيلها من خلال تحديث منصة Mousa.ai وإضافة منطق التسعيرة في الكود.
+                <p className="text-xs text-green-300/70">
+                  سيناريو: 5 | مشهد: 30 | فيلم قصير: 450 | متوسط: 1100 | طويل: 3200 | تلقائي/فاجئني: 400
                 </p>
               </div>
+              {user && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-xs border-green-500/40 text-green-300 hover:text-green-200 gap-1.5 shrink-0"
+                  onClick={() => syncPricingMutation.mutate()}
+                  disabled={syncPricingMutation.isPending}
+                >
+                  {syncPricingMutation.isPending ? (
+                    <RefreshCw className="w-3 h-3 animate-spin" />
+                  ) : (
+                    <Send className="w-3 h-3" />
+                  )}
+                  إرسال لـ Mousa.ai
+                </Button>
+              )}
             </div>
 
             {/* بطاقات التسعيرة المقترحة */}
@@ -364,7 +473,7 @@ export default function DeveloperPage() {
                 </table>
               </div>
               <p className="text-xs text-white/30 mt-2 text-right">
-                * التكلفة المقترحة لخيال متدرجة: 30 (مشهد) / 50 (فيلم قصير) / 100 (فيلم طويل) / 200 (فيلم ملحمي)
+                * التسعيرة المعتمدة لخيال: 5 (سيناريو) / 30 (مشهد) / 450 (فيلم قصير) / 1100 (متوسط) / 3200 (طويل) / 400 (تلقائي)
               </p>
             </div>
 

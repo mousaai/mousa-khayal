@@ -11,6 +11,9 @@ import {
   guardMousaBalance,
   getCreditsPerSession,
   isMousaEnabled,
+  notifyMousaPricing,
+  SESSION_COSTS,
+  KHAYAL_SERVICES,
 } from "./mousaCreditsService";
 
 // ─── Mock fetch ───────────────────────────────────────────────────────────────
@@ -196,6 +199,111 @@ describe("deductMousaCredits", () => {
     const result = await deductMousaCredits(42, "توليد مشهد");
     expect(result?.success).toBe(false);
     expect(result?.upgradeUrl).toContain("mousa.ai/pricing");
+  });
+});
+
+describe("SESSION_COSTS — التسعيرة المعتمدة", () => {
+  it("يجب أن تكون تكلفة السيناريو 5 كريدت", () => {
+    expect(SESSION_COSTS.script_only).toBe(5);
+  });
+
+  it("يجب أن تكون تكلفة المشهد 30 كريدت", () => {
+    expect(SESSION_COSTS.scene).toBe(30);
+  });
+
+  it("يجب أن تكون تكلفة الفيلم القصير 450 كريدت", () => {
+    expect(SESSION_COSTS.film_short).toBe(450);
+  });
+
+  it("يجب أن تكون تكلفة الفيلم المتوسط 1100 كريدت", () => {
+    expect(SESSION_COSTS.film_medium).toBe(1100);
+  });
+
+  it("يجب أن تكون تكلفة الفيلم الطويل 3200 كريدت", () => {
+    expect(SESSION_COSTS.film_long).toBe(3200);
+  });
+
+  it("يجب أن تكون تكلفة التلقائي 400 كريدت", () => {
+    expect(SESSION_COSTS.autonomous).toBe(400);
+    expect(SESSION_COSTS.surprise).toBe(400);
+  });
+
+  it("يجب أن تحتوي KHAYAL_SERVICES على 7 خدمات", () => {
+    expect(KHAYAL_SERVICES).toHaveLength(7);
+  });
+
+  it("يجب أن تتطابق KHAYAL_SERVICES مع SESSION_COSTS", () => {
+    const servicesMap = Object.fromEntries(
+      KHAYAL_SERVICES.map((s) => [s.name, s.cost])
+    );
+    expect(servicesMap["scene"]).toBe(SESSION_COSTS.scene);
+    expect(servicesMap["script_only"]).toBe(SESSION_COSTS.script_only);
+    expect(servicesMap["film_short"]).toBe(SESSION_COSTS.film_short);
+    expect(servicesMap["film_medium"]).toBe(SESSION_COSTS.film_medium);
+    expect(servicesMap["film_long"]).toBe(SESSION_COSTS.film_long);
+  });
+});
+
+describe("notifyMousaPricing — pricing-webhook", () => {
+  it("يجب أن يُرسل طلب POST صحيح مع بيانات التسعيرة", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        platform: "khayal",
+        updated: {
+          minCost: 5,
+          maxCost: 3200,
+          baseCost: 30,
+          services: KHAYAL_SERVICES.map((s) => ({ name: s.name, cost: s.cost })),
+        },
+        updatedAt: "2026-03-23T12:00:00.000Z",
+      }),
+    });
+
+    const result = await notifyMousaPricing();
+
+    expect(mockFetch).toHaveBeenCalledWith(
+      "https://www.mousa.ai/api/platform/pricing-webhook",
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({
+          Authorization: "Bearer khayal@mousa30",
+          "X-Platform-ID": "khayal",
+        }),
+      })
+    );
+
+    const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
+    expect(callBody.minCost).toBe(5);
+    expect(callBody.maxCost).toBe(3200);
+    expect(callBody.baseCost).toBe(30);
+    expect(callBody.services).toHaveLength(7);
+
+    expect(result.success).toBe(true);
+    expect(result.platform).toBe("khayal");
+    expect(result.updatedAt).toBe("2026-03-23T12:00:00.000Z");
+  });
+
+  it("يجب أن يعيد success:false عند فشل الخادم (401)", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: "Unauthorized" }),
+    });
+
+    const result = await notifyMousaPricing();
+    expect(result.success).toBe(false);
+    expect(result.error).toBe("Unauthorized");
+    expect(result.status).toBe(401);
+  });
+
+  it("يجب أن يعيد success:false عند خطأ الشبكة (لا يرمي خطأ)", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+    const result = await notifyMousaPricing();
+    expect(result.success).toBe(false);
+    expect(result.error).toContain("Network error");
   });
 });
 

@@ -2,8 +2,14 @@
  * developerRouter.ts — بيانات صفحة المطور
  * يوفر معلومات التكامل مع Mousa.ai والتسعيرة
  */
-import { publicProcedure, router } from "./_core/trpc";
-import { getCreditsPerSession, isMousaEnabled } from "./mousaCreditsService";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import {
+  getCreditsPerSession,
+  isMousaEnabled,
+  notifyMousaPricing,
+  SESSION_COSTS,
+  KHAYAL_SERVICES,
+} from "./mousaCreditsService";
 
 // التسعيرة المتدرجة المقترحة حسب نوع الجلسة
 export const PRICING_TIERS = [
@@ -47,6 +53,26 @@ export const PRICING_TIERS = [
 ];
 
 export const developerRouter = router({
+  // إرسال التسعيرة المحدّثة لـ Mousa.ai عبر pricing-webhook
+  syncPricing: protectedProcedure.mutation(async () => {
+    const result = await notifyMousaPricing();
+    return {
+      success: result.success,
+      platform: result.platform,
+      updated: result.updated,
+      updatedAt: result.updatedAt,
+      error: result.error,
+      status: result.status,
+      // البيانات المرسلة
+      sentData: {
+        services: KHAYAL_SERVICES.map((s) => ({ name: s.name, cost: s.cost })),
+        minCost: SESSION_COSTS.script_only,
+        maxCost: SESSION_COSTS.film_long,
+        baseCost: SESSION_COSTS.scene,
+      },
+    };
+  }),
+
   // بيانات التكامل الكاملة مع Mousa.ai
   getPlatformInfo: publicProcedure.query(async () => {
     const costPerSession = getCreditsPerSession();
