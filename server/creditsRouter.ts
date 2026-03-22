@@ -1,9 +1,19 @@
 /**
  * creditsRouter.ts — إدارة رصيد MOUSA.AI في منصة خيال
+ *
+ * التسعيرة المسجلة في منصة Mousa.ai:
+ *   - اسم المنصة: خيال (KHAYAL)
+ *   - التكلفة: 30 كريدت/جلسة
+ *   - الرابط: https://khayal.mousa.ai/
  */
 import { z } from "zod";
 import { publicProcedure, router } from "./_core/trpc";
-import { verifyMousaToken, checkMousaBalance, isMousaEnabled } from "./mousaCreditsService";
+import {
+  verifyMousaToken,
+  checkMousaBalance,
+  isMousaEnabled,
+  getCreditsPerSession,
+} from "./mousaCreditsService";
 
 export const creditsRouter = router({
   // فحص الرصيد الحالي للمستخدم
@@ -11,16 +21,19 @@ export const creditsRouter = router({
     .input(z.object({ userId: z.string().optional() }))
     .query(async ({ input, ctx }) => {
       const userId = input.userId || (ctx as any)?.user?.id;
+      const costPerSession = getCreditsPerSession(); // 30 كريدت (من منصة Mousa.ai)
+
       if (!userId || !isMousaEnabled()) {
-        return { enabled: false, balance: null, canGenerate: true };
+        return { enabled: false, balance: null, canGenerate: true, costPerSession };
       }
+
       const balanceResult = await checkMousaBalance(userId);
       return {
         enabled: true,
         balance: balanceResult?.balance ?? null,
         sufficient: balanceResult?.sufficient ?? true,
-        canGenerate: balanceResult === null || (balanceResult.balance >= 25),
-        costPerSession: 25,
+        canGenerate: balanceResult === null || (balanceResult.balance >= costPerSession),
+        costPerSession,
         upgradeUrl: "https://www.mousa.ai/pricing?ref=khayal",
       };
     }),
@@ -43,13 +56,17 @@ export const creditsRouter = router({
       };
     }),
 
-  // حالة تكامل MOUSA.AI
+  // حالة تكامل MOUSA.AI — يُستخدم من الواجهة الأمامية لعرض التسعيرة
   getStatus: publicProcedure.query(() => {
     return {
       enabled: isMousaEnabled(),
       platformId: process.env.MOUSA_PLATFORM_ID || "khayal",
-      costPerSession: 25,
+      platformNameAr: "خيال",
+      platformNameEn: "KHAYAL",
+      costPerSession: getCreditsPerSession(), // 30 كريدت (مزامن مع Mousa.ai)
+      platformUrl: "https://khayal.mousa.ai/",
       upgradeUrl: "https://www.mousa.ai/pricing?ref=khayal",
+      dashboardUrl: "https://www.mousa.ai/dashboard",
     };
   }),
 });

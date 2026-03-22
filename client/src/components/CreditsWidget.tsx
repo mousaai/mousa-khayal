@@ -38,8 +38,9 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
 
   const balance = balanceData?.balance ?? null;
   const canGenerate = balanceData?.canGenerate ?? true;
-  const isLow = balance !== null && balance < 50;
-  const isEmpty = balance !== null && balance < 25;
+  const costPerSession = balanceData?.costPerSession ?? status?.costPerSession ?? 30; // 30 كريدت (من Mousa.ai)
+  const isLow = balance !== null && balance < costPerSession * 2; // تحذير عند أقل من جلستين
+  const isEmpty = balance !== null && balance < costPerSession; // نفاد عند أقل من جلسة واحدة
 
   if (compact) {
     return (
@@ -96,7 +97,7 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
             <Zap className="w-3 h-3 text-white/30" />
             <span className="text-[10px] text-white/30">{t.creditsPerSession}</span>
           </div>
-          <span className="text-sm font-bold font-mono text-white/60">25</span>
+          <span className="text-sm font-bold font-mono text-white/60">{costPerSession}</span>
         </div>
       </div>
 

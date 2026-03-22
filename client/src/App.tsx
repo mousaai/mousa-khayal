@@ -9,6 +9,7 @@ import Home from "./pages/Home";
 import MyFilms from "./pages/MyFilms";
 import SharePage from "./pages/SharePage";
 import AdminCosts from "./pages/AdminCosts";
+import DeveloperPage from "./pages/DeveloperPage";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -18,6 +19,7 @@ function Router() {
       <Route path={"/my-films"} component={MyFilms} />
       <Route path={"/share/:shareId"} component={SharePage} />
       <Route path={"/admin/costs"} component={AdminCosts} />
+      <Route path={"/developer"} component={DeveloperPage} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

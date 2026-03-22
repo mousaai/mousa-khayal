@@ -11,8 +11,10 @@
 const MOUSA_BASE_URL = process.env.MOUSA_BASE_URL ?? "https://www.mousa.ai";
 const MOUSA_API_KEY = process.env.MOUSA_API_KEY ?? "";
 const MOUSA_PLATFORM_ID = process.env.MOUSA_PLATFORM_ID ?? "khayal";
+// التكلفة المسجلة في منصة Mousa.ai: 30 كريدت/جلسة
+// يمكن تجاوزها عبر متغير البيئة MOUSA_CREDITS_PER_SESSION
 const MOUSA_CREDITS_PER_SESSION = parseInt(
-  process.env.MOUSA_CREDITS_PER_SESSION ?? "25",
+  process.env.MOUSA_CREDITS_PER_SESSION ?? "30",
   10
 );
 
