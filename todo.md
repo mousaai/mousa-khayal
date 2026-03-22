@@ -779,3 +779,7 @@
 - [ ] إضافة رسالة TOKEN_EXPIRED مع زر إعادة توجيه لـ Mousa.ai
 - [ ] تحديث minCost/maxCost: خيال 10–50 كريدت حسب الوثيقة
 - [ ] اختبارات vitest للتحقق من Token Handoff وdeduct-credits
+
+## 🔧 إصلاح deductMousaCredits — Fail-Safe (مارس 22)
+- [x] تغيير catch في deductMousaCredits لرمي خطأ بدلاً من success:true عند فشل الشبكة أو URL خاطئ
+- [x] تحديث الاختبارات للتحقق من رمي الخطأ

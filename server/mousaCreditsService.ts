@@ -228,8 +228,13 @@ export async function deductMousaCredits(
 
     return data as MousaDeductResult;
   } catch (err) {
-    console.error("[MousaCredits] deduct-credits error:", err);
-    return null;
+    // ❌ خطأ شبكة أو URL خاطئ — يجب رمي الخطأ لمنع السماح بالعملية بدون خصم
+    console.error("[MousaCredits] deduct-credits network error:", err);
+    throw new Error(
+      `[MousaCredits] Failed to deduct credits for userId=${userId}: ${
+        err instanceof Error ? err.message : String(err)
+      }`
+    );
   }
 }
 

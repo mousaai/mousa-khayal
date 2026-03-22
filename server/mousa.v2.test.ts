@@ -230,6 +230,24 @@ describe("deductMousaCredits — v2.0 (amount + usage_factors)", () => {
     expect(result?.deducted).toBe(40);
     expect(result?.costBreakdown).toBeDefined();
   });
+
+  it("يرمي Error عند خطأ الشبكة أو URL خاطئ (لا يعيد null أو success:true)", async () => {
+    mockFetch.mockRejectedValueOnce(new Error("Network error"));
+
+    const { deductMousaCredits } = await import("./mousaCreditsService");
+    await expect(
+      deductMousaCredits(42, "مشهد سينمائي", { amount: 30 })
+    ).rejects.toThrow("Failed to deduct credits for userId=42");
+  });
+
+  it("يرمي Error عند URL خاطئ (fetch rejection)", async () => {
+    mockFetch.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+
+    const { deductMousaCredits } = await import("./mousaCreditsService");
+    await expect(
+      deductMousaCredits(99, "فيلم قصير", { sessionType: "film_short" })
+    ).rejects.toThrow("Failed to deduct credits for userId=99");
+  });
 });
 
 // ─── 6. guardMousaBalance ─────────────────────────────────────────────────────
