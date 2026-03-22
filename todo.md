@@ -768,3 +768,14 @@
 - [x] بناء صفحة مطور /developer داخل خيال
 - [x] إضافة developer endpoint في الخادم
 - [x] تحديث URL المنصة في Mousa.ai
+
+## 🔗 تحديث التكامل مع Mousa.ai v2.0 — مارس 2026
+
+- [ ] تحديث mousaCreditsService: استخدام API key الصحيح (khayal@mousa30)
+- [ ] تطبيق Token Handoff: استقبال ?token= من URL وتحقق verify-token
+- [ ] تحديث check-balance: استخدام balance بدلاً من sufficient (v2.0)
+- [ ] تحديث deduct-credits: دعم usage_factors للتسعيرة المتدرجة
+- [ ] تحديث الواجهة: استقبال token من URL وتسجيل دخول تلقائي
+- [ ] إضافة رسالة TOKEN_EXPIRED مع زر إعادة توجيه لـ Mousa.ai
+- [ ] تحديث minCost/maxCost: خيال 10–50 كريدت حسب الوثيقة
+- [ ] اختبارات vitest للتحقق من Token Handoff وdeduct-credits

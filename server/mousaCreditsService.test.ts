@@ -24,7 +24,7 @@ beforeEach(() => {
   process.env.MOUSA_API_KEY = "khayal@mousa30";
   process.env.MOUSA_PLATFORM_ID = "khayal";
   process.env.MOUSA_BASE_URL = "https://www.mousa.ai";
-  process.env.MOUSA_CREDITS_PER_SESSION = "25";
+  process.env.MOUSA_CREDITS_PER_SESSION = "30";  // v2.0
 });
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -34,11 +34,11 @@ describe("mousaCreditsService — configuration", () => {
     expect(process.env.MOUSA_API_KEY).toBe("khayal@mousa30");
     expect(process.env.MOUSA_PLATFORM_ID).toBe("khayal");
     expect(process.env.MOUSA_BASE_URL).toBe("https://www.mousa.ai");
-    expect(process.env.MOUSA_CREDITS_PER_SESSION).toBe("25");
+    expect(process.env.MOUSA_CREDITS_PER_SESSION).toBe("30");  // v2.0
   });
 
-  it("getCreditsPerSession يجب أن يعيد 25", () => {
-    expect(getCreditsPerSession()).toBe(25);
+  it("getCreditsPerSession يجب أن يعيد 30 (v2.0)", () => {
+    expect(getCreditsPerSession()).toBe(30);
   });
 
   it("isMousaEnabled يجب أن يعيد true عند وجود API key", () => {
@@ -47,14 +47,15 @@ describe("mousaCreditsService — configuration", () => {
 });
 
 describe("verifyMousaToken", () => {
-  it("يجب أن يُرسل طلب POST صحيح ويعيد بيانات المستخدم", async () => {
+  it("يجب أن يُرسل طلب POST صحيح ويعيد بيانات المستخدم (v2.0)", async () => {
     const mockResponse = {
       valid: true,
       userId: 42,
-      userName: "أحمد",
-      balance: 200,
-      platformCost: 25,
-      sufficient: true,
+      openId: "open_42",
+      name: "أحمد",
+      email: "ahmed@test.com",
+      creditBalance: 200,  // v2.0: creditBalance
+      platform: "khayal",
     };
 
     mockFetch.mockResolvedValueOnce({
@@ -62,7 +63,7 @@ describe("verifyMousaToken", () => {
       json: async () => mockResponse,
     });
 
-    const result = await verifyMousaToken("test-token-123");
+    const { result, error } = await verifyMousaToken("test-token-123");
 
     expect(mockFetch).toHaveBeenCalledWith(
       "https://www.mousa.ai/api/platform/verify-token",
@@ -76,22 +77,28 @@ describe("verifyMousaToken", () => {
       })
     );
 
-    expect(result).toEqual(mockResponse);
+    expect(error).toBeNull();
     expect(result?.valid).toBe(true);
     expect(result?.userId).toBe(42);
-    expect(result?.sufficient).toBe(true);
+    expect(result?.creditBalance).toBe(200);  // v2.0
   });
 
-  it("يجب أن يعيد null عند فشل الطلب", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 401 });
-    const result = await verifyMousaToken("invalid-token");
+  it("يجب أن يعيد error عند فشل الطلب (v2.0)", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: "Invalid token", code: "INVALID_TOKEN" }),
+    });
+    const { result, error } = await verifyMousaToken("invalid-token");
     expect(result).toBeNull();
+    expect(error?.code).toBe("INVALID_TOKEN");
   });
 
-  it("يجب أن يعيد null عند خطأ الشبكة", async () => {
+  it("يجب أن يعيد {result:null, error:null} عند خطأ الشبكة", async () => {
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
-    const result = await verifyMousaToken("token");
+    const { result, error } = await verifyMousaToken("token");
     expect(result).toBeNull();
+    expect(error).toBeNull();
   });
 });
 
@@ -164,8 +171,8 @@ describe("deductMousaCredits", () => {
         method: "POST",
         body: JSON.stringify({
           userId: 42,
-          amount: 25,
           description: "توليد مشهد سينمائي",
+          amount: 30,  // v2.0: default = 30
         }),
       })
     );
@@ -181,7 +188,7 @@ describe("deductMousaCredits", () => {
       json: async () => ({
         success: false,
         currentBalance: 5,
-        required: 25,
+        required: 30,  // v2.0
         upgradeUrl: "https://www.mousa.ai/pricing?ref=khayal",
       }),
     });
@@ -198,13 +205,12 @@ describe("guardMousaBalance", () => {
       ok: true,
       json: async () => ({
         balance: 200,
-        sufficient: true,
-        platformCost: 25,
+        // v2.0: لا sufficient ولا platformCost — تُحسب محلياً
         upgradeUrl: "https://www.mousa.ai/pricing?ref=khayal",
       }),
     });
 
-    const result = await guardMousaBalance(42);
+    const result = await guardMousaBalance(42, "default");
     expect(result.allowed).toBe(true);
     expect(result.balance).toBe(200);
   });
@@ -214,13 +220,12 @@ describe("guardMousaBalance", () => {
       ok: true,
       json: async () => ({
         balance: 10,
-        sufficient: false,
-        platformCost: 25,
+        // v2.0: لا sufficient — تُحسب محلياً (10 < 30)
         upgradeUrl: "https://www.mousa.ai/pricing?ref=khayal",
       }),
     });
 
-    const result = await guardMousaBalance(42);
+    const result = await guardMousaBalance(42, "default");
     expect(result.allowed).toBe(false);
     expect(result.upgradeUrl).toContain("mousa.ai/pricing");
   });

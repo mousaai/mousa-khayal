@@ -15,6 +15,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { ALL_LANGS, LANG_NAMES, LANG_FLAGS, isRTLLang } from "@/i18n/translations";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { getLoginUrl } from "@/const";
+import { useMousaTokenHandoff } from "@/hooks/useMousaTokenHandoff";
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
 const PORTAL_SCENES = [
@@ -264,8 +265,11 @@ export default function Home() {
   // ── نظام اللغة ──
   const { lang: activeLang, setLang: setActiveLang, t: lang, isRTL, detectLangFromText } = useLanguage();
 
-  // ── المصادقة ──
+  // ــ المصادقة ــ
   const { user, isAuthenticated, loading: authLoading } = useAuth();
+
+  // ــ Mousa Token Handoff: استقبال ?token= من URL تلقائياً ــ
+  const { handoffState, isExpired, redirectToMousa } = useMousaTokenHandoff();
 
   // ── Refs ──
   const textareaRef = useRef<HTMLTextAreaElement>(null);

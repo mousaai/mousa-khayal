@@ -36,9 +36,23 @@ vi.mock("./_core/imageGeneration", () => ({
   generateImage: vi.fn().mockResolvedValue({ url: "https://example.com/test-image.jpg" }),
 }));
 
-// ── Mock DB ──
+// ــ Mock DB ــ
 vi.mock("./db", () => ({
   getDb: vi.fn().mockResolvedValue(null),
+}));
+
+// ــ Mock Mousa Credits Service ــ (fail-open للاختبارات)
+vi.mock("./mousaCreditsService", () => ({
+  guardMousaBalance: vi.fn().mockResolvedValue({ allowed: true, balance: 200 }),
+  deductMousaCredits: vi.fn().mockResolvedValue({ success: true, newBalance: 170, deducted: 30 }),
+  checkMousaBalance: vi.fn().mockResolvedValue({ balance: 200, upgradeUrl: "https://www.mousa.ai/pricing?ref=khayal" }),
+  verifyMousaToken: vi.fn().mockResolvedValue({ result: { valid: true, userId: 1, creditBalance: 200 }, error: null }),
+  getCreditsPerSession: vi.fn().mockReturnValue(30),
+  getCostForSession: vi.fn().mockReturnValue(30),
+  isMousaEnabled: vi.fn().mockReturnValue(true),
+  getMousaPlatformId: vi.fn().mockReturnValue("khayal"),
+  getMousaUpgradeUrl: vi.fn().mockReturnValue("https://www.mousa.ai/pricing?ref=khayal"),
+  SESSION_COSTS: { scene: 30, film_short: 40, film_long: 50, film_epic: 50, default: 30 },
 }));
 
 function createPublicContext(): TrpcContext {

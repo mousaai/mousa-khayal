@@ -22,7 +22,7 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
   });
 
   const { data: balanceData, isLoading } = trpc.credits.getBalance.useQuery(
-    { userId: user?.id?.toString() },
+    { userId: user?.id },  // v2.0: userId is number
     {
       enabled: !!user?.id && status?.enabled === true,
       staleTime: 30_000,
@@ -38,7 +38,7 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
 
   const balance = balanceData?.balance ?? null;
   const canGenerate = balanceData?.canGenerate ?? true;
-  const costPerSession = balanceData?.costPerSession ?? status?.costPerSession ?? 30; // 30 كريدت (من Mousa.ai)
+  const costPerSession = balanceData?.costForSession ?? status?.costPerSession ?? 30; // v2.0: costForSession
   const isLow = balance !== null && balance < costPerSession * 2; // تحذير عند أقل من جلستين
   const isEmpty = balance !== null && balance < costPerSession; // نفاد عند أقل من جلسة واحدة
 
