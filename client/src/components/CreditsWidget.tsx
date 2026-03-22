@@ -6,6 +6,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Coins, AlertTriangle, ExternalLink, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useLanguage } from "@/i18n/LanguageContext";
 
 interface CreditsWidgetProps {
   compact?: boolean;
@@ -14,6 +15,7 @@ interface CreditsWidgetProps {
 
 export default function CreditsWidget({ compact = false, className = "" }: CreditsWidgetProps) {
   const { user } = useAuth();
+  const { t } = useLanguage();
   
   const { data: status } = trpc.credits.getStatus.useQuery(undefined, {
     staleTime: 60_000,
@@ -70,7 +72,7 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
           </div>
           <div>
             <div className="flex items-center gap-1.5">
-              <span className="text-xs text-white/50 font-medium">رصيد خيال</span>
+              <span className="text-xs text-white/50 font-medium">{t.creditsBalance}</span>
               <span className="text-[10px] text-white/30 font-mono">MOUSA.AI</span>
             </div>
             {isLoading ? (
@@ -80,10 +82,10 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
                 <span className={`text-lg font-bold font-mono ${isEmpty ? "text-red-400" : isLow ? "text-yellow-400" : "text-white"}`}>
                   {balance.toLocaleString()}
                 </span>
-                <span className="text-xs text-white/40">كريدت</span>
+                <span className="text-xs text-white/40">{t.creditsBalance.split(" ")[0]}</span>
               </div>
             ) : (
-              <span className="text-sm text-white/40">غير متاح</span>
+              <span className="text-sm text-white/40">—</span>
             )}
           </div>
         </div>
@@ -92,7 +94,7 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
         <div className="text-right">
           <div className="flex items-center gap-1 justify-end">
             <Zap className="w-3 h-3 text-white/30" />
-            <span className="text-[10px] text-white/30">كل جلسة</span>
+            <span className="text-[10px] text-white/30">{t.creditsPerSession}</span>
           </div>
           <span className="text-sm font-bold font-mono text-white/60">25</span>
         </div>
@@ -101,14 +103,14 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
       {/* تحذير نفاد الرصيد */}
       {isEmpty && (
         <div className="mt-2 pt-2 border-t border-red-500/20">
-          <p className="text-xs text-red-300/80 mb-2">رصيدك غير كافٍ لإنشاء خيال جديد</p>
+          <p className="text-xs text-red-300/80 mb-2">{t.creditsInsufficient}</p>
           <Button
             size="sm"
             className="w-full h-7 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-300 border border-red-500/30"
             onClick={() => window.open("https://www.mousa.ai/pricing?ref=khayal", "_blank")}
           >
             <ExternalLink className="w-3 h-3 mr-1" />
-            شحن الرصيد على MOUSA.AI
+            {t.creditsTopUp} — MOUSA.AI
           </Button>
         </div>
       )}
@@ -117,12 +119,12 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
       {isLow && !isEmpty && (
         <div className="mt-2 pt-2 border-t border-yellow-500/20">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-yellow-300/70">رصيد منخفض</span>
+            <span className="text-xs text-yellow-300/70">{t.creditsInsufficient}</span>
             <button
               className="text-[10px] text-yellow-400/70 hover:text-yellow-400 underline"
               onClick={() => window.open("https://www.mousa.ai/pricing?ref=khayal", "_blank")}
             >
-              شحن الرصيد ↗
+              {t.creditsTopUp} ↗
             </button>
           </div>
         </div>

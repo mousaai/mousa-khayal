@@ -11,6 +11,8 @@ import ImmersiveViewer from "@/components/ImmersiveViewer";
 import CreditsWidget from "@/components/CreditsWidget";
 import type { GenerationResult, DocumentAnalysis, ImmersiveResult } from "@/types/khayal";
 import { musicEngine, selectMusicMood } from "@/lib/musicEngine";
+import { useLanguage } from "@/i18n/LanguageContext";
+import { ALL_LANGS, LANG_NAMES, LANG_FLAGS, isRTLLang } from "@/i18n/translations";
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
 const PORTAL_SCENES = [
@@ -50,9 +52,10 @@ const EXAMPLE_PROMPTS = [
   { text: "Futuristic Dubai skyline at night, neon reflections on the water, cinematic wide shot", lang: "EN", hint: "image" },
   { text: "قطة تقود سيارة رياضية في الصحراء، غروب الشمس", lang: "AR", hint: "صورة" },
   { text: "مدينة عائمة في السماء بين الغيوم، أبراج معلقة بسلاسل ذهبية", lang: "AR", hint: "صورة" },
-  { text: "京都の静かな竹林に囲まれた古い日本の神社", lang: "JA", hint: "image" },
+  { text: "پاکستان کے شاندار پہاڑوں میں سورج کی روشنی میں نہایا ہوا ایک قدیمی محل", lang: "UR", hint: "تصویر" },
+  { text: "مینار پاکستان کی روشنی میں چمکتی لاہور کی بادشاہی مسجد", lang: "UR", hint: "تصویر" },
   { text: "Un château médiéval flottant sur un lac de nuages au coucher du soleil", lang: "FR", hint: "image" },
-  { text: "ADN humano brillando en colores cósmicos, doble hélice flotando en el universo", lang: "ES", hint: "image" },
+  { text: "La tour Eiffel illuminée la nuit, reflets sur la Seine, plan cinématographique", lang: "FR", hint: "image" },
   // ── تحويل شخصي (image-to-image) ──
   { text: "ارفع صورتك واطلب: تخيلني طفلاً في الخامسة من عمري", lang: "AR", hint: "تحويل شخصي" },
   { text: "ارفع صورتك واطلب: تخيلني بعد 30 سنة من الآن", lang: "AR", hint: "تحويل شخصي" },
@@ -62,39 +65,7 @@ const EXAMPLE_PROMPTS = [
   { text: "سوق عربي قديم في القرن العاشر، تجار وبضائع وأضواء المصابيح", lang: "AR", hint: "صورة" },
 ];
 
-// ── نصوص الواجهة ─────────────────────────────────────────────────────────────
-const UI_LANGS: Record<string, { placeholder: string; btn: string; listening: string; processing: string; thinking: string; examples: string; tagline: string; sub: string; attachHint: string; }> = {
-  AR: {
-    placeholder: "صِف ما تتخيله أو تريده... فيديو، صورة، سيناريو، أو أي فكرة",
-    btn: "✦ توليد",
-    listening: "يستمع...",
-    processing: "يُحلّل الصوت...",
-    thinking: "يفهم ويُحلّل...",
-    examples: "أمثلة للإلهام",
-    tagline: "خيال",
-    sub: "حوّل أي وصف إلى مرئيات سينمائية",
-    attachHint: "أرفق صورة أو مستنداً أو أدخل رابطاً",
-  },
-  EN: {
-    placeholder: "Describe what you want... video, image, script, or any idea",
-    btn: "✦ Generate",
-    listening: "Listening...",
-    processing: "Analyzing audio...",
-    thinking: "Understanding & analyzing...",
-    examples: "Inspiration examples",
-    tagline: "Khayal",
-    sub: "Transform any description into cinematic visuals",
-    attachHint: "Attach image, document, or enter a URL",
-  },
-  JA: { placeholder: "想像するものを説明してください...", btn: "✦ 生成", listening: "聴いています...", processing: "分析中...", thinking: "理解中...", examples: "インスピレーション例", tagline: "خيال", sub: "あらゆる説明を映画的シーンに変換", attachHint: "画像・文書を添付またはURLを入力" },
-  FR: { placeholder: "Décrivez ce que vous imaginez...", btn: "✦ Générer", listening: "Écoute...", processing: "Analyse...", thinking: "Compréhension...", examples: "Exemples d'inspiration", tagline: "خيال", sub: "Transformez toute description en scène cinématographique", attachHint: "Joindre une image, un document ou entrer une URL" },
-  ZH: { placeholder: "描述您想象的内容...", btn: "✦ 生成", listening: "聆听中...", processing: "分析中...", thinking: "理解中...", examples: "灵感示例", tagline: "خيال", sub: "将任何描述转化为电影场景", attachHint: "附加图片、文档或输入URL" },
-  IT: { placeholder: "Descrivi cosa immagini...", btn: "✦ Genera", listening: "Ascolta...", processing: "Analizza...", thinking: "Comprensione...", examples: "Esempi di ispirazione", tagline: "خيال", sub: "Trasforma qualsiasi descrizione in una scena cinematografica", attachHint: "Allega immagine, documento o inserisci URL" },
-  ES: { placeholder: "Describe lo que imaginas...", btn: "✦ Generar", listening: "Escuchando...", processing: "Analizando...", thinking: "Entendiendo...", examples: "Ejemplos de inspiración", tagline: "خيال", sub: "Transforma cualquier descripción en una escena cinematográfica", attachHint: "Adjunta imagen, documento o ingresa URL" },
-  HI: { placeholder: "वर्णन करें जो आप कल्पना करते हैं...", btn: "✦ उत्पन्न करें", listening: "सुन रहा है...", processing: "विश्लेषण...", thinking: "समझ रहा है...", examples: "प्रेरणा के उदाहरण", tagline: "خيال", sub: "किसी भी विवरण को सिनेमाई दृश्य में बदलें", attachHint: "छवि, दस्तावेज़ संलग्न करें या URL दर्ज करें" },
-};
-
-const LANG_KEYS = Object.keys(UI_LANGS);
+// ── نصوص الواجهة — مُدارة الآن عبر نظام i18n في /i18n/translations.ts ──
 
 // ── رسائل المحادثة ───────────────────────────────────────────────────────────
 interface ChatMsg {
@@ -285,9 +256,11 @@ export default function Home() {
   const [bgIdx, setBgIdx] = useState(0);
   const [portalIdx, setPortalIdx] = useState(0);
   const [particles, setParticles] = useState<Array<{ id: number; x: number; y: number; size: number; speed: number; opacity: number }>>([]);
-  const [activeLang, setActiveLang] = useState("AR");
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [portalGlow, setPortalGlow] = useState(false);
+
+  // ── نظام اللغة ──
+  const { lang: activeLang, setLang: setActiveLang, t: lang, isRTL, detectLangFromText } = useLanguage();
 
   // ── Refs ──
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -299,9 +272,6 @@ export default function Home() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const waveAnimRef = useRef<number>(0);
   const intentTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const lang = UI_LANGS[activeLang] || UI_LANGS.AR;
-  const isRTL = ["AR", "FA", "UR", "HE"].includes(activeLang);
 
   // ── tRPC mutations ──
   const chatWithContextMutation = trpc.chat.chatWithContext.useMutation();
@@ -821,9 +791,10 @@ export default function Home() {
             setPrompt(prev => prev ? prev + " " + data.text : data.text);
             if (data.language) {
               const detectedLang = data.language.toUpperCase().slice(0, 2);
-              const ISO_MAP: Record<string, string> = { AR: "AR", EN: "EN", JA: "JA", FR: "FR", ZH: "ZH", IT: "IT", ES: "ES", HI: "HI", DE: "EN", PT: "ES", RU: "EN", KO: "JA", TR: "EN", FA: "AR", UR: "HI", BN: "HI" };
+              // تعيين اللغات المدعومة فقط (AR, EN, UR, FR)
+              const ISO_MAP: Record<string, string> = { AR: "AR", EN: "EN", FR: "FR", UR: "UR", FA: "AR", HE: "AR", DE: "EN", PT: "EN", RU: "EN", IT: "EN", ES: "EN", ZH: "EN", JA: "EN", KO: "EN", HI: "UR", BN: "UR", TR: "EN" };
               const mapped = ISO_MAP[detectedLang] || "EN";
-              if (mapped in UI_LANGS) setActiveLang(mapped);
+              setActiveLang(mapped as import("@/i18n/translations").LangCode);
             }
           }
         } catch { /* ignore */ } finally {
@@ -1193,25 +1164,24 @@ export default function Home() {
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
             style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)", color: "#a78bfa" }}
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/>
-            </svg>
-            <span>{activeLang}</span>
+            <span className="text-sm">{LANG_FLAGS[activeLang]}</span>
+            <span>{LANG_NAMES[activeLang]}</span>
             <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
               <path d="M6 9l6 6 6-6"/>
             </svg>
           </button>
           {showLangMenu && (
-            <div className="absolute top-10 left-0 rounded-xl overflow-hidden z-50 shadow-2xl" style={{ background: "rgba(8,9,20,0.97)", border: "1px solid rgba(167,139,250,0.2)", minWidth: 130 }}>
-              {LANG_KEYS.map(lk => (
+            <div className="absolute top-10 left-0 rounded-xl overflow-hidden z-50 shadow-2xl" style={{ background: "rgba(8,9,20,0.97)", border: "1px solid rgba(167,139,250,0.2)", minWidth: 150 }}>
+              {ALL_LANGS.map(lk => (
                 <button
                   key={lk}
                   onClick={() => { setActiveLang(lk); setShowLangMenu(false); }}
-                  className="w-full flex items-center gap-2 px-3 py-2 text-xs transition-all hover:bg-purple-500/10 text-left"
-                  style={{ color: lk === activeLang ? "#a78bfa" : "rgba(255,255,255,0.6)" }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-xs transition-all hover:bg-purple-500/10"
+                  style={{ color: lk === activeLang ? "#a78bfa" : "rgba(255,255,255,0.6)", direction: isRTLLang(lk) ? "rtl" : "ltr", textAlign: isRTLLang(lk) ? "right" : "left" }}
                 >
+                  <span>{LANG_FLAGS[lk]}</span>
                   <span className="font-bold w-6">{lk}</span>
-                  <span>{{ AR:"العربية", EN:"English", JA:"日本語", FR:"Français", ZH:"中文", IT:"Italiano", ES:"Español", HI:"हिन्दी" }[lk]}</span>
+                  <span>{LANG_NAMES[lk]}</span>
                 </button>
               ))}
             </div>
@@ -1264,10 +1234,10 @@ export default function Home() {
             WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
             letterSpacing: "-0.02em",
           }}>
-            {lang.tagline}
+            {lang.appTagline}
           </h1>
           <p className="text-sm font-light" style={{ color: "rgba(196,181,253,0.6)", letterSpacing: "0.05em" }}>
-            {lang.sub}
+            {lang.appSubtitle}
           </p>
         </div>
 
@@ -1319,12 +1289,7 @@ export default function Home() {
                 const val = e.target.value;
                 setPrompt(val);
                 if (val.length > 8) {
-                  if (/[\u0600-\u06FF]/.test(val)) setActiveLang("AR");
-                  else if (/[\u0900-\u097F]/.test(val)) setActiveLang("HI");
-                  else if (/[\u3040-\u30FF\u4E00-\u9FFF]/.test(val)) setActiveLang("JA");
-                  else if (/[àâçéèêëîïôùûüæœ]/i.test(val)) setActiveLang("FR");
-                  else if (/[áéíóúüñ¿¡]/i.test(val)) setActiveLang("ES");
-                  else if (/[a-zA-Z]/.test(val)) setActiveLang("EN");
+                  detectLangFromText(val);
                 }
               }}
               onKeyDown={handleKeyDown}
@@ -1420,10 +1385,10 @@ export default function Home() {
                   fontFamily: "'Tajawal', sans-serif",
                   boxShadow: outputMode === "auto" ? "0 0 12px rgba(250,204,21,0.25)" : "none",
                 }}
-                title={activeLang === "AR" ? "خيال تقرر كل شيء تلقائياً — بدون أي اختيارات" : "Khayal decides everything automatically"}
+                title={lang.tooltipAuto}
               >
                 <span>🧠</span>
-                <span>{activeLang === "AR" ? "ذاتية" : "Auto"}</span>
+                <span>{lang.modeAuto.replace("🧠 ", "")}</span>
               </button>
 
               {/* 🧠 مؤشر ذاكرة خيال — يظهر بعد 3 إنتاجات */}
@@ -1439,7 +1404,7 @@ export default function Home() {
                   title={`خيال تتذكرك — ${memoryStatusQuery.data.totalProductions} إنتاج`}
                 >
                   <span>🧠</span>
-                  <span>{activeLang === "AR" ? `تتذكرك (${memoryStatusQuery.data.totalProductions})` : `Memory (${memoryStatusQuery.data.totalProductions})`}</span>
+                  <span>{activeLang === "AR" ? `تتذكرك (${memoryStatusQuery.data.totalProductions})` : activeLang === "UR" ? `یادداشت (${memoryStatusQuery.data.totalProductions})` : activeLang === "FR" ? `Mémoire (${memoryStatusQuery.data.totalProductions})` : `Memory (${memoryStatusQuery.data.totalProductions})`}</span>
                 </div>
               )}
 
@@ -1599,7 +1564,7 @@ export default function Home() {
                   </button>
                   {micState !== "idle" && (
                     <span className="text-xs" style={{ color: micState === "listening" ? "#ef4444" : "#a78bfa" }}>
-                      {micState === "listening" ? lang.listening : lang.processing}
+                      {micState === "listening" ? lang.listening : lang.processingAudio}
                     </span>
                   )}
                 </div>
@@ -1642,7 +1607,7 @@ export default function Home() {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#60a5fa" strokeWidth="2">
                           <rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>
                         </svg>
-                        {activeLang === "AR" ? "صورة مرجعية" : "Reference Image"}
+                        {lang.attachImage}
                       </button>
                       <button
                         onClick={() => docInputRef.current?.click()}
@@ -1652,7 +1617,7 @@ export default function Home() {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34d399" strokeWidth="2">
                           <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
                         </svg>
-                        {activeLang === "AR" ? "مستند / مخطط" : "Document / Plan"}
+                        {lang.attachDocument}
                       </button>
                       <button
                         onClick={() => { setShowUrlInput(v => !v); setShowAttachMenu(false); }}
@@ -1662,7 +1627,7 @@ export default function Home() {
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#a78bfa" strokeWidth="2">
                           <path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71"/>
                         </svg>
-                        {activeLang === "AR" ? "رابط URL" : "URL Link"}
+                        {lang.attachUrl}
                       </button>
                     </div>
                   )}
@@ -1725,21 +1690,21 @@ export default function Home() {
                 {isGeneratingImmersive ? (
                   <>
                     <div className="w-4 h-4 border-2 border-amber-400/40 border-t-amber-300 rounded-full animate-spin" />
-                    <span>{activeLang === "AR" ? "ينقلك هناك..." : "Teleporting..."}</span>
+                    <span>{activeLang === "AR" ? "ينقلك هناك..." : activeLang === "UR" ? "وہاں لے جا رہا ہے..." : activeLang === "FR" ? "Téléportation..." : "Teleporting..."}</span>
                   </>
                 ) : (isGenerating || isGeneratingScript) ? (
                   <>
                     <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>{activeLang === "AR" ? "يُشكّل..." : "Generating..."}</span>
+                    <span>{activeLang === "AR" ? "يُشكّل..." : activeLang === "UR" ? "بنا رہا ہے..." : activeLang === "FR" ? "Génération..." : "Generating..."}</span>
                   </>
                 ) : outputMode === "auto" ? (
-                  <span className="relative z-10">🧠 {activeLang === "AR" ? "خيال تقرر" : "Khayal Decides"}</span>
+                  <span className="relative z-10">{lang.generateBtn}</span>
                 ) : outputMode === "immersive" ? (
-                  <span className="relative z-10">🌍 {activeLang === "AR" ? "انقلني هناك" : "Take Me There"}</span>
+                  <span className="relative z-10">🌍 {activeLang === "AR" ? "انقلني هناك" : activeLang === "UR" ? "مجھے وہاں لے جاؤ" : activeLang === "FR" ? "Emmenez-moi" : "Take Me There"}</span>
                 ) : detectedIntent === "script" ? (
-                  <span className="relative z-10">📄 {activeLang === "AR" ? "اكتب" : "Write"}</span>
+                  <span className="relative z-10">📄 {activeLang === "AR" ? "اكتب" : activeLang === "UR" ? "لکھیں" : activeLang === "FR" ? "Écrire" : "Write"}</span>
                 ) : (
-                  <span className="relative z-10">🎨 {activeLang === "AR" ? "صوّر" : "Generate"}</span>
+                  <span className="relative z-10">🎨 {activeLang === "AR" ? "صوّر" : activeLang === "UR" ? "بنائیں" : activeLang === "FR" ? "Générer" : "Generate"}</span>
                 )}
               </button>
             </div>
@@ -1765,7 +1730,7 @@ export default function Home() {
                     animation: videoJob.status === "processing" ? "micPulse 1.5s ease-out infinite" : "none",
                   }} />
                   <span className="text-sm font-bold" style={{ color: "rgba(255,255,255,0.8)", fontFamily: "'Tajawal', sans-serif" }}>
-                    {videoJob.status === "done" ? "✅ اكتمل الإنتاج!" : videoJob.status === "failed" ? "❌ فشل الإنتاج" : "🎬 جاري إنتاج الفيديو..."}
+                    {videoJob.status === "done" ? lang.videoReady : videoJob.status === "failed" ? lang.videoFailed.split(".")[0] : "🎬 " + lang.preparing}
                   </span>
                 </div>
                 <button
@@ -1780,7 +1745,7 @@ export default function Home() {
                   style={{ background: "rgba(239,68,68,0.15)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171", fontFamily: "'Tajawal', sans-serif" }}
                 >
                   <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 6L6 18M6 6l12 12"/></svg>
-                  إلغاء
+                  {activeLang === "AR" ? "إلغاء" : activeLang === "UR" ? "رد کریں" : activeLang === "FR" ? "Annuler" : "Cancel"}
                 </button>
               </div>
 
@@ -1942,7 +1907,7 @@ export default function Home() {
                       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/>
                       </svg>
-                      {activeLang === "AR" ? "تحميل" : "Download"}
+                      {lang.downloadVideo}
                     </a>
                     <ShareVideoButton jobId={videoJob.jobId} description={prompt} />
                     <a
@@ -1955,7 +1920,7 @@ export default function Home() {
                       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                         <path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6M15 3h6v6M10 14L21 3"/>
                       </svg>
-                      {activeLang === "AR" ? "فتح" : "Open"}
+                      {lang.openVideo}
                     </a>
                   </div>
                 </div>
@@ -2053,7 +2018,7 @@ export default function Home() {
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-purple-400" style={{ animation: "micPulse 2s ease-out infinite" }} />
                   <span className="text-xs font-bold" style={{ color: "rgba(196,181,253,0.8)", fontFamily: "'Tajawal', sans-serif" }}>
-                    {activeLang === "AR" ? "تحدّث مع خيال" : "Chat with Khayal"}
+                    {lang.chatWithKhayal}
                   </span>
                   <span className="text-[10px]" style={{ color: "rgba(148,163,184,0.35)" }}>
                     {activeLang === "AR" ? "اسأل، عدّل، استفسر..." : "Ask, edit, inquire..."}
@@ -2112,7 +2077,7 @@ export default function Home() {
                   value={chatInput}
                   onChange={e => setChatInput(e.target.value)}
                   onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleChatSend(); } }}
-                  placeholder={activeLang === "AR" ? "اسأل خيال... كم يستغرق؟ عدّل المشهد الثاني..." : "Ask Khayal... how long? edit scene 2..."}
+                  placeholder={lang.chatPlaceholder}
                   className="flex-1 bg-transparent text-white/70 placeholder-white/20 outline-none text-xs"
                   style={{ fontFamily: "'Tajawal', sans-serif" }}
                   dir={isRTL ? "rtl" : "ltr"}
@@ -2151,7 +2116,7 @@ export default function Home() {
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
               </svg>
-              {activeLang === "AR" ? "تحدّث مع خيال" : "Chat with Khayal"}
+              {lang.chatWithKhayal}
             </button>
           )}
 
@@ -2169,7 +2134,7 @@ export default function Home() {
               }}
             >
               <div className="flex items-center justify-between mb-3">
-                <span className="text-sm font-bold" style={{ color: "#34d399", fontFamily: "'Tajawal', sans-serif" }}>📄 {activeLang === "AR" ? "السيناريو" : "Script"}</span>
+                <span className="text-sm font-bold" style={{ color: "#34d399", fontFamily: "'Tajawal', sans-serif" }}>📄 {lang.scriptTitle}</span>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => {
@@ -2182,7 +2147,7 @@ export default function Home() {
                     className="text-xs px-2 py-1 rounded-lg transition-all hover:scale-105"
                     style={{ background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.25)", color: "#34d399" }}
                   >
-                    {activeLang === "AR" ? "تحميل" : "Download"}
+                    {lang.downloadScript}
                   </button>
                   <button onClick={() => setScriptResult(null)} className="text-white/30 hover:text-white/70 text-xs">✕</button>
                 </div>
@@ -2212,10 +2177,10 @@ export default function Home() {
             </div>
             <p style={{ color: "rgba(196,181,253,0.7)", fontSize: 14, fontFamily: "'Tajawal', sans-serif" }}>
               {isGeneratingScript
-                ? (activeLang === "AR" ? "يكتب السيناريو الاحترافي..." : "Writing professional script...")
+                ? lang.generatingScript
                 : documentAnalysis
-                ? (activeLang === "AR" ? `يُحلّل ${documentAnalysis.projectTitle} ويُشكّل المشاهد...` : `Analyzing ${documentAnalysis.projectTitle}...`)
-                : (activeLang === "AR" ? "يُحلّل الخيال ويُشكّل المشاهد السينمائية..." : "Analyzing and generating cinematic scenes...")
+                ? lang.analyzingDoc.replace("{title}", documentAnalysis.projectTitle)
+                : lang.generatingScenes
               }
             </p>
           </div>
@@ -2225,7 +2190,7 @@ export default function Home() {
         {!isGenerating && !isGeneratingScript && !videoJob && !scriptResult && (
           <div className="mt-8 w-full max-w-2xl">
             <p className="text-center text-xs mb-3" style={{ color: "rgba(148,163,184,0.4)" }}>
-              {lang.examples}
+              {lang.examplesTitle}
             </p>
             <div className="flex flex-wrap justify-center gap-2">
               {EXAMPLE_PROMPTS.map((ex, i) => (
@@ -2252,13 +2217,13 @@ export default function Home() {
         {/* ── CAPABILITIES ROW ── */}
         <div className="mt-10 flex items-center justify-center gap-5 flex-wrap">
           {[
-            { icon: "🎬", label: activeLang === "AR" ? "فيديو" : "Video" },
-            { icon: "🎨", label: activeLang === "AR" ? "صورة" : "Image" },
-            { icon: "📄", label: activeLang === "AR" ? "سيناريو" : "Script" },
-            { icon: "🎙️", label: activeLang === "AR" ? "صوت" : "Voice" },
-            { icon: "📎", label: activeLang === "AR" ? "مرفقات" : "Attachments" },
-            { icon: "🔗", label: activeLang === "AR" ? "روابط" : "Links" },
-            { icon: "🌍", label: activeLang === "AR" ? "متعدد اللغات" : "Multilingual" },
+            { icon: "🎬", label: lang.capVideo },
+            { icon: "🎨", label: lang.capImage },
+            { icon: "📄", label: lang.capScript },
+            { icon: "🎤️", label: lang.capVoice },
+            { icon: "📎", label: lang.capAttachments },
+            { icon: "🔗", label: lang.capLinks },
+            { icon: "🌍", label: lang.capMultilingual },
           ].map((cap, i) => (
             <div key={i} className="flex items-center gap-1 text-xs" style={{ color: "rgba(148,163,184,0.4)" }}>
               <span>{cap.icon}</span>

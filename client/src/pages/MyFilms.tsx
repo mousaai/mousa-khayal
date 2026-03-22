@@ -9,6 +9,7 @@ import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Link } from "wouter";
+import { useLanguage } from "@/i18n/LanguageContext";
 import {
   Film,
   Share2,
@@ -421,25 +422,26 @@ function FilmCard({ item }: { item: ProductionItem }) {
 // ─────────────────────────────────────────────────────────────
 export default function MyFilms() {
   const { data: history, isLoading } = trpc.video.getProductionHistory.useQuery({ limit: 20 });
+  const { t, isRTL } = useLanguage();
 
   return (
-    <div className="min-h-screen bg-[#08090f] text-white">
+    <div className="min-h-screen bg-[#08090f] text-white" dir={isRTL ? "rtl" : "ltr"}>
       {/* Header */}
       <div className="border-b border-blue-500/20 bg-[#0a0b10]">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center gap-4">
           <Link href="/">
             <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
               <ArrowLeft className="w-4 h-4 mr-2" />
-              الرئيسية
+              {t.backHome}
             </Button>
           </Link>
           <div className="flex items-center gap-2">
             <Clapperboard className="w-5 h-5 text-blue-400" />
-            <h1 className="text-lg font-bold text-white">أفلامي</h1>
+            <h1 className="text-lg font-bold text-white">{t.myFilmsTitle}</h1>
           </div>
           {history && (
             <Badge className="bg-blue-500/20 text-blue-300 border-blue-500/30">
-              {history.length} فيلم
+              {history.length} {t.myFilmsScenes}
             </Badge>
           )}
         </div>
@@ -460,14 +462,14 @@ export default function MyFilms() {
           <div className="text-center py-24">
             <Film className="w-16 h-16 text-blue-500/30 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-400 mb-2">
-              لا توجد أفلام بعد
+              {t.myFilmsEmpty}
             </h2>
             <p className="text-gray-600 mb-6">
-              ابدأ بإنتاج فيلمك الأول من الصفحة الرئيسية
+              {t.myFilms}
             </p>
             <Link href="/">
               <Button className="bg-blue-600 hover:bg-blue-700">
-                إنتاج فيلم جديد
+                {t.myFilmsTitle}
               </Button>
             </Link>
           </div>
