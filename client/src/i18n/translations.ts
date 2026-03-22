@@ -655,7 +655,7 @@ export const LANG_NAMES: Record<LangCode, string> = {
 };
 
 export const LANG_FLAGS: Record<LangCode, string> = {
-  AR: "🇸🇦",
+  AR: "🇦🇪",
   EN: "🇬🇧",
   UR: "🇵🇰",
   FR: "🇫🇷",
