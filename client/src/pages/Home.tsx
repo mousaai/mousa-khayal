@@ -13,6 +13,8 @@ import type { GenerationResult, DocumentAnalysis, ImmersiveResult } from "@/type
 import { musicEngine, selectMusicMood } from "@/lib/musicEngine";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { ALL_LANGS, LANG_NAMES, LANG_FLAGS, isRTLLang } from "@/i18n/translations";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { getLoginUrl } from "@/const";
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
 const PORTAL_SCENES = [
@@ -261,6 +263,9 @@ export default function Home() {
 
   // ── نظام اللغة ──
   const { lang: activeLang, setLang: setActiveLang, t: lang, isRTL, detectLangFromText } = useLanguage();
+
+  // ── المصادقة ──
+  const { user, isAuthenticated, loading: authLoading } = useAuth();
 
   // ── Refs ──
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -864,6 +869,12 @@ export default function Home() {
 
   // ── الزر الرئيسي: توليد ذكي ──
   const handleGenerate = async () => {
+    // ━━ إلزام تسجيل الدخول ━━
+    if (!isAuthenticated && !authLoading) {
+      window.location.href = getLoginUrl();
+      return;
+    }
+
     const desc = prompt.trim() || documentAnalysis?.mainDescription || "";
     if (!desc && !uploadedImageUrl && !urlInput) return;
     if (isGenerating || isGeneratingScript) return;
@@ -1040,6 +1051,11 @@ export default function Home() {
 
   // ── فاجئني: خيال تختار وتنتج بلا أي إدخال ──
   const handleSurprise = async () => {
+    // ━━ إلزام تسجيل الدخول ━━
+    if (!isAuthenticated && !authLoading) {
+      window.location.href = getLoginUrl();
+      return;
+    }
     if (isGenerating || isGeneratingScript) return;
     if ('Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission();
@@ -1073,6 +1089,116 @@ export default function Home() {
       handleGenerate();
     }
   };
+
+  // ── شاشة تسجيل الدخول ──
+  if (!authLoading && !isAuthenticated) {
+    return (
+      <div
+        className="relative min-h-screen overflow-hidden bg-[#020408] flex items-center justify-center"
+        dir={isRTL ? "rtl" : "ltr"}
+        style={{ fontFamily: "'Tajawal', 'Cairo', sans-serif" }}
+      >
+        {/* خلفية كونية */}
+        <div className="absolute inset-0 z-0">
+          <div className="absolute inset-0" style={{ backgroundImage: `url(${SPACE_BG})`, backgroundSize: "cover", backgroundPosition: "center", opacity: 0.4 }} />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#020408] via-transparent to-[#020408] opacity-90" />
+          <div className="absolute inset-0" style={{ background: "radial-gradient(ellipse 60% 50% at 50% 35%, rgba(120,60,220,0.2) 0%, transparent 70%)" }} />
+        </div>
+
+        {/* جسيمات */}
+        <div className="absolute inset-0 z-[1] pointer-events-none overflow-hidden">
+          {particles.map(p => (
+            <div key={p.id} className="absolute rounded-full" style={{
+              left: `${p.x}%`, top: `${p.y}%`,
+              width: `${p.size}px`, height: `${p.size}px`,
+              background: p.id % 3 === 0 ? "#a78bfa" : p.id % 3 === 1 ? "#60a5fa" : "#f0e6ff",
+              opacity: p.opacity,
+              boxShadow: `0 0 ${p.size * 3}px ${p.size}px ${p.id % 3 === 0 ? "rgba(167,139,250,0.4)" : "rgba(96,165,250,0.3)"}`,
+            }} />
+          ))}
+        </div>
+
+        {/* محتوى تسجيل الدخول */}
+        <div className="relative z-10 text-center max-w-md px-6">
+          {/* شعار خيال */}
+          <div className="mb-8 flex justify-center">
+            <div className="relative">
+              <div className="w-24 h-24 border-2 border-purple-500/30 rounded-2xl rotate-12 absolute inset-0 animate-spin" style={{ animationDuration: "10s" }} />
+              <div className="w-24 h-24 border-2 border-purple-400/50 rounded-2xl flex items-center justify-center relative">
+                <span className="text-purple-300 font-bold text-4xl" style={{ fontFamily: "'Tajawal', sans-serif" }}>خ</span>
+              </div>
+            </div>
+          </div>
+
+          <h1 className="text-5xl font-bold text-white mb-3 tracking-tight" style={{ fontFamily: "'Tajawal', sans-serif" }}>
+            {lang.appName}
+          </h1>
+          <p className="text-purple-300/70 text-base mb-10" style={{ fontFamily: "'Tajawal', sans-serif" }}>
+            {lang.tagline}
+          </p>
+
+          {/* ميزات */}
+          <div className="grid grid-cols-3 gap-3 mb-10">
+            {[
+              { icon: "🎨", label: lang.features?.image ?? "صورة سينمائية" },
+              { icon: "🎥", label: lang.features?.video ?? "فيديو احترافي" },
+              { icon: "🌍", label: lang.features?.immersive ?? "جولة 360°" },
+            ].map((f, i) => (
+              <div key={i} className="rounded-xl p-3 text-center" style={{ background: "rgba(167,139,250,0.08)", border: "1px solid rgba(167,139,250,0.15)" }}>
+                <div className="text-2xl mb-1">{f.icon}</div>
+                <div className="text-xs text-purple-200/70" style={{ fontFamily: "'Tajawal', sans-serif" }}>{f.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* زر تسجيل الدخول */}
+          <button
+            onClick={() => { window.location.href = getLoginUrl(); }}
+            className="w-full py-4 rounded-2xl text-lg font-bold transition-all hover:scale-105 active:scale-95"
+            style={{
+              background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+              boxShadow: "0 0 40px rgba(124,58,237,0.4), 0 0 80px rgba(124,58,237,0.2)",
+              color: "white",
+              fontFamily: "'Tajawal', sans-serif",
+            }}
+          >
+            {lang.loginBtn ?? "سجل الدخول عبر Mousa.ai"}
+          </button>
+
+          <p className="mt-4 text-xs text-purple-300/40" style={{ fontFamily: "'Tajawal', sans-serif" }}>
+            {lang.loginHint ?? "تسجيل الدخول مطلوب لاستخدام خيال"}
+          </p>
+        </div>
+
+        {/* محدد اللغة */}
+        <div className="absolute top-4 left-4 z-30" onClick={e => e.stopPropagation()}>
+          <div className="relative">
+            <button
+              onClick={() => setShowLangMenu(v => !v)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all hover:scale-105"
+              style={{ background: "rgba(167,139,250,0.12)", border: "1px solid rgba(167,139,250,0.25)", color: "#a78bfa" }}
+            >
+              <span>{LANG_FLAGS[activeLang]}</span>
+              <span style={{ fontFamily: "'Tajawal', sans-serif" }}>{LANG_NAMES[activeLang]}</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            {showLangMenu && (
+              <div className="absolute top-9 left-0 rounded-xl overflow-hidden" style={{ background: "rgba(10,8,20,0.95)", border: "1px solid rgba(167,139,250,0.2)", minWidth: "140px" }}>
+                {ALL_LANGS.map(l => (
+                  <button key={l} onClick={() => { setActiveLang(l); setShowLangMenu(false); }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-xs hover:bg-purple-500/10 transition-colors"
+                    style={{ color: l === activeLang ? "#a78bfa" : "#9ca3af", fontFamily: "'Tajawal', sans-serif" }}
+                  >
+                    <span>{LANG_FLAGS[l]}</span><span>{LANG_NAMES[l]}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── عرض وضع أنا هناك ──
   if (immersiveResult) {

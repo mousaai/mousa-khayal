@@ -282,7 +282,7 @@ describe("videoRouter v2.0", () => {
     const caller = appRouter.createCaller({
       req: {} as any,
       res: {} as any,
-      user: null,
+      user: { id: 1, openId: "test_user", name: "Test", role: "user" as const },
     });
 
     const result = await caller.video.generateScript({
@@ -302,7 +302,7 @@ describe("videoRouter v2.0", () => {
     const caller = appRouter.createCaller({
       req: {} as any,
       res: {} as any,
-      user: null,
+      user: { id: 1, openId: "test_user", name: "Test", role: "user" as const },
     });
 
     const result = await caller.video.startProduction({
@@ -336,7 +336,7 @@ describe("videoRouter v2.0", () => {
     const caller = appRouter.createCaller({
       req: {} as any,
       res: {} as any,
-      user: null,
+      user: { id: 1, openId: "test_user", name: "Test", role: "user" as const },
     });
 
     const result = await caller.video.quickProduce({

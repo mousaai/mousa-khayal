@@ -742,3 +742,13 @@
 - [x] تحديث CreditsWidget.tsx لاستخدام نظام الترجمة
 - [x] إضافة أمثلة بالأوردو والفرنسية في EXAMPLE_PROMPTS
 - [x] زر تبديل اللغة في الواجهة الرئيسية مع علم وأيقونة
+
+## 🔐 إلزام المصادقة وخصم الكريدتس — مارس 2026
+
+- [x] تحويل khayalRouter: generate إلى protectedProcedure + فحص رصيد Mousa + خصم بعد النجاح
+- [x] تحويل videoRouter: startProduction وquickProduce إلى protectedProcedure + فحص رصيد + خصم
+- [x] تحويل videoRouter: getMyLatestJob وgetProductionHistory إلى protectedProcedure مع تصفية بـ userId
+- [x] تحويل chatRouter: detectIntent وgenerateScript إلى protectedProcedure
+- [x] إلزام تسجيل الدخول في الواجهة الأمامية (Home.tsx) قبل أي عملية توليد
+- [x] عرض شاشة تسجيل دخول جميلة بدلاً من البوكس عند عدم تسجيل الدخول
+- [x] اختبارات vitest للتحقق من حماية الإجراءات

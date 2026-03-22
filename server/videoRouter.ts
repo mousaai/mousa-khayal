@@ -5,7 +5,8 @@
  * الـ jobs تُحفظ في DB حتى تعمل بعد إغلاق المتصفح
  */
 import { z } from "zod";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+import { guardMousaBalance, deductMousaCredits, isMousaEnabled, getCreditsPerSession } from "./mousaCreditsService";
 import {
   VideoProducer,
   generateVideoScript,
@@ -90,12 +91,14 @@ async function createJobInDB(
   jobId: string,
   description?: string,
   scriptData?: any,
-  optionsData?: any
+  optionsData?: any,
+  userId?: string
 ) {
   const db = await getDb();
   if (!db) return;
   await db.insert(videoJobsTable).values({
     id: jobId,
+    userId: userId ? parseInt(userId) || null : null,
     status: "pending",
     progress: 0,
     currentStep: "جاري التحضير...",
@@ -106,6 +109,29 @@ async function createJobInDB(
     retryCount: 0,
     lastHeartbeat: new Date(),
   });
+}
+
+// دالة مساعدة: تشغيل الإنتاج مع خصم الكريدتس عند الاكتمال
+async function runProductionJobWithDeduct(
+  jobId: string,
+  scriptData: any,
+  optionsData: any,
+  userId: number | string
+): Promise<void> {
+  await runProductionJob(jobId, scriptData, optionsData);
+  // خصم الكريدتس بعد اكتمال الإنتاج
+  if (isMousaEnabled() && userId) {
+    const job = await getJobFromDB(jobId);
+    if (job?.status === 'done') {
+      const numericUserId = typeof userId === 'string' ? parseInt(userId) : userId;
+      if (!isNaN(numericUserId)) {
+        await deductMousaCredits(
+          numericUserId,
+          `خيال — إنتاج فيديو: ${(scriptData.description ?? scriptData.title ?? 'فيديو').slice(0, 60)}`
+        ).catch(err => console.error('[videoRouter] deductMousaCredits error:', err));
+      }
+    }
+  }
 }
 
 async function updateJobInDB(jobId: string, update: {
@@ -272,14 +298,25 @@ export const videoRouter = router({
   // ──────────────────────────────────────────────────────────
   // توليد سيناريو الفيديو (بدون إنتاج)
   // ──────────────────────────────────────────────────────────
-  generateScript: publicProcedure
+  generateScript: protectedProcedure
     .input(z.object({
       description: z.string().min(2).max(2000),
       language: z.enum(["ar", "en"]).default("ar"),
       voice: voiceEnum.default("ar_male"),
       sceneCount: z.number().min(3).max(10).default(6),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // ━━ فحص رصيد MOUSA.AI قبل توليد السيناريو ━━
+      if (isMousaEnabled() && ctx.user?.id) {
+        const guard = await guardMousaBalance(ctx.user.id);
+        if (!guard.allowed) {
+          throw new Error(JSON.stringify({
+            code: "INSUFFICIENT_CREDITS",
+            balance: guard.balance ?? 0,
+            upgradeUrl: guard.upgradeUrl ?? "https://www.mousa.ai/pricing?ref=khayal",
+          }));
+        }
+      }
       const script = await generateVideoScript(
         input.description,
         input.language,
@@ -292,7 +329,7 @@ export const videoRouter = router({
   // ──────────────────────────────────────────────────────────
   // بدء إنتاج الفيديو (يعيد jobId فوراً، يعمل في الخلفية)
   // ──────────────────────────────────────────────────────────
-  startProduction: publicProcedure
+  startProduction: protectedProcedure
     .input(z.object({
       description: z.string().min(2).max(2000).optional(),
       script: scriptSchema.optional(),
@@ -301,8 +338,21 @@ export const videoRouter = router({
       sceneCount: z.number().min(3).max(10).default(6),
       options: productionOptionsSchema.optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
+      if (isMousaEnabled() && ctx.user?.id) {
+        const guard = await guardMousaBalance(ctx.user.id);
+        if (!guard.allowed) {
+          throw new Error(JSON.stringify({
+            code: "INSUFFICIENT_CREDITS",
+            balance: guard.balance ?? 0,
+            upgradeUrl: guard.upgradeUrl ?? "https://www.mousa.ai/pricing?ref=khayal",
+          }));
+        }
+      }
+
       const jobId = `job_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const realUserId = ctx.user.id.toString();
 
       // حفظ السيناريو والخيارات في DB للاستئناف عند الانقطاع
       const scriptData = input.script ?? {
@@ -311,13 +361,12 @@ export const videoRouter = router({
         voice: input.voice,
         sceneCount: input.sceneCount,
       };
-      await createJobInDB(jobId, input.description, scriptData, input.options ?? {});
+      await createJobInDB(jobId, input.description, scriptData, input.options ?? {}, realUserId);
 
       // إضافة إلى الطابور الذكي — يدعم 500 مستخدم متزامن
-      const userId = `anon_${Math.random().toString(36).slice(2, 8)}`;
       try {
         const { position, waitSeconds } = await new Promise<{ position: number; waitSeconds: number }>((resolve) => {
-          jobQueue.enqueue(jobId, userId, () => runProductionJob(jobId, scriptData, input.options ?? {}))
+          jobQueue.enqueue(jobId, realUserId, () => runProductionJobWithDeduct(jobId, scriptData, input.options ?? {}, ctx.user.id))
             .then(resolve)
             .catch(async (err: Error) => {
               const msg = err.message.includes(':') ? err.message.split(':')[1] : err.message;
@@ -377,7 +426,7 @@ export const videoRouter = router({
   // ──────────────────────────────────────────────────────────
   // إنتاج سريع (سيناريو + إنتاج في خطوة واحدة)
   // ──────────────────────────────────────────────────────────
-  quickProduce: publicProcedure
+  quickProduce: protectedProcedure
     .input(z.object({
       description: z.string().min(2).max(2000),
       language: z.enum(["ar", "en"]).default("ar"),
@@ -385,8 +434,21 @@ export const videoRouter = router({
       sceneCount: z.number().min(3).max(8).default(3),
       options: productionOptionsSchema.optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
+      if (isMousaEnabled() && ctx.user?.id) {
+        const guard = await guardMousaBalance(ctx.user.id);
+        if (!guard.allowed) {
+          throw new Error(JSON.stringify({
+            code: "INSUFFICIENT_CREDITS",
+            balance: guard.balance ?? 0,
+            upgradeUrl: guard.upgradeUrl ?? "https://www.mousa.ai/pricing?ref=khayal",
+          }));
+        }
+      }
+
       const jobId = `quick_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+      const realUserId = ctx.user.id.toString();
 
       // حفظ البيانات في DB للاستئناف عند الانقطاع
       const scriptData = {
@@ -395,11 +457,10 @@ export const videoRouter = router({
         voice: input.voice,
         sceneCount: input.sceneCount,
       };
-      await createJobInDB(jobId, input.description, scriptData, input.options ?? {});
+      await createJobInDB(jobId, input.description, scriptData, input.options ?? {}, realUserId);
 
       // إضافة إلى الطابور الذكي — يدعم 500 مستخدم متزامن
-      const qUserId = `anon_${Math.random().toString(36).slice(2, 8)}`;
-      jobQueue.enqueue(jobId, qUserId, () => runProductionJob(jobId, scriptData, input.options ?? {}))
+      jobQueue.enqueue(jobId, realUserId, () => runProductionJobWithDeduct(jobId, scriptData, input.options ?? {}, ctx.user.id))
         .then(async ({ position, waitSeconds }) => {
           if (position > 0) {
             await updateJobInDB(jobId, {
@@ -420,20 +481,23 @@ export const videoRouter = router({
   //  // ────────────────────────────────────────────────────────
   // جلب آخر job للمستخدم (للعودة بعد إغلاق المتصفح)
   // ────────────────────────────────────────────────────────
-  getMyLatestJob: publicProcedure
-    .query(async () => {
+  getMyLatestJob: protectedProcedure
+    .query(async ({ ctx }) => {
       const db = await getDb();
       if (!db) return null;
-      // نجلب آخر job قيد المعالجة
+      const { and, eq: eqOp } = await import('drizzle-orm');
+      // نجلب آخر job قيد المعالجة لهذا المستخدم
       const rows = await db.select()
         .from(videoJobsTable)
-        .where(eq(videoJobsTable.status, "processing"))
+        .where(and(eqOp(videoJobsTable.status, "processing"), eqOp(videoJobsTable.userId, ctx.user.id)))
+        .orderBy(desc(videoJobsTable.createdAt))
         .limit(1);
-      // إذا لم يوجد processing، نجلب آخر done
+      // إذا لم يوجد processing، نجلب آخر done لهذا المستخدم
       if (rows.length === 0) {
         const doneRows = await db.select()
           .from(videoJobsTable)
-          .where(eq(videoJobsTable.status, "done"))
+          .where(and(eqOp(videoJobsTable.status, "done"), eqOp(videoJobsTable.userId, ctx.user.id)))
+          .orderBy(desc(videoJobsTable.createdAt))
           .limit(1);
         return doneRows[0] ?? null;
       }
@@ -443,16 +507,17 @@ export const videoRouter = router({
   // ────────────────────────────────────────────────────────
   // تاريخ الإنتاجات — آخر 20 فيديو مكتمل
   // ────────────────────────────────────────────────────────
-  getProductionHistory: publicProcedure
+  getProductionHistory: protectedProcedure
     .input(z.object({
       limit: z.number().min(1).max(50).default(20),
     }).optional())
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return [];
+      const { and, eq: eqOp } = await import('drizzle-orm');
       const rows = await db.select()
         .from(videoJobsTable)
-        .where(eq(videoJobsTable.status, "done"))
+        .where(and(eqOp(videoJobsTable.status, "done"), eqOp(videoJobsTable.userId, ctx.user.id)))
         .orderBy(desc(videoJobsTable.createdAt))
         .limit(input?.limit ?? 20);
       return rows.map((r: any) => ({
@@ -653,7 +718,7 @@ Be specific and objective. Use English for the description as it works best with
   // ────────────────────────────────────────────────────────
   // إنتاج سريع مع Character Consistency
   // ────────────────────────────────────────────────────────
-  quickProduceWithCharacter: publicProcedure
+  quickProduceWithCharacter: protectedProcedure
     .input(z.object({
       description: z.string().min(2).max(2000),
       language: z.enum(["ar", "en"]).default("ar"),
@@ -663,10 +728,22 @@ Be specific and objective. Use English for the description as it works best with
       referenceImageUrl: z.string().url().optional(),
       characterDescription: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
+      if (isMousaEnabled() && ctx.user?.id) {
+        const guard = await guardMousaBalance(ctx.user.id);
+        if (!guard.allowed) {
+          throw new Error(JSON.stringify({
+            code: "INSUFFICIENT_CREDITS",
+            balance: guard.balance ?? 0,
+            upgradeUrl: guard.upgradeUrl ?? "https://www.mousa.ai/pricing?ref=khayal",
+          }));
+        }
+      }
+
       const jobId = `char_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
-      await createJobInDB(jobId, input.description);
+      await createJobInDB(jobId, input.description, undefined, undefined, ctx.user.id.toString());
 
       (async () => {
         try {
@@ -739,15 +816,27 @@ Be specific and objective. Use English for the description as it works best with
   // ════════════════════════════════════════════════════════════════
   // autonomousProduce — خيال تقرر كل شيء بنفسها (مثل Manus)
   // ════════════════════════════════════════════════════════════════
-  autonomousProduce: publicProcedure
+  autonomousProduce: protectedProcedure
     .input(z.object({
       description: z.string().min(2).max(2000),
       userId: z.string().optional(), // openId أو IP للذاكرة
     }))
     .mutation(async ({ input, ctx }) => {
+      // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
+      if (isMousaEnabled() && ctx.user?.id) {
+        const guard = await guardMousaBalance(ctx.user.id);
+        if (!guard.allowed) {
+          throw new Error(JSON.stringify({
+            code: "INSUFFICIENT_CREDITS",
+            balance: guard.balance ?? 0,
+            upgradeUrl: guard.upgradeUrl ?? "https://www.mousa.ai/pricing?ref=khayal",
+          }));
+        }
+      }
+
       const jobId = `auto_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      const memUserId = input.userId ?? (ctx as any)?.user?.openId ?? `guest_${Math.random().toString(36).slice(2, 8)}`;
-      await createJobInDB(jobId, input.description);
+      const memUserId = ctx.user.openId ?? ctx.user.id.toString();
+      await createJobInDB(jobId, input.description, undefined, undefined, ctx.user.id.toString());
       await updateJobInDB(jobId, { status: 'pending', currentStep: '🧠 خيال تفكر...', progress: 0 });
 
       const qUserId = memUserId;
@@ -852,18 +941,30 @@ Be specific and objective. Use English for the description as it works best with
   // ════════════════════════════════════════════════════════════════
   // surpriseProduce — خيال تختار الموضوع وتنتج كاملاً من الصفر (فاجئني)
   // ════════════════════════════════════════════════════════════════
-  surpriseProduce: publicProcedure
+  surpriseProduce: protectedProcedure
     .input(z.object({
       userId: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      const memUserId = input.userId ?? (ctx as any)?.user?.openId ?? `guest_${Math.random().toString(36).slice(2, 8)}`;
+      // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
+      if (isMousaEnabled() && ctx.user?.id) {
+        const guard = await guardMousaBalance(ctx.user.id);
+        if (!guard.allowed) {
+          throw new Error(JSON.stringify({
+            code: "INSUFFICIENT_CREDITS",
+            balance: guard.balance ?? 0,
+            upgradeUrl: guard.upgradeUrl ?? "https://www.mousa.ai/pricing?ref=khayal",
+          }));
+        }
+      }
+
+      const memUserId = ctx.user.openId ?? ctx.user.id.toString();
 
       // خيال تختار الموضوع
       const surprise = await pickSurprise(memUserId);
 
       const jobId = `surprise_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-      await createJobInDB(jobId, surprise.description);
+      await createJobInDB(jobId, surprise.description, undefined, undefined, ctx.user.id.toString());
       await updateJobInDB(jobId, {
         status: 'pending',
         currentStep: surprise.announcement,

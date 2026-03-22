@@ -13,6 +13,8 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { getLoginUrl } from "@/const";
 import { cn } from "@/lib/utils";
 import { Send, Loader2, Sparkles, Film, ImageIcon, FileText } from "lucide-react";
 import { Streamdown } from "streamdown";
@@ -205,7 +207,7 @@ function ChatBubble({ msg, onVideoComplete }: {
 // ─── المكوّن الرئيسي ───────────────────────────────────────────
 
 export default function KhayalChat() {
-  const [messages, setMessages] = useState<KhayalChatMessage[]>([
+  const { isAuthenticated, loading: authLoading } = useAuth();  const [messages, setMessages] = useState<KhayalChatMessage[]>([
     {
       id: "welcome",
       role: "assistant",
@@ -262,6 +264,7 @@ export default function KhayalChat() {
   }, []);
 
   const handleSend = useCallback(async () => {
+    if (!isAuthenticated && !authLoading) { window.location.href = getLoginUrl(); return; }
     const text = input.trim();
     if (!text || isProcessing) return;
 

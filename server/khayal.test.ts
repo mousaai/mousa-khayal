@@ -43,7 +43,7 @@ vi.mock("./db", () => ({
 
 function createPublicContext(): TrpcContext {
   return {
-    user: null,
+    user: { id: 1, openId: "test_user", name: "Test", role: "user" as const },
     req: { protocol: "https", headers: {} } as TrpcContext["req"],
     res: { clearCookie: vi.fn() } as unknown as TrpcContext["res"],
   };

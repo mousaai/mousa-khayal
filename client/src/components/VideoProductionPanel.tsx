@@ -5,6 +5,8 @@
 
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/_core/hooks/useAuth";
+import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -119,6 +121,7 @@ const PIPELINE_STAGES = [
 // ─── المكوّن الرئيسي ──────────────────────────────────────────
 
 export default function VideoProductionPanel() {
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [description, setDescription] = useState("");
   const [language, setLanguage] = useState<"ar" | "en">("ar");
   const [voice, setVoice] = useState<VideoScript["voice"]>("ar_male");
@@ -183,6 +186,7 @@ export default function VideoProductionPanel() {
 
   // ── كتابة السيناريو ──
   const handleWriteScript = async () => {
+    if (!isAuthenticated && !authLoading) { window.location.href = getLoginUrl(); return; }
     if (!description.trim()) return;
     setStep("writing_script");
     setError(null);
@@ -219,6 +223,7 @@ export default function VideoProductionPanel() {
 
   // ── الإنتاج السريع ──
   const handleQuickProduce = async () => {
+    if (!isAuthenticated && !authLoading) { window.location.href = getLoginUrl(); return; }
     if (!description.trim()) return;
     setStep("producing");
     setProgress(0);

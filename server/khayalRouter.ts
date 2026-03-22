@@ -9,7 +9,7 @@
  * 5. محرك الفيلم الإخراجي بمدة محددة
  */
 import { z } from "zod";
-import { publicProcedure, router } from "./_core/trpc";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { generateImage } from "./_core/imageGeneration";
 import { invokeLLM } from "./_core/llm";
 import { getDb } from "./db";
@@ -474,7 +474,7 @@ export const khayalRouter = router({
     }),
 
   // ── توليد المشهد الكامل ──
-  generateScene: publicProcedure
+  generateScene: protectedProcedure
     .input(z.object({
       description: z.string().min(2),
       scenarioType: z.string().optional(),
@@ -633,7 +633,7 @@ export const khayalRouter = router({
     }),
 
   // ── توليد فيلم إخراجي طويل (دفعات) ──
-  generateFilm: publicProcedure
+  generateFilm: protectedProcedure
     .input(z.object({
       description: z.string().min(2),
       durationMinutes: z.number().min(1).max(120),
@@ -756,7 +756,7 @@ export const khayalRouter = router({
     }),
 
   // ── تحسين المشهد ──
-  refineScene: publicProcedure
+  refineScene: protectedProcedure
     .input(z.object({
       projectId: z.number(),
       feedback: z.string().min(3),

@@ -151,6 +151,16 @@ export interface Translations {
   views: string;
   createdBy: string;
   createYourOwn: string;
+
+  // ── Login screen ──
+  tagline: string;
+  loginBtn: string;
+  loginHint: string;
+  features: {
+    image: string;
+    video: string;
+    immersive: string;
+  };
 }
 
 const AR: Translations = {
@@ -274,6 +284,15 @@ const AR: Translations = {
   views: "مشاهدة",
   createdBy: "تم الإنشاء بواسطة",
   createYourOwn: "أنشئ فيلمك الخاص",
+
+  tagline: "حوّل أي وصف إلى مرئيات سينمائية",
+  loginBtn: "سجّل الدخول عبر Mousa.ai",
+  loginHint: "تسجيل الدخول مطلوب لاستخدام خيال",
+  features: {
+    image: "صورة سينمائية",
+    video: "فيديو احترافي",
+    immersive: "جولة 360°",
+  },
 };
 
 const EN: Translations = {
@@ -397,6 +416,15 @@ const EN: Translations = {
   views: "views",
   createdBy: "Created by",
   createYourOwn: "Create your own film",
+
+  tagline: "Transform any description into cinematic visuals",
+  loginBtn: "Sign in via Mousa.ai",
+  loginHint: "Login required to use Khayal",
+  features: {
+    image: "Cinematic Image",
+    video: "Professional Video",
+    immersive: "360° Tour",
+  },
 };
 
 const UR: Translations = {
@@ -520,6 +548,15 @@ const UR: Translations = {
   views: "منظر",
   createdBy: "بنایا گیا بذریعہ",
   createYourOwn: "اپنی فلم بنائیں",
+
+  tagline: "کسی بھی وضاحت کو سینماٹک ویژوال میں تبدیل کریں",
+  loginBtn: "Mousa.ai سے سائن ان کریں",
+  loginHint: "خیال استعمال کرنے کے لیے لاگ ان ضروری ہے",
+  features: {
+    image: "سینماٹک تصویر",
+    video: "پیشہ ورانہ ویڈیو",
+    immersive: "360° ٹور",
+  },
 };
 
 const FR: Translations = {
@@ -643,6 +680,15 @@ const FR: Translations = {
   views: "vues",
   createdBy: "Créé par",
   createYourOwn: "Créez votre propre film",
+
+  tagline: "Transformez toute description en scène cinématographique",
+  loginBtn: "Se connecter via Mousa.ai",
+  loginHint: "Connexion requise pour utiliser Khayal",
+  features: {
+    image: "Image cinématographique",
+    video: "Vidéo professionnelle",
+    immersive: "Visite 360°",
+  },
 };
 
 export const TRANSLATIONS: Record<LangCode, Translations> = { AR, EN, UR, FR };
