@@ -28,7 +28,7 @@ export const creditsRouter = router({
     .input(
       z.object({
         userId: z.number().optional(),
-        sessionType: z.enum(["scene", "film_short", "film_long", "film_epic", "default"]).optional(),
+        sessionType: z.enum(["scene", "script_only", "film_short", "film_medium", "film_long", "autonomous", "surprise", "default"]).optional(),
       })
     )
     .query(async ({ input, ctx }) => {
@@ -114,8 +114,8 @@ export const creditsRouter = router({
       platformNameEn: "KHAYAL",
       costPerSession: getCreditsPerSession(),
       sessionCosts: SESSION_COSTS,
-      minCost: 10,
-      maxCost: 50,
+      minCost: 5,    // script_only
+      maxCost: 3200,  // film_long
       platformUrl: "https://khayal.mousa.ai/",
       upgradeUrl: getMousaUpgradeUrl(),
       dashboardUrl: "https://www.mousa.ai/dashboard",

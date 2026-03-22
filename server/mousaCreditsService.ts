@@ -19,13 +19,34 @@ const MOUSA_BASE_URL = process.env.MOUSA_BASE_URL ?? "https://www.mousa.ai";
 const MOUSA_API_KEY = process.env.MOUSA_API_KEY ?? "khayal@mousa30";
 const MOUSA_PLATFORM_ID = process.env.MOUSA_PLATFORM_ID ?? "khayal";
 
-// التسعيرة المتدرجة حسب نوع الجلسة (وفق minCost=10, maxCost=50)
+/**
+ * التسعيرة المعتمدة — مارس 2026
+ * (كل كريدت = $0.01 | هامش ربح 25–40%)
+ *
+ * Standard (صور فقط، بدون Runway):
+ *   scene:         30 كريدت = $0.30  (تكلفة فعلية $0.215)
+ *   script_only:    5 كريدت = $0.05  (تكلفة فعلية $0.010)
+ *
+ * Cinema (صور + Runway + ElevenLabs):
+ *   film_short:   450 كريدت = $4.50  (تكلفة فعلية $3.445 — 6 مشاهد)
+ *   film_medium: 1100 كريدت = $11.00 (تكلفة فعلية $8.585 — 15 مشهد)
+ *   film_long:   3200 كريدت = $32.00 (تكلفة فعلية $25.700 — 45 مشهد)
+ *   autonomous:   400 كريدت = $4.00  (تكلفة فعلية $2.875 — 5 مشاهد)
+ *   surprise:     400 كريدت = $4.00  (تكلفة فعلية $2.875 — 5 مشاهد)
+ */
 export const SESSION_COSTS = {
-  scene: 30,        // مشهد واحد: 3–8 صور
-  film_short: 40,   // فيلم قصير: 15–60 ثانية
-  film_long: 50,    // فيلم طويل: 1–5 دقائق
-  film_epic: 50,    // فيلم ملحمي: 5–30 دقيقة (maxCost)
-  default: 30,      // افتراضي
+  // Standard — صور سينمائية فقط
+  scene:        30,    // مشهد واحد: 3–8 صور، بدون Runway
+  script_only:   5,    // سيناريو نصي فقط، بدون صور أو فيديو
+
+  // Cinema — إنتاج كامل بـ Runway + ElevenLabs
+  film_short:  450,    // فيلم قصير: 15–60 ثانية (6 مشاهد)
+  film_medium: 1100,   // فيلم متوسط: 1–3 دقائق (15 مشهد)
+  film_long:   3200,   // فيلم طويل: 3–10 دقائق (45 مشهد)
+  autonomous:   400,   // خيال تقرر: 5 مشاهد تلقائية
+  surprise:     400,   // فاجئني: 5 مشاهد تلقائية
+
+  default:      30,    // افتراضي (مشهد واحد)
 } as const;
 
 export type SessionType = keyof typeof SESSION_COSTS;

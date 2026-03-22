@@ -125,9 +125,13 @@ async function runProductionJobWithDeduct(
     if (job?.status === 'done') {
       const numericUserId = typeof userId === 'string' ? parseInt(userId) : userId;
       if (!isNaN(numericUserId)) {
+        // تحديد نوع الجلسة حسب عدد المشاهد
+        const sceneCount = scriptData?.sceneCount ?? 5;
+        const sessionType = sceneCount <= 6 ? 'film_short' : sceneCount <= 15 ? 'film_medium' : 'film_long';
         await deductMousaCredits(
           numericUserId,
-          `خيال — إنتاج فيديو: ${(scriptData.description ?? scriptData.title ?? 'فيديو').slice(0, 60)}`
+          `خيال — إنتاج فيديو: ${(scriptData.description ?? scriptData.title ?? 'فيديو').slice(0, 60)}`,
+          { sessionType }
         ).catch(err => console.error('[videoRouter] deductMousaCredits error:', err));
       }
     }
@@ -308,7 +312,7 @@ export const videoRouter = router({
     .mutation(async ({ input, ctx }) => {
       // ━━ فحص رصيد MOUSA.AI قبل توليد السيناريو ━━
       if (isMousaEnabled() && ctx.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id);
+        const guard = await guardMousaBalance(ctx.user.id, 'autonomous');
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",
@@ -341,7 +345,7 @@ export const videoRouter = router({
     .mutation(async ({ input, ctx }) => {
       // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
       if (isMousaEnabled() && ctx.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id);
+        const guard = await guardMousaBalance(ctx.user.id, 'autonomous');
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",
@@ -437,7 +441,7 @@ export const videoRouter = router({
     .mutation(async ({ input, ctx }) => {
       // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
       if (isMousaEnabled() && ctx.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id);
+        const guard = await guardMousaBalance(ctx.user.id, 'autonomous');
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",
@@ -731,7 +735,7 @@ Be specific and objective. Use English for the description as it works best with
     .mutation(async ({ input, ctx }) => {
       // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
       if (isMousaEnabled() && ctx.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id);
+        const guard = await guardMousaBalance(ctx.user.id, 'autonomous');
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",
@@ -824,7 +828,7 @@ Be specific and objective. Use English for the description as it works best with
     .mutation(async ({ input, ctx }) => {
       // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
       if (isMousaEnabled() && ctx.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id);
+        const guard = await guardMousaBalance(ctx.user.id, 'autonomous');
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",
@@ -948,7 +952,7 @@ Be specific and objective. Use English for the description as it works best with
     .mutation(async ({ input, ctx }) => {
       // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
       if (isMousaEnabled() && ctx.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id);
+        const guard = await guardMousaBalance(ctx.user.id, 'autonomous');
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",

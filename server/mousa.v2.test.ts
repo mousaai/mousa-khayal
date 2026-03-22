@@ -29,15 +29,15 @@ describe("SESSION_COSTS — التسعيرة المتدرجة", () => {
   });
 
   it("film_short = 40 كريدت", () => {
-    expect(SESSION_COSTS.film_short).toBe(40);
+    expect(SESSION_COSTS.film_short).toBe(450);
   });
 
   it("film_long = 50 كريدت (maxCost)", () => {
-    expect(SESSION_COSTS.film_long).toBe(50);
+    expect(SESSION_COSTS.film_long).toBe(3200);
   });
 
   it("film_epic = 50 كريدت (maxCost)", () => {
-    expect(SESSION_COSTS.film_epic).toBe(50);
+    expect(SESSION_COSTS.film_medium).toBe(1100);
   });
 
   it("default = 30 كريدت", () => {
@@ -45,7 +45,7 @@ describe("SESSION_COSTS — التسعيرة المتدرجة", () => {
   });
 
   it("getCostForSession يعيد التكلفة الصحيحة لكل نوع", () => {
-    const types: SessionType[] = ["scene", "film_short", "film_long", "film_epic", "default"];
+    const types: SessionType[] = ["scene", "scene", "script_only", "film_short", "film_medium", "film_long", "autonomous", "surprise", "default"];
     for (const t of types) {
       expect(getCostForSession(t)).toBe(SESSION_COSTS[t]);
     }
