@@ -46,7 +46,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          fontFamily: "sans-serif",
+          fontFamily: "'IBM Plex Arabic', sans-serif",
           color: "#E8E0D0",
           gap: 16,
         }}
@@ -64,7 +64,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
         />
         <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         <div style={{ color: "#D4A017", fontWeight: 700, fontSize: "1.2rem" }}>
-          mousa.ai — خيال
+          mousa.ai
         </div>
         <div style={{ color: "#8A9BB0", fontSize: "0.9rem" }}>
           جاري التحقق من هويتك...
@@ -85,7 +85,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           flexDirection: "column",
           alignItems: "center",
           justifyContent: "center",
-          fontFamily: "sans-serif",
+          fontFamily: "'IBM Plex Arabic', sans-serif",
           color: "#E8E0D0",
           gap: 16,
           padding: 24,
