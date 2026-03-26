@@ -5,7 +5,7 @@
 
 import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuth } from "@/components/AuthGate";
 import { getLoginUrl } from "@/const";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -121,7 +121,9 @@ const PIPELINE_STAGES = [
 // ─── المكوّن الرئيسي ──────────────────────────────────────────
 
 export default function VideoProductionPanel() {
-  const { isAuthenticated, loading: authLoading } = useAuth();
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
+  const authLoading = false; // AuthGate يضمن وجود user
   const [description, setDescription] = useState("");
   const [language, setLanguage] = useState<"ar" | "en">("ar");
   const [voice, setVoice] = useState<VideoScript["voice"]>("ar_male");

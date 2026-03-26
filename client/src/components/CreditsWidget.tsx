@@ -5,7 +5,7 @@
  *   خيال تقرر / فاجئني: 400
  */
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuth } from "@/components/AuthGate";
 import { Coins, AlertTriangle, ExternalLink, Zap, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -37,9 +37,9 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
   });
 
   const { data: balanceData, isLoading } = trpc.credits.getBalance.useQuery(
-    { userId: user?.id },
+    { userId: user?.userId },
     {
-      enabled: !!user?.id && status?.enabled === true,
+      enabled: !!user?.userId && status?.enabled === true,
       staleTime: 30_000,
       refetchInterval: 60_000,
     }

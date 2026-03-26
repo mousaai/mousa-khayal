@@ -5,7 +5,7 @@
 
 import { useState, useMemo } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuth } from "@/components/AuthGate";
 import { Link } from "wouter";
 
 // ─── ألوان المزوّدين ──────────────────────────────────────────
@@ -125,7 +125,8 @@ function DailyChart({ daily }: { daily: { day: string; provider: string; cost_us
 
 // ─── الصفحة الرئيسية ──────────────────────────────────────────
 export default function AdminCosts() {
-  const { user, loading: authLoading } = useAuth();
+  const { user } = useAuth();
+  const authLoading = false; // AuthGate يضمن وجود user
   const [days, setDays] = useState(30);
 
   const { data: report, isLoading, refetch } = trpc.costs.getFullReport.useQuery(
@@ -142,7 +143,10 @@ export default function AdminCosts() {
     );
   }
 
-  if (!user || user.role !== "admin") {
+  // في منصة خيال: المشرف هو صاحب الحساب في Mousa.ai فقط
+  // نتحقق من openId بدلاً من role
+  const OWNER_OPEN_ID = import.meta.env.VITE_OWNER_OPEN_ID ?? "";
+  if (!user || (OWNER_OPEN_ID && user.openId !== OWNER_OPEN_ID)) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "#08090f" }}>
         <div style={{ fontSize: 48 }}>🔒</div>

@@ -797,3 +797,10 @@
 - [x] إضافة زر "مزامنة التسعيرة" في صفحة /developer (يظهر للمستخدمين المسجلين فقط)
 - [x] تحديث بطاقات التسعيرة في DeveloperPage لعرض التسعيرة المعتمدة (مارس 2026)
 - [x] اختبارات vitest لـ SESSION_COSTS وKHAYAL_SERVICES وnotifyMousaPricing (220 اختبار ناجح)
+
+## 🔐 نظام مصادقة Mousa.ai — مارس 2026
+- [x] بناء useMousaAuth hook في client/src/hooks/useMousaAuth.ts
+- [x] بناء AuthGate component في client/src/components/AuthGate.tsx
+- [x] دمج AuthGate في App.tsx لحماية كل الصفحات
+- [x] تحديث CreditsWidget وHome وKhayalChat وVideoProductionPanel وAdminCosts لاستخدام AuthGate
+- [x] كتابة اختبارات vitest لـ useMousaAuth (235 اختبار ناجح)

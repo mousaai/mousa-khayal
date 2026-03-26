@@ -13,7 +13,7 @@
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuth } from "@/components/AuthGate";
 import { getLoginUrl } from "@/const";
 import { cn } from "@/lib/utils";
 import { Send, Loader2, Sparkles, Film, ImageIcon, FileText } from "lucide-react";
@@ -207,7 +207,10 @@ function ChatBubble({ msg, onVideoComplete }: {
 // ─── المكوّن الرئيسي ───────────────────────────────────────────
 
 export default function KhayalChat() {
-  const { isAuthenticated, loading: authLoading } = useAuth();  const [messages, setMessages] = useState<KhayalChatMessage[]>([
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
+  const authLoading = false; // AuthGate يضمن وجود user
+  const [messages, setMessages] = useState<KhayalChatMessage[]>([
     {
       id: "welcome",
       role: "assistant",

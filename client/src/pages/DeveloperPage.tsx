@@ -26,7 +26,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import { useLanguage } from "@/i18n/LanguageContext";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuth } from "@/components/AuthGate";
 
 // ─── التسعيرة المتدرجة لخيال (معتمدة مارس 2026) ───────────────────────
 

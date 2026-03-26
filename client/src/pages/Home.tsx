@@ -13,7 +13,7 @@ import type { GenerationResult, DocumentAnalysis, ImmersiveResult } from "@/type
 import { musicEngine, selectMusicMood } from "@/lib/musicEngine";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { ALL_LANGS, LANG_NAMES, LANG_FLAGS, isRTLLang } from "@/i18n/translations";
-import { useAuth } from "@/_core/hooks/useAuth";
+import { useAuth } from "@/components/AuthGate";
 import { getLoginUrl } from "@/const";
 import { useMousaTokenHandoff } from "@/hooks/useMousaTokenHandoff";
 
@@ -266,7 +266,9 @@ export default function Home() {
   const { lang: activeLang, setLang: setActiveLang, t: lang, isRTL, detectLangFromText } = useLanguage();
 
   // ــ المصادقة ــ
-  const { user, isAuthenticated, loading: authLoading } = useAuth();
+  const { user } = useAuth();
+  const isAuthenticated = !!user;
+  const authLoading = false; // AuthGate يضمن وجود user قبل عرض الصفحة
 
   // ــ Mousa Token Handoff: استقبال ?token= من URL تلقائياً ــ
   const { handoffState, isExpired, redirectToMousa } = useMousaTokenHandoff();

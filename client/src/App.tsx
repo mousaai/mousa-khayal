@@ -5,6 +5,7 @@ import { Route, Switch } from "wouter";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { LanguageProvider } from "./i18n/LanguageContext";
+import AuthGate from "./components/AuthGate";
 import Home from "./pages/Home";
 import MyFilms from "./pages/MyFilms";
 import SharePage from "./pages/SharePage";
@@ -12,7 +13,6 @@ import AdminCosts from "./pages/AdminCosts";
 import DeveloperPage from "./pages/DeveloperPage";
 
 function Router() {
-  // make sure to consider if you need authentication for certain routes
   return (
     <Switch>
       <Route path={"/"} component={Home} />
@@ -42,7 +42,9 @@ function App() {
         <LanguageProvider>
           <TooltipProvider>
             <Toaster />
-            <Router />
+            <AuthGate>
+              <Router />
+            </AuthGate>
           </TooltipProvider>
         </LanguageProvider>
       </ThemeProvider>
