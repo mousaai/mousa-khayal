@@ -62,7 +62,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             root@${{ secrets.SERVER_HOST }} \
             'cd /var/www/mousa-khayal && \
-             pnpm install --prod --frozen-lockfile && \
+             pnpm install --frozen-lockfile && \
              if pm2 describe mousa-khayal > /dev/null 2>&1; then \
                pm2 reload mousa-khayal --update-env; \
              else \
