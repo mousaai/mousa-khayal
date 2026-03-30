@@ -48,14 +48,17 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             root@${{ secrets.SERVER_HOST }} \
-            "mkdir -p /var/www/mousa-khayal/dist /var/log/mousa-khayal"
+            "mkdir -p /var/www/mousa-khayal/dist /var/www/mousa-khayal/patches /var/log/mousa-khayal"
           rsync -avz --delete \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             dist/ root@${{ secrets.SERVER_HOST }}:/var/www/mousa-khayal/dist/
           rsync -avz \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            package.json pnpm-lock.yaml ecosystem.config.cjs patches/ \
+            package.json pnpm-lock.yaml ecosystem.config.cjs \
             root@${{ secrets.SERVER_HOST }}:/var/www/mousa-khayal/
+          rsync -avz \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            patches/ root@${{ secrets.SERVER_HOST }}:/var/www/mousa-khayal/patches/
 
       - name: 🔄 Install deps & start/restart PM2
         run: |
@@ -87,10 +90,4 @@ jobs:
           curl -s -X POST "https://www.mousa.ai/api/platform/github-action-status" \
             -H "Content-Type: application/json" \
             -H "X-Platform-Key: USAA" \
-            -d "{\
-              \"repo\": \"${{ github.repository }}\",\
-              \"action\": \"deploy\",\
-              \"status\": \"${{ job.status }}\",\
-              \"runId\": \"${{ github.run_id }}\",\
-              \"platform\": \"khayal\"\
-            }" || echo "Notification sent"
+            -d '{"repo":"${{ github.repository }}","action":"deploy","status":"${{ job.status }}","runId":"${{ github.run_id }}","platform":"khayal"}' || echo "Notification sent"
