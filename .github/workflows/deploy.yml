@@ -91,3 +91,19 @@ jobs:
             -H "Content-Type: application/json" \
             -H "X-Platform-Key: USAA" \
             -d '{"repo":"${{ github.repository }}","action":"deploy","status":"${{ job.status }}","runId":"${{ github.run_id }}","platform":"khayal"}' || echo "Notification sent"
+
+      - name: Notify mousa.ai on success
+        if: success()
+        run: |
+          curl -s -X POST https://www.mousa.ai/api/platform/github-action-status \
+            -H "Content-Type: application/json" \
+            -H "X-Platform-Key: USAA" \
+            -d '{"repo":"${{ github.repository }}","action":"deploy","status":"success","runId":"${{ github.run_id }}","platform":"khayal"}' || true
+
+      - name: Notify mousa.ai on failure
+        if: failure()
+        run: |
+          curl -s -X POST https://www.mousa.ai/api/platform/github-action-status \
+            -H "Content-Type: application/json" \
+            -H "X-Platform-Key: USAA" \
+            -d '{"repo":"${{ github.repository }}","action":"deploy","status":"failure","runId":"${{ github.run_id }}","platform":"khayal"}' || true
