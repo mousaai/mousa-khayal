@@ -1,0 +1,18 @@
+{
+  "query": "\nSELECT \n  (SELECT COUNT(*) FROM users) as total_users,\n  (SELECT COUNT(*) FROM ai_sessions) as total_sessions,\n  (SELECT COUNT(*) FROM credit_transactions) as total_transactions,\n  (SELECT COUNT(*) FROM subscriptions WHERE status = 'active') as active_subscriptions,\n  (SELECT COALESCE(SUM(totalSpent),0) FROM credit_wallets) as total_credits_spent,\n  (SELECT COALESCE(SUM(balance),0) FROM credit_wallets) as total_credits_balance;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute \nSELECT \n  (SELECT COUNT(*) FROM users) as total_users,\n  (SELECT COUNT(*) FROM ai_sessions) as total_sessions,\n  (SELECT COUNT(*) FROM credit_transactions) as total_transactions,\n  (SELECT COUNT(*) FROM subscriptions WHERE status = 'active') as active_subscriptions,\n  (SELECT COALESCE(SUM(totalSpent),0) FROM credit_wallets) as total_credits_spent,\n  (SELECT COALESCE(SUM(balance),0) FROM credit_wallets) as total_credits_balance;\n",
+  "rows": [
+    {
+      "total_users": "9",
+      "total_sessions": "0",
+      "total_transactions": "25",
+      "active_subscriptions": "1",
+      "total_credits_spent": "75",
+      "total_credits_balance": "2325"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_users\ttotal_sessions\ttotal_transactions\tactive_subscriptions\ttotal_credits_spent\ttotal_credits_balance\n9\t0\t25\t1\t75\t2325\n",
+  "stderr": "",
+  "execution_time_ms": 2166
+}

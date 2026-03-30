@@ -1,0 +1,58 @@
+{
+  "query": "SELECT platform, baseCost, minCost, maxCost, description, updatedAt FROM platform_pricing_rules ORDER BY platform;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SELECT platform, baseCost, minCost, maxCost, description, updatedAt FROM platform_pricing_rules ORDER BY platform;",
+  "rows": [
+    {
+      "platform": "code",
+      "baseCost": "0",
+      "minCost": "0",
+      "maxCost": "10",
+      "description": "كود: 0 للاستعلام المحلي، 3–5 للـ Smart-Query، 10 للذكاء الاصطناعي",
+      "updatedAt": "2026-03-22 20:17:58"
+    },
+    {
+      "platform": "fada",
+      "baseCost": "15",
+      "minCost": "15",
+      "maxCost": "30",
+      "description": "فضاء: تسعير متدرج حسب نوع الخدمة — 5 إلى 30 كريدت",
+      "updatedAt": "2026-03-22 20:17:58"
+    },
+    {
+      "platform": "harara",
+      "baseCost": "35",
+      "minCost": "35",
+      "maxCost": "70",
+      "description": "حرارة: 35 كريدت لبدء الجلسة + 35 للتحليل الذكي = 70 للجلسة الكاملة",
+      "updatedAt": "2026-03-22 20:17:58"
+    },
+    {
+      "platform": "khayal",
+      "baseCost": "30",
+      "minCost": "30",
+      "maxCost": "50",
+      "description": "خيال: 30–50 كريدت حسب نوع الجلسة",
+      "updatedAt": "2026-03-22 20:17:58"
+    },
+    {
+      "platform": "maskan",
+      "baseCost": "10",
+      "minCost": "10",
+      "maxCost": "30",
+      "description": "مسكن: 10–30 كريدت حسب حجم الأسرة وعدد الغرف",
+      "updatedAt": "2026-03-22 20:17:58"
+    },
+    {
+      "platform": "raqaba",
+      "baseCost": "35",
+      "minCost": "35",
+      "maxCost": "35",
+      "description": "رقابة: 35 كريدت لكل جلسة فحص",
+      "updatedAt": "2026-03-22 20:17:58"
+    }
+  ],
+  "messages": [],
+  "stdout": "platform\tbaseCost\tminCost\tmaxCost\tdescription\tupdatedAt\ncode\t0\t0\t10\tكود: 0 للاستعلام المحلي، 3–5 للـ Smart-Query، 10 للذكاء الاصطناعي\t2026-03-22 20:17:58\nfada\t15\t15\t30\tفضاء: تسعير متدرج حسب نوع الخدمة — 5 إلى 30 كريدت\t2026-03-22 20:17:58\nharara\t35\t35\t70\tحرارة: 35 كريدت لبدء الجلسة + 35 للتحليل الذكي = 70 للجلسة الكاملة\t2026-03-22 20:17:58\nkhayal\t30\t30\t50\tخيال: 30–50 كريدت حسب نوع الجلسة\t2026-03-22 20:17:58\nmaskan\t10\t10\t30\tمسكن: 10–30 كريدت حسب حجم الأسرة وعدد الغرف\t2026-03-22 20:17:58\nraqaba\t35\t35\t35\tرقابة: 35 كريدت لكل جلسة فحص\t2026-03-22 20:17:58\n",
+  "stderr": "",
+  "execution_time_ms": 1606
+}

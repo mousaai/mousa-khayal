@@ -1,0 +1,13 @@
+{
+  "query": "\n-- Check if subscriptions table exists and its structure\nSHOW TABLES LIKE 'subscriptions';\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute \n-- Check if subscriptions table exists and its structure\nSHOW TABLES LIKE 'subscriptions';\n",
+  "rows": [
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK (subscriptions)": "subscriptions"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_6PpfERRQXfuwb7GGi2gFrK (subscriptions)\nsubscriptions\n",
+  "stderr": "",
+  "execution_time_ms": 1582
+}

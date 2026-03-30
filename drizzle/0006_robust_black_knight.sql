@@ -1,0 +1,2 @@
+ALTER TABLE `ai_sessions` MODIFY COLUMN `platform` enum('fada','raqaba','harara','maskan','code','khayal') NOT NULL;--> statement-breakpoint
+ALTER TABLE `user_project_profiles` MODIFY COLUMN `platform` enum('fada','raqaba','harara','maskan','code','khayal') NOT NULL;

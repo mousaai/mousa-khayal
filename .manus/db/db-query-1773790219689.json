@@ -1,0 +1,18 @@
+{
+  "query": "SELECT id, name, email FROM users WHERE id = 1;\nSELECT id, userId, balance, totalEarned FROM credit_wallets WHERE userId = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SELECT id, name, email FROM users WHERE id = 1;\nSELECT id, userId, balance, totalEarned FROM credit_wallets WHERE userId = 1;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "MOUSA A",
+      "email": "mousa@almaskanengineering.com"
+    }
+  ],
+  "messages": [
+    "id\tuserId\tbalance\ttotalEarned",
+    "1\t1\t200\t200"
+  ],
+  "stdout": "id\tname\temail\n1\tMOUSA A\tmousa@almaskanengineering.com\nid\tuserId\tbalance\ttotalEarned\n1\t1\t200\t200\n",
+  "stderr": "",
+  "execution_time_ms": 1823
+}

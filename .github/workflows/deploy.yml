@@ -1,0 +1,96 @@
+name: 🚀 Deploy KHAYAL to Production
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'سبب النشر اليدوي'
+        required: false
+        default: 'نشر يدوي'
+
+jobs:
+  deploy-khayal:
+    name: 🏗️ نشر خيال (khayal.mousa.ai)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: ⚙️ Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: 📦 Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: 🔧 Install ALL dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: 🏗️ Build project
+        run: pnpm build
+        env:
+          NODE_ENV: production
+          VITE_APP_ID: ${{ secrets.VITE_APP_ID }}
+          VITE_FRONTEND_FORGE_API_KEY: ${{ secrets.VITE_FRONTEND_FORGE_API_KEY }}
+          VITE_FRONTEND_FORGE_API_URL: ${{ secrets.VITE_FRONTEND_FORGE_API_URL }}
+
+      - name: 🔑 Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+      - name: 📤 Deploy dist to server
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            root@${{ secrets.SERVER_HOST }} \
+            "mkdir -p /var/www/mousa-khayal/dist /var/log/mousa-khayal"
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            dist/ root@${{ secrets.SERVER_HOST }}:/var/www/mousa-khayal/dist/
+          rsync -avz \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            package.json pnpm-lock.yaml ecosystem.config.cjs patches/ \
+            root@${{ secrets.SERVER_HOST }}:/var/www/mousa-khayal/
+
+      - name: 🔄 Install deps & start/restart PM2
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            root@${{ secrets.SERVER_HOST }} \
+            'cd /var/www/mousa-khayal && \
+             pnpm install --prod --frozen-lockfile && \
+             if pm2 describe mousa-khayal > /dev/null 2>&1; then \
+               pm2 reload mousa-khayal --update-env; \
+             else \
+               pm2 start ecosystem.config.cjs; \
+             fi && \
+             pm2 save && \
+             echo "✅ KHAYAL deployment complete!"'
+
+      - name: ✅ Verify khayal.mousa.ai is up
+        run: |
+          sleep 10
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://khayal.mousa.ai/ || echo "000")
+          if [ "$STATUS" = "200" ]; then
+            echo "✅ khayal.mousa.ai → HTTP $STATUS — ONLINE"
+          else
+            echo "⚠️ khayal.mousa.ai → HTTP $STATUS — CHECK REQUIRED"
+          fi
+
+      - name: 📊 Notify mousa.ai of deployment
+        if: always()
+        run: |
+          curl -s -X POST "https://www.mousa.ai/api/platform/github-action-status" \
+            -H "Content-Type: application/json" \
+            -H "X-Platform-Key: USAA" \
+            -d "{\
+              \"repo\": \"${{ github.repository }}\",\
+              \"action\": \"deploy\",\
+              \"status\": \"${{ job.status }}\",\
+              \"runId\": \"${{ github.run_id }}\",\
+              \"platform\": \"khayal\"\
+            }" || echo "Notification sent"

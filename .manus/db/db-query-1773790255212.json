@@ -1,0 +1,17 @@
+{
+  "query": "SELECT balance, totalEarned FROM credit_wallets WHERE userId = 1;\nSELECT planId, planNameAr, status, currentPeriodEnd FROM subscriptions WHERE userId = 1;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SELECT balance, totalEarned FROM credit_wallets WHERE userId = 1;\nSELECT planId, planNameAr, status, currentPeriodEnd FROM subscriptions WHERE userId = 1;",
+  "rows": [
+    {
+      "balance": "800",
+      "totalEarned": "800"
+    }
+  ],
+  "messages": [
+    "planId\tplanNameAr\tstatus\tcurrentPeriodEnd",
+    "sub_starter\tمبتدئ شهري\tactive\t2026-04-16 23:30:48"
+  ],
+  "stdout": "balance\ttotalEarned\n800\t800\nplanId\tplanNameAr\tstatus\tcurrentPeriodEnd\nsub_starter\tمبتدئ شهري\tactive\t2026-04-16 23:30:48\n",
+  "stderr": "",
+  "execution_time_ms": 1818
+}

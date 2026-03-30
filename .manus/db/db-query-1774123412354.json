@@ -1,0 +1,13 @@
+{
+  "query": "SELECT COUNT(*) as total_transactions FROM credit_transactions;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SELECT COUNT(*) as total_transactions FROM credit_transactions;",
+  "rows": [
+    {
+      "total_transactions": "39"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_transactions\n39\n",
+  "stderr": "",
+  "execution_time_ms": 1634
+}

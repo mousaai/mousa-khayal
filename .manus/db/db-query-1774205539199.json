@@ -1,0 +1,9 @@
+{
+  "query": "UPDATE credit_wallets SET balance = balance + 6 WHERE id = (SELECT id FROM credit_wallets ORDER BY id LIMIT 1);",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute UPDATE credit_wallets SET balance = balance + 6 WHERE id = (SELECT id FROM credit_wallets ORDER BY id LIMIT 1);",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1594
+}

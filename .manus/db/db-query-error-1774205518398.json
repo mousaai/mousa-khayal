@@ -1,0 +1,8 @@
+{
+  "query": "\n-- إعادة 6 كريدت خُصمت في الاختبار (1 + 5)\nUPDATE credit_wallets SET balance = balance + 6, total_earned = total_earned + 6 WHERE user_id = 1;\n-- حذف سجلات الاختبار\nDELETE FROM credit_transactions WHERE user_id = 1 AND description IN ('اختبار', 'اختبار خصم') ORDER BY created_at DESC LIMIT 2;\nSELECT balance FROM credit_wallets WHERE user_id = 1;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute \n-- إعادة 6 كريدت خُصمت في الاختبار (1 + 5)\nUPDATE credit_wallets SET balance = balance + 6, total_earned = total_earned + 6 WHERE user_id = 1;\n-- حذف سجلات الاختبار\nDELETE FROM credit_transactions WHERE user_id = 1 AND description IN ('اختبار', 'اختبار خصم') ORDER BY created_at DESC LIMIT 2;\nSELECT balance FROM credit_wallets WHERE user_id = 1;\n",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 3: Unknown column 'user_id' in 'where clause'"
+  ]
+}

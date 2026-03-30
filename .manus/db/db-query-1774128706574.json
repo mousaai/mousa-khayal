@@ -1,0 +1,145 @@
+{
+  "query": "SHOW TABLES;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SHOW TABLES;",
+  "rows": [
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "__drizzle_migrations"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "ai_messages"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "ai_sessions"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "archive_contracts"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "archive_drawings"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "audit_log"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "building_codes"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "calculation_rules"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "climate_data"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "construction_materials"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "cost_benchmarks"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "credit_transactions"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "credit_wallets"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "data_expiry_alerts"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "data_versions"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "decision_trees"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "design_standards"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "error_reports"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "expert_corrections"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "expert_profiles"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "faq_cache"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "gig_professionals"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "gig_tasks"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "guest_trials"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "knowledge_sync_log"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "output_templates"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "partner_projects"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "partner_reviews"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "partner_services"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "partners"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "payments"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "platform_cost_budgets"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "platform_cost_logs"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "project_documents"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "projects"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "property_market_data"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "refund_requests"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "space_planning_benchmarks"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "subscriptions"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "supplier_catalog"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "suppliers"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "trust_scores"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "user_feedback"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "user_project_profiles"
+    },
+    {
+      "Tables_in_6PpfERRQXfuwb7GGi2gFrK": "users"
+    }
+  ],
+  "messages": [],
+  "stdout": "Tables_in_6PpfERRQXfuwb7GGi2gFrK\n__drizzle_migrations\nai_messages\nai_sessions\narchive_contracts\narchive_drawings\naudit_log\nbuilding_codes\ncalculation_rules\nclimate_data\nconstruction_materials\ncost_benchmarks\ncredit_transactions\ncredit_wallets\ndata_expiry_alerts\ndata_versions\ndecision_trees\ndesign_standards\nerror_reports\nexpert_corrections\nexpert_profiles\nfaq_cache\ngig_professionals\ngig_tasks\nguest_trials\nknowledge_sync_log\noutput_templates\npartner_projects\npartner_reviews\npartner_services\npartners\npayments\nplatform_cost_budgets\nplatform_cost_logs\nproject_documents\nprojects\nproperty_market_data\nrefund_requests\nspace_planning_benchmarks\nsubscriptions\nsupplier_catalog\nsuppliers\ntrust_scores\nuser_feedback\nuser_project_profiles\nusers\n",
+  "stderr": "",
+  "execution_time_ms": 1564
+}

@@ -1,0 +1,70 @@
+{
+  "query": "SELECT id, name, email, role FROM users LIMIT 10;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SELECT id, name, email, role FROM users LIMIT 10;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "MOUSA A",
+      "email": "mousa@almaskanengineering.com",
+      "role": "admin"
+    },
+    {
+      "id": "600001",
+      "name": "KHALFAN ALMARAR",
+      "email": "binamer007@gmail.com",
+      "role": "user"
+    },
+    {
+      "id": "600020",
+      "name": "Nazar Almaskan",
+      "email": "nazaralmaskan@gmail.com",
+      "role": "user"
+    },
+    {
+      "id": "930083",
+      "name": "MISSOUM HADJER",
+      "email": "hadjermissoum26@gmail.com",
+      "role": "user"
+    },
+    {
+      "id": "960061",
+      "name": "aneesh.nal",
+      "email": "aneesh.nal@gmail.com",
+      "role": "user"
+    },
+    {
+      "id": "1110018",
+      "name": "AL MASKAN Engineering",
+      "email": "nezar@almaskanengineering.com",
+      "role": "user"
+    },
+    {
+      "id": "1200001",
+      "name": "Mohamed Alshehhi",
+      "email": "alshehhi94@hotmail.com",
+      "role": "user"
+    },
+    {
+      "id": "1200054",
+      "name": "User_953",
+      "email": "k8mzds5dpc@privaterelay.appleid.com",
+      "role": "user"
+    },
+    {
+      "id": "1200057",
+      "name": "Saleh Alshehhi",
+      "email": "strangerhome2023@gmail.com",
+      "role": "user"
+    },
+    {
+      "id": "1200075",
+      "name": "AL MASKAN Engineering",
+      "email": "online@almaskanengineering.com",
+      "role": "user"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\temail\trole\n1\tMOUSA A\tmousa@almaskanengineering.com\tadmin\n600001\tKHALFAN ALMARAR\tbinamer007@gmail.com\tuser\n600020\tNazar Almaskan\tnazaralmaskan@gmail.com\tuser\n930083\tMISSOUM HADJER\thadjermissoum26@gmail.com\tuser\n960061\taneesh.nal\taneesh.nal@gmail.com\tuser\n1110018\tAL MASKAN Engineering\tnezar@almaskanengineering.com\tuser\n1200001\tMohamed Alshehhi\talshehhi94@hotmail.com\tuser\n1200054\tUser_953\tk8mzds5dpc@privaterelay.appleid.com\tuser\n1200057\tSaleh Alshehhi\tstrangerhome2023@gmail.com\tuser\n1200075\tAL MASKAN Engineering\tonline@almaskanengineering.com\tuser\n",
+  "stderr": "",
+  "execution_time_ms": 1537
+}

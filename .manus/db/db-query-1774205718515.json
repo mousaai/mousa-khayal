@@ -1,0 +1,22 @@
+{
+  "query": "SELECT id, balance FROM credit_wallets LIMIT 3;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SELECT id, balance FROM credit_wallets LIMIT 3;",
+  "rows": [
+    {
+      "id": "1",
+      "balance": "490"
+    },
+    {
+      "id": "30001",
+      "balance": "200"
+    },
+    {
+      "id": "30002",
+      "balance": "200"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tbalance\n1\t490\n30001\t200\n30002\t200\n",
+  "stderr": "",
+  "execution_time_ms": 1583
+}

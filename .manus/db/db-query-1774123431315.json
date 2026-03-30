@@ -1,0 +1,160 @@
+{
+  "query": "SELECT id, userId, amount, type, platform, description, balanceAfter, createdAt FROM credit_transactions ORDER BY createdAt DESC LIMIT 15;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SELECT id, userId, amount, type, platform, description, balanceAfter, createdAt FROM credit_transactions ORDER BY createdAt DESC LIMIT 15;",
+  "rows": [
+    {
+      "id": "210018",
+      "userId": "1",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "fada",
+      "description": "اختبار خصم كريدت",
+      "balanceAfter": "680",
+      "createdAt": "2026-03-21 19:05:00"
+    },
+    {
+      "id": "210017",
+      "userId": "1",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "685",
+      "createdAt": "2026-03-21 18:45:34"
+    },
+    {
+      "id": "210016",
+      "userId": "1",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "690",
+      "createdAt": "2026-03-21 17:24:15"
+    },
+    {
+      "id": "210015",
+      "userId": "1",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "695",
+      "createdAt": "2026-03-21 17:22:23"
+    },
+    {
+      "id": "210014",
+      "userId": "1",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "700",
+      "createdAt": "2026-03-21 17:21:52"
+    },
+    {
+      "id": "210013",
+      "userId": "1",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "705",
+      "createdAt": "2026-03-21 17:21:24"
+    },
+    {
+      "id": "210012",
+      "userId": "1",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "710",
+      "createdAt": "2026-03-21 17:20:13"
+    },
+    {
+      "id": "210011",
+      "userId": "1",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "715",
+      "createdAt": "2026-03-21 17:19:43"
+    },
+    {
+      "id": "210010",
+      "userId": "1",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "720",
+      "createdAt": "2026-03-21 17:19:12"
+    },
+    {
+      "id": "210009",
+      "userId": "1",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "725",
+      "createdAt": "2026-03-21 17:18:03"
+    },
+    {
+      "id": "210008",
+      "userId": "1",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "730",
+      "createdAt": "2026-03-21 17:17:44"
+    },
+    {
+      "id": "210007",
+      "userId": "1200075",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "190",
+      "createdAt": "2026-03-21 15:20:22"
+    },
+    {
+      "id": "210006",
+      "userId": "1200075",
+      "amount": "-5",
+      "type": "usage",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "195",
+      "createdAt": "2026-03-21 15:20:03"
+    },
+    {
+      "id": "210005",
+      "userId": "1200075",
+      "amount": "200",
+      "type": "welcome_bonus",
+      "platform": "NULL",
+      "description": "مكافأة الترحيب — 200 كريدت مجاني عند التسجيل",
+      "balanceAfter": "200",
+      "createdAt": "2026-03-21 15:09:36"
+    },
+    {
+      "id": "210004",
+      "userId": "1200057",
+      "amount": "200",
+      "type": "welcome_bonus",
+      "platform": "NULL",
+      "description": "مكافأة الترحيب — 200 كريدت مجاني عند التسجيل",
+      "balanceAfter": "200",
+      "createdAt": "2026-03-21 14:04:07"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tuserId\tamount\ttype\tplatform\tdescription\tbalanceAfter\tcreatedAt\n210018\t1\t-5\tusage\tfada\tاختبار خصم كريدت\t680\t2026-03-21 19:05:00\n210017\t1\t-5\tusage\tmousa_widget\tمحادثة مع ثاني الذكي\t685\t2026-03-21 18:45:34\n210016\t1\t-5\tusage\tmousa_widget\tمحادثة مع ثاني الذكي\t690\t2026-03-21 17:24:15\n210015\t1\t-5\tusage\tmousa_widget\tمحادثة مع ثاني الذكي\t695\t2026-03-21 17:22:23\n210014\t1\t-5\tusage\tmousa_widget\tمحادثة مع ثاني الذكي\t700\t2026-03-21 17:21:52\n210013\t1\t-5\tusage\tmousa_widget\tمحادثة مع ثاني الذكي\t705\t2026-03-21 17:21:24\n210012\t1\t-5\tusage\tmousa_widget\tمحادثة مع ثاني الذكي\t710\t2026-03-21 17:20:13\n210011\t1\t-5\tusage\tmousa_widget\tمحادثة مع ثاني الذكي\t715\t2026-03-21 17:19:43\n210010\t1\t-5\tusage\tmousa_widget\tمحادثة مع ثاني الذكي\t720\t2026-03-21 17:19:12\n210009\t1\t-5\tusage\tmousa_widget\tمحادثة مع ثاني الذكي\t725\t2026-03-21 17:18:03\n210008\t1\t-5\tusage\tmousa_widget\tمحادثة مع ثاني الذكي\t730\t2026-03-21 17:17:44\n210007\t1200075\t-5\tusage\tmousa_widget\tمحادثة مع ثاني الذكي\t190\t2026-03-21 15:20:22\n210006\t1200075\t-5\tusage\tmousa_widget\tمحادثة مع ثاني الذكي\t195\t2026-03-21 15:20:03\n210005\t1200075\t200\twelcome_bonus\tNULL\tمكافأة الترحيب — 200 كريدت مجاني عند التسجيل\t200\t2026-03-21 15:09:36\n210004\t1200057\t200\twelcome_bonus\tNULL\tمكافأة الترحيب — 200 كريدت مجاني عند التسجيل\t200\t2026-03-21 14:04:07\n",
+  "stderr": "",
+  "execution_time_ms": 1586
+}

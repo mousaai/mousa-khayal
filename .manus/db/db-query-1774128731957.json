@@ -1,0 +1,28 @@
+{
+  "query": "SELECT * FROM credit_wallets LIMIT 2;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SELECT * FROM credit_wallets LIMIT 2;",
+  "rows": [
+    {
+      "id": "1",
+      "userId": "1",
+      "balance": "680",
+      "totalEarned": "800",
+      "totalSpent": "120",
+      "createdAt": "2026-03-17 00:27:36",
+      "updatedAt": "2026-03-21 19:05:00"
+    },
+    {
+      "id": "30001",
+      "userId": "600001",
+      "balance": "200",
+      "totalEarned": "200",
+      "totalSpent": "0",
+      "createdAt": "2026-03-18 10:12:01",
+      "updatedAt": "2026-03-18 10:12:01"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tuserId\tbalance\ttotalEarned\ttotalSpent\tcreatedAt\tupdatedAt\n1\t1\t680\t800\t120\t2026-03-17 00:27:36\t2026-03-21 19:05:00\n30001\t600001\t200\t200\t0\t2026-03-18 10:12:01\t2026-03-18 10:12:01\n",
+  "stderr": "",
+  "execution_time_ms": 1577
+}

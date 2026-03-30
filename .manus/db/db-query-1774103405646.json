@@ -1,0 +1,145 @@
+{
+  "query": "\nSELECT id, type, amount, platform, description, balanceAfter, createdAt\nFROM credit_transactions\nWHERE userId = 1\nORDER BY createdAt DESC;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute \nSELECT id, type, amount, platform, description, balanceAfter, createdAt\nFROM credit_transactions\nWHERE userId = 1\nORDER BY createdAt DESC;\n",
+  "rows": [
+    {
+      "id": "210002",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "735",
+      "createdAt": "2026-03-21 13:08:10"
+    },
+    {
+      "id": "180002",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "740",
+      "createdAt": "2026-03-20 20:40:22"
+    },
+    {
+      "id": "180001",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع ثاني الذكي",
+      "balanceAfter": "745",
+      "createdAt": "2026-03-20 20:39:53"
+    },
+    {
+      "id": "150007",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع موسى الذكي",
+      "balanceAfter": "750",
+      "createdAt": "2026-03-20 18:20:02"
+    },
+    {
+      "id": "150006",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع موسى الذكي",
+      "balanceAfter": "755",
+      "createdAt": "2026-03-20 18:19:28"
+    },
+    {
+      "id": "150005",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع موسى الذكي",
+      "balanceAfter": "760",
+      "createdAt": "2026-03-20 16:59:58"
+    },
+    {
+      "id": "150004",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع موسى الذكي",
+      "balanceAfter": "765",
+      "createdAt": "2026-03-20 16:57:25"
+    },
+    {
+      "id": "120006",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع موسى الذكي",
+      "balanceAfter": "770",
+      "createdAt": "2026-03-19 23:17:43"
+    },
+    {
+      "id": "120005",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع موسى الذكي",
+      "balanceAfter": "775",
+      "createdAt": "2026-03-19 23:16:40"
+    },
+    {
+      "id": "120004",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع موسى الذكي",
+      "balanceAfter": "780",
+      "createdAt": "2026-03-19 21:42:19"
+    },
+    {
+      "id": "120003",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع موسى الذكي",
+      "balanceAfter": "785",
+      "createdAt": "2026-03-19 19:07:29"
+    },
+    {
+      "id": "120001",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع موسى الذكي",
+      "balanceAfter": "790",
+      "createdAt": "2026-03-19 18:19:31"
+    },
+    {
+      "id": "90002",
+      "type": "usage",
+      "amount": "-5",
+      "platform": "mousa_widget",
+      "description": "محادثة مع موسى الذكي",
+      "balanceAfter": "795",
+      "createdAt": "2026-03-19 16:34:05"
+    },
+    {
+      "id": "30001",
+      "type": "purchase",
+      "amount": "600",
+      "platform": "NULL",
+      "description": "اشتراك مبتدئ — 600 كريدت (تعويض يدوي بسبب مشكلة webhook)",
+      "balanceAfter": "800",
+      "createdAt": "2026-03-17 23:30:28"
+    },
+    {
+      "id": "1",
+      "type": "welcome_bonus",
+      "amount": "200",
+      "platform": "NULL",
+      "description": "مكافأة الترحيب — 200 كريدت مجاني عند التسجيل",
+      "balanceAfter": "200",
+      "createdAt": "2026-03-17 00:27:36"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\ttype\tamount\tplatform\tdescription\tbalanceAfter\tcreatedAt\n210002\tusage\t-5\tmousa_widget\tمحادثة مع ثاني الذكي\t735\t2026-03-21 13:08:10\n180002\tusage\t-5\tmousa_widget\tمحادثة مع ثاني الذكي\t740\t2026-03-20 20:40:22\n180001\tusage\t-5\tmousa_widget\tمحادثة مع ثاني الذكي\t745\t2026-03-20 20:39:53\n150007\tusage\t-5\tmousa_widget\tمحادثة مع موسى الذكي\t750\t2026-03-20 18:20:02\n150006\tusage\t-5\tmousa_widget\tمحادثة مع موسى الذكي\t755\t2026-03-20 18:19:28\n150005\tusage\t-5\tmousa_widget\tمحادثة مع موسى الذكي\t760\t2026-03-20 16:59:58\n150004\tusage\t-5\tmousa_widget\tمحادثة مع موسى الذكي\t765\t2026-03-20 16:57:25\n120006\tusage\t-5\tmousa_widget\tمحادثة مع موسى الذكي\t770\t2026-03-19 23:17:43\n120005\tusage\t-5\tmousa_widget\tمحادثة مع موسى الذكي\t775\t2026-03-19 23:16:40\n120004\tusage\t-5\tmousa_widget\tمحادثة مع موسى الذكي\t780\t2026-03-19 21:42:19\n120003\tusage\t-5\tmousa_widget\tمحادثة مع موسى الذكي\t785\t2026-03-19 19:07:29\n120001\tusage\t-5\tmousa_widget\tمحادثة مع موسى الذكي\t790\t2026-03-19 18:19:31\n90002\tusage\t-5\tmousa_widget\tمحادثة مع موسى الذكي\t795\t2026-03-19 16:34:05\n30001\tpurchase\t600\tNULL\tاشتراك مبتدئ — 600 كريدت (تعويض يدوي بسبب مشكلة webhook)\t800\t2026-03-17 23:30:28\n1\twelcome_bonus\t200\tNULL\tمكافأة الترحيب — 200 كريدت مجاني عند التسجيل\t200\t2026-03-17 00:27:36\n",
+  "stderr": "",
+  "execution_time_ms": 1616
+}

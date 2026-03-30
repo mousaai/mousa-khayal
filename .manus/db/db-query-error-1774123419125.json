@@ -1,0 +1,8 @@
+{
+  "query": "SELECT id, user_id, amount, type, platform, description, balance_after, created_at FROM credit_transactions ORDER BY created_at DESC LIMIT 15;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SELECT id, user_id, amount, type, platform, description, balance_after, created_at FROM credit_transactions ORDER BY created_at DESC LIMIT 15;",
+  "returncode": 1,
+  "logs": [
+    "ERROR 1054 (42S22) at line 1: Unknown column 'user_id' in 'field list'"
+  ]
+}

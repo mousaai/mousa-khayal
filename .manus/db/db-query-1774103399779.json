@@ -1,0 +1,109 @@
+{
+  "query": "\nSELECT u.id, u.name, u.email, u.loginMethod,\n  cw.balance, cw.totalEarned, cw.totalSpent,\n  (SELECT COUNT(*) FROM ai_sessions WHERE userId = u.id) as sessions_count,\n  (SELECT COUNT(*) FROM credit_transactions WHERE userId = u.id) as transactions_count\nFROM users u\nLEFT JOIN credit_wallets cw ON cw.userId = u.id\nORDER BY cw.totalSpent DESC;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute \nSELECT u.id, u.name, u.email, u.loginMethod,\n  cw.balance, cw.totalEarned, cw.totalSpent,\n  (SELECT COUNT(*) FROM ai_sessions WHERE userId = u.id) as sessions_count,\n  (SELECT COUNT(*) FROM credit_transactions WHERE userId = u.id) as transactions_count\nFROM users u\nLEFT JOIN credit_wallets cw ON cw.userId = u.id\nORDER BY cw.totalSpent DESC;\n",
+  "rows": [
+    {
+      "id": "1",
+      "name": "MOUSA A",
+      "email": "mousa@almaskanengineering.com",
+      "loginMethod": "apple",
+      "balance": "735",
+      "totalEarned": "800",
+      "totalSpent": "65",
+      "sessions_count": "0",
+      "transactions_count": "15"
+    },
+    {
+      "id": "1110018",
+      "name": "AL MASKAN Engineering",
+      "email": "nezar@almaskanengineering.com",
+      "loginMethod": "google",
+      "balance": "190",
+      "totalEarned": "200",
+      "totalSpent": "10",
+      "sessions_count": "0",
+      "transactions_count": "3"
+    },
+    {
+      "id": "600001",
+      "name": "KHALFAN ALMARAR",
+      "email": "binamer007@gmail.com",
+      "loginMethod": "google",
+      "balance": "200",
+      "totalEarned": "200",
+      "totalSpent": "0",
+      "sessions_count": "0",
+      "transactions_count": "1"
+    },
+    {
+      "id": "600020",
+      "name": "Nazar Almaskan",
+      "email": "nazaralmaskan@gmail.com",
+      "loginMethod": "google",
+      "balance": "200",
+      "totalEarned": "200",
+      "totalSpent": "0",
+      "sessions_count": "0",
+      "transactions_count": "1"
+    },
+    {
+      "id": "930083",
+      "name": "MISSOUM HADJER",
+      "email": "hadjermissoum26@gmail.com",
+      "loginMethod": "google",
+      "balance": "200",
+      "totalEarned": "200",
+      "totalSpent": "0",
+      "sessions_count": "0",
+      "transactions_count": "1"
+    },
+    {
+      "id": "960061",
+      "name": "aneesh.nal",
+      "email": "aneesh.nal@gmail.com",
+      "loginMethod": "email",
+      "balance": "200",
+      "totalEarned": "200",
+      "totalSpent": "0",
+      "sessions_count": "0",
+      "transactions_count": "1"
+    },
+    {
+      "id": "1200001",
+      "name": "Mohamed Alshehhi",
+      "email": "alshehhi94@hotmail.com",
+      "loginMethod": "apple",
+      "balance": "200",
+      "totalEarned": "200",
+      "totalSpent": "0",
+      "sessions_count": "0",
+      "transactions_count": "1"
+    },
+    {
+      "id": "1200054",
+      "name": "User_953",
+      "email": "k8mzds5dpc@privaterelay.appleid.com",
+      "loginMethod": "apple",
+      "balance": "200",
+      "totalEarned": "200",
+      "totalSpent": "0",
+      "sessions_count": "0",
+      "transactions_count": "1"
+    },
+    {
+      "id": "1200057",
+      "name": "Saleh Alshehhi",
+      "email": "strangerhome2023@gmail.com",
+      "loginMethod": "google",
+      "balance": "200",
+      "totalEarned": "200",
+      "totalSpent": "0",
+      "sessions_count": "0",
+      "transactions_count": "1"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\temail\tloginMethod\tbalance\ttotalEarned\ttotalSpent\tsessions_count\ttransactions_count\n1\tMOUSA A\tmousa@almaskanengineering.com\tapple\t735\t800\t65\t0\t15\n1110018\tAL MASKAN Engineering\tnezar@almaskanengineering.com\tgoogle\t190\t200\t10\t0\t3\n600001\tKHALFAN ALMARAR\tbinamer007@gmail.com\tgoogle\t200\t200\t0\t0\t1\n600020\tNazar Almaskan\tnazaralmaskan@gmail.com\tgoogle\t200\t200\t0\t0\t1\n930083\tMISSOUM HADJER\thadjermissoum26@gmail.com\tgoogle\t200\t200\t0\t0\t1\n960061\taneesh.nal\taneesh.nal@gmail.com\temail\t200\t200\t0\t0\t1\n1200001\tMohamed Alshehhi\talshehhi94@hotmail.com\tapple\t200\t200\t0\t0\t1\n1200054\tUser_953\tk8mzds5dpc@privaterelay.appleid.com\tapple\t200\t200\t0\t0\t1\n1200057\tSaleh Alshehhi\tstrangerhome2023@gmail.com\tgoogle\t200\t200\t0\t0\t1\n",
+  "stderr": "",
+  "execution_time_ms": 1599
+}

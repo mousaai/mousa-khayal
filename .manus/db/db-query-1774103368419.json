@@ -1,0 +1,35 @@
+{
+  "query": "\nSELECT platform, COUNT(*) as sessions, COALESCE(SUM(creditsUsed),0) as credits_used \nFROM ai_sessions \nGROUP BY platform;\n\nSELECT s.planId, s.status, COUNT(*) as count \nFROM subscriptions s \nGROUP BY s.planId, s.status;\n\nSELECT type, COUNT(*) as count, COALESCE(SUM(ABS(amount)),0) as total_amount \nFROM credit_transactions \nGROUP BY type;\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute \nSELECT platform, COUNT(*) as sessions, COALESCE(SUM(creditsUsed),0) as credits_used \nFROM ai_sessions \nGROUP BY platform;\n\nSELECT s.planId, s.status, COUNT(*) as count \nFROM subscriptions s \nGROUP BY s.planId, s.status;\n\nSELECT type, COUNT(*) as count, COALESCE(SUM(ABS(amount)),0) as total_amount \nFROM credit_transactions \nGROUP BY type;\n",
+  "rows": [
+    {
+      "planId": "sub_starter",
+      "status": "active",
+      "count": "1"
+    },
+    {
+      "planId": "type",
+      "status": "count",
+      "count": "total_amount"
+    },
+    {
+      "planId": "purchase",
+      "status": "1",
+      "count": "600"
+    },
+    {
+      "planId": "welcome_bonus",
+      "status": "9",
+      "count": "1800"
+    },
+    {
+      "planId": "usage",
+      "status": "15",
+      "count": "75"
+    }
+  ],
+  "messages": [],
+  "stdout": "planId\tstatus\tcount\nsub_starter\tactive\t1\ntype\tcount\ttotal_amount\npurchase\t1\t600\nwelcome_bonus\t9\t1800\nusage\t15\t75\n",
+  "stderr": "",
+  "execution_time_ms": 2094
+}

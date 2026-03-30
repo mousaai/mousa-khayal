@@ -1,0 +1,20 @@
+{
+  "query": "SELECT \n  (SELECT COUNT(*) FROM users) as total_users,\n  (SELECT COUNT(*) FROM credit_wallets) as total_wallets,\n  (SELECT COUNT(*) FROM ai_sessions) as total_sessions,\n  (SELECT COUNT(*) FROM ai_messages) as total_messages,\n  (SELECT COUNT(*) FROM payments) as total_payments,\n  (SELECT COUNT(*) FROM subscriptions) as total_subscriptions,\n  (SELECT COUNT(*) FROM credit_transactions) as total_transactions,\n  (SELECT COALESCE(SUM(balance),0) FROM credit_wallets) as total_credits_in_system;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SELECT \n  (SELECT COUNT(*) FROM users) as total_users,\n  (SELECT COUNT(*) FROM credit_wallets) as total_wallets,\n  (SELECT COUNT(*) FROM ai_sessions) as total_sessions,\n  (SELECT COUNT(*) FROM ai_messages) as total_messages,\n  (SELECT COUNT(*) FROM payments) as total_payments,\n  (SELECT COUNT(*) FROM subscriptions) as total_subscriptions,\n  (SELECT COUNT(*) FROM credit_transactions) as total_transactions,\n  (SELECT COALESCE(SUM(balance),0) FROM credit_wallets) as total_credits_in_system;",
+  "rows": [
+    {
+      "total_users": "1",
+      "total_wallets": "1",
+      "total_sessions": "0",
+      "total_messages": "0",
+      "total_payments": "0",
+      "total_subscriptions": "0",
+      "total_transactions": "1",
+      "total_credits_in_system": "200"
+    }
+  ],
+  "messages": [],
+  "stdout": "total_users\ttotal_wallets\ttotal_sessions\ttotal_messages\ttotal_payments\ttotal_subscriptions\ttotal_transactions\ttotal_credits_in_system\n1\t1\t0\t0\t0\t0\t1\t200\n",
+  "stderr": "",
+  "execution_time_ms": 1667
+}

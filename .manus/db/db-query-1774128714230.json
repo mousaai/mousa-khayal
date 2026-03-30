@@ -1,0 +1,25 @@
+{
+  "query": "SELECT id, name, email FROM users LIMIT 3;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SELECT id, name, email FROM users LIMIT 3;",
+  "rows": [
+    {
+      "id": "1",
+      "name": "MOUSA A",
+      "email": "mousa@almaskanengineering.com"
+    },
+    {
+      "id": "600001",
+      "name": "KHALFAN ALMARAR",
+      "email": "binamer007@gmail.com"
+    },
+    {
+      "id": "600020",
+      "name": "Nazar Almaskan",
+      "email": "nazaralmaskan@gmail.com"
+    }
+  ],
+  "messages": [],
+  "stdout": "id\tname\temail\n1\tMOUSA A\tmousa@almaskanengineering.com\n600001\tKHALFAN ALMARAR\tbinamer007@gmail.com\n600020\tNazar Almaskan\tnazaralmaskan@gmail.com\n",
+  "stderr": "",
+  "execution_time_ms": 1603
+}

@@ -1,0 +1,9 @@
+{
+  "query": "\nINSERT INTO subscriptions \n  (userId, stripeSubscriptionId, stripeCustomerId, stripePriceId, planId, planNameAr, creditsPerMonth, amountCents, currency, status, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd)\nVALUES \n  (1, 'sub_manual_20260318', 'cus_UAPF4fSjQHXS4u', 'price_starter_live', 'sub_starter', 'مبتدئ شهري', 600, 1399, 'usd', 'active', NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 0)\nON DUPLICATE KEY UPDATE\n  status = 'active',\n  currentPeriodStart = NOW(),\n  currentPeriodEnd = DATE_ADD(NOW(), INTERVAL 30 DAY),\n  updatedAt = NOW();\n",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute \nINSERT INTO subscriptions \n  (userId, stripeSubscriptionId, stripeCustomerId, stripePriceId, planId, planNameAr, creditsPerMonth, amountCents, currency, status, currentPeriodStart, currentPeriodEnd, cancelAtPeriodEnd)\nVALUES \n  (1, 'sub_manual_20260318', 'cus_UAPF4fSjQHXS4u', 'price_starter_live', 'sub_starter', 'مبتدئ شهري', 600, 1399, 'usd', 'active', NOW(), DATE_ADD(NOW(), INTERVAL 30 DAY), 0)\nON DUPLICATE KEY UPDATE\n  status = 'active',\n  currentPeriodStart = NOW(),\n  currentPeriodEnd = DATE_ADD(NOW(), INTERVAL 30 DAY),\n  updatedAt = NOW();\n",
+  "rows": [],
+  "messages": [],
+  "stdout": "",
+  "stderr": "",
+  "execution_time_ms": 1580
+}

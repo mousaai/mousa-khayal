@@ -1,0 +1,90 @@
+{
+  "query": "SELECT cw.userId, u.name, u.email, cw.balance, cw.totalSpent, cw.totalEarned FROM credit_wallets cw LEFT JOIN users u ON cw.userId = u.id ORDER BY cw.userId;",
+  "command": "mysql --batch --raw --column-names --default-character-set=utf8mb4 --host gateway03.us-east-1.prod.aws.tidbcloud.com --port 4000 --user 3RYRgiKBksaJ9ku.eff254cfce12 --database 6PpfERRQXfuwb7GGi2gFrK --execute SELECT cw.userId, u.name, u.email, cw.balance, cw.totalSpent, cw.totalEarned FROM credit_wallets cw LEFT JOIN users u ON cw.userId = u.id ORDER BY cw.userId;",
+  "rows": [
+    {
+      "userId": "1",
+      "name": "MOUSA A",
+      "email": "mousa@almaskanengineering.com",
+      "balance": "680",
+      "totalSpent": "120",
+      "totalEarned": "800"
+    },
+    {
+      "userId": "600001",
+      "name": "KHALFAN ALMARAR",
+      "email": "binamer007@gmail.com",
+      "balance": "200",
+      "totalSpent": "0",
+      "totalEarned": "200"
+    },
+    {
+      "userId": "600020",
+      "name": "Nazar Almaskan",
+      "email": "nazaralmaskan@gmail.com",
+      "balance": "200",
+      "totalSpent": "0",
+      "totalEarned": "200"
+    },
+    {
+      "userId": "930083",
+      "name": "MISSOUM HADJER",
+      "email": "hadjermissoum26@gmail.com",
+      "balance": "200",
+      "totalSpent": "0",
+      "totalEarned": "200"
+    },
+    {
+      "userId": "960061",
+      "name": "aneesh.nal",
+      "email": "aneesh.nal@gmail.com",
+      "balance": "200",
+      "totalSpent": "0",
+      "totalEarned": "200"
+    },
+    {
+      "userId": "1110018",
+      "name": "AL MASKAN Engineering",
+      "email": "nezar@almaskanengineering.com",
+      "balance": "190",
+      "totalSpent": "10",
+      "totalEarned": "200"
+    },
+    {
+      "userId": "1200001",
+      "name": "Mohamed Alshehhi",
+      "email": "alshehhi94@hotmail.com",
+      "balance": "200",
+      "totalSpent": "0",
+      "totalEarned": "200"
+    },
+    {
+      "userId": "1200054",
+      "name": "User_953",
+      "email": "k8mzds5dpc@privaterelay.appleid.com",
+      "balance": "200",
+      "totalSpent": "0",
+      "totalEarned": "200"
+    },
+    {
+      "userId": "1200057",
+      "name": "Saleh Alshehhi",
+      "email": "strangerhome2023@gmail.com",
+      "balance": "200",
+      "totalSpent": "0",
+      "totalEarned": "200"
+    },
+    {
+      "userId": "1200075",
+      "name": "AL MASKAN Engineering",
+      "email": "online@almaskanengineering.com",
+      "balance": "190",
+      "totalSpent": "10",
+      "totalEarned": "200"
+    }
+  ],
+  "messages": [],
+  "stdout": "userId\tname\temail\tbalance\ttotalSpent\ttotalEarned\n1\tMOUSA A\tmousa@almaskanengineering.com\t680\t120\t800\n600001\tKHALFAN ALMARAR\tbinamer007@gmail.com\t200\t0\t200\n600020\tNazar Almaskan\tnazaralmaskan@gmail.com\t200\t0\t200\n930083\tMISSOUM HADJER\thadjermissoum26@gmail.com\t200\t0\t200\n960061\taneesh.nal\taneesh.nal@gmail.com\t200\t0\t200\n1110018\tAL MASKAN Engineering\tnezar@almaskanengineering.com\t190\t10\t200\n1200001\tMohamed Alshehhi\talshehhi94@hotmail.com\t200\t0\t200\n1200054\tUser_953\tk8mzds5dpc@privaterelay.appleid.com\t200\t0\t200\n1200057\tSaleh Alshehhi\tstrangerhome2023@gmail.com\t200\t0\t200\n1200075\tAL MASKAN Engineering\tonline@almaskanengineering.com\t190\t10\t200\n",
+  "stderr": "",
+  "execution_time_ms": 1572
+}
