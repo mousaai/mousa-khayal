@@ -9,6 +9,7 @@ import { exportRouter } from "./exportRouter";
 import { costRouter } from "./costRouter";
 import { creditsRouter } from "./creditsRouter";
 import { developerRouter } from "./developerRouter";
+import { designRouter } from "./designRouter";
 
 export const appRouter = router({
   system: systemRouter,
@@ -29,6 +30,7 @@ export const appRouter = router({
   costs: costRouter,
   credits: creditsRouter,
   developer: developerRouter,
+  design: designRouter,
 });
 
 export type AppRouter = typeof appRouter;

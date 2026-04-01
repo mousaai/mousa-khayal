@@ -236,3 +236,30 @@ export const costEvents = mysqlTable("cost_events", {
 
 export type CostEvent = typeof costEvents.$inferSelect;
 export type InsertCostEvent = typeof costEvents.$inferInsert;
+
+// ══════════════════════════════════════════════════════════════
+// جدول التصاميم المعمارية — وفق دليل مطور منصة خيال
+// ══════════════════════════════════════════════════════════════
+export const architecturalDesigns = mysqlTable("architectural_designs", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: varchar("userId", { length: 128 }).notNull(), // Mousa userId
+  // بيانات التصميم
+  prompt: text("prompt").notNull(),
+  style: mysqlEnum("style", ["modern", "islamic", "gulf", "contemporary"]).default("modern").notNull(),
+  type: mysqlEnum("type", ["exterior", "interior", "floor_plan"]).default("exterior").notNull(),
+  // الصورة
+  imageUrl: text("imageUrl").notNull(),
+  imageKey: varchar("imageKey", { length: 512 }), // مفتاح S3
+  referenceImageUrl: text("referenceImageUrl"), // صورة مرجعية للتعديل التدريجي
+  // التكلفة
+  creditsCost: int("creditsCost").default(50).notNull(),
+  // مشاركة
+  shareToken: varchar("shareToken", { length: 64 }).unique(), // رمز المشاركة العامة
+  isPublic: int("isPublic").default(0).notNull(), // 0=خاص, 1=عام
+  // الوقت
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ArchitecturalDesign = typeof architecturalDesigns.$inferSelect;
+export type InsertArchitecturalDesign = typeof architecturalDesigns.$inferInsert;

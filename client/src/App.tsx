@@ -11,6 +11,8 @@ import MyFilms from "./pages/MyFilms";
 import SharePage from "./pages/SharePage";
 import AdminCosts from "./pages/AdminCosts";
 import DeveloperPage from "./pages/DeveloperPage";
+import DesignStudio from "./pages/DesignStudio";
+import SharedDesign from "./pages/SharedDesign";
 
 function Router() {
   return (
@@ -20,6 +22,8 @@ function Router() {
       <Route path={"/share/:shareId"} component={SharePage} />
       <Route path={"/admin/costs"} component={AdminCosts} />
       <Route path={"/developer"} component={DeveloperPage} />
+      <Route path={"/design-studio"} component={DesignStudio} />
+      <Route path={"/design/:shareToken"} component={SharedDesign} />
       <Route path={"/404"} component={NotFound} />
       {/* Final fallback route */}
       <Route component={NotFound} />

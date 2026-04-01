@@ -804,3 +804,14 @@
 - [x] دمج AuthGate في App.tsx لحماية كل الصفحات
 - [x] تحديث CreditsWidget وHome وKhayalChat وVideoProductionPanel وAdminCosts لاستخدام AuthGate
 - [x] كتابة اختبارات vitest لـ useMousaAuth (235 اختبار ناجح)
+
+## 🎨 استوديو التصاميم المعمارية — أبريل 2026
+- [x] جدول `architectural_designs` في schema.ts مع db:push
+- [x] `designRouter.ts` — 6 procedures: generate, refine, getMyDesigns, share, getSharedDesign, delete
+- [x] `buildArabicPrompt` — بناء prompt عربي احترافي لكل نمط ونوع
+- [x] `calculateCost` — تكلفة حسب النوع (exterior/interior=50, floor_plan=40) + 10 للصورة المرجعية
+- [x] حفظ الصور في S3 عبر `storagePut`
+- [x] صفحة `DesignStudio.tsx` — توليد + معرض + تعديل تدريجي + مشاركة + تحميل
+- [x] صفحة `SharedDesign.tsx` — عرض التصميم المشترك عامياً
+- [x] مسارات `/design-studio` و`/design/:shareToken` في App.tsx
+- [x] اختبارات vitest لـ designRouter (247 اختبار ناجح)

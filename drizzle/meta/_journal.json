@@ -71,6 +71,13 @@
       "when": 1774102629500,
       "tag": "0009_fast_boomerang",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1775070381295,
+      "tag": "0010_workable_tigra",
+      "breakpoints": true
     }
   ]
 }
