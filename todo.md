@@ -815,3 +815,6 @@
 - [x] صفحة `SharedDesign.tsx` — عرض التصميم المشترك عامياً
 - [x] مسارات `/design-studio` و`/design/:shareToken` في App.tsx
 - [x] اختبارات vitest لـ designRouter (247 اختبار ناجح)
+
+## 🔴 إصلاح عاجل — flattenChildren is not defined (أبريل 2026)
+- [x] إصلاح wouter patch: إعادة بناء الـ patch باستخدام _fc محلية بدلاً من flattenChildren الخارجية — البناء ناجح وWOUTER_ROUTES موجود في dist

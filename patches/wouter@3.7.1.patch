@@ -1,8 +1,8 @@
 diff --git a/esm/index.js b/esm/index.js
-index c83bc63a2c10431fb62e25b7d490656a3796f301..bcae513cc20a4be6c38dc116e0b8d9bacda62b5b 100644
---- a/esm/index.js
-+++ b/esm/index.js
-@@ -338,6 +338,23 @@ const Switch = ({ children, location }) => {
+index c83bc63a2c10431fb62e25b7d490656a3796f301..cb0aeed4f0ee2ba6069164eddf67fa88e1f6a64c 100644
+--- a/esm/index.js	1985-10-26 04:15:00.000000000 -0400
++++ b/esm/index.js	2026-04-01 16:18:44.466335465 -0400
+@@ -338,6 +338,22 @@
    const router = useRouter();
    const [originalLocation] = useLocationFromRouter(router);
  
@@ -11,9 +11,8 @@ index c83bc63a2c10431fb62e25b7d490656a3796f301..bcae513cc20a4be6c38dc116e0b8d9ba
 +    if (!window.__WOUTER_ROUTES__) {
 +      window.__WOUTER_ROUTES__ = [];
 +    }
-+
-+    const allChildren = flattenChildren(children);
-+    allChildren.forEach((element) => {
++    const _fc = (ch) => Array.isArray(ch) ? ch.flatMap((c) => _fc(c && c.type === Fragment ? c.props.children : c)) : [ch];
++    _fc(children).forEach((element) => {
 +      if (isValidElement(element) && element.props.path) {
 +        const path = element.props.path;
 +        if (!window.__WOUTER_ROUTES__.includes(path)) {
