@@ -818,3 +818,11 @@
 
 ## 🔴 إصلاح عاجل — flattenChildren is not defined (أبريل 2026)
 - [x] إصلاح wouter patch: إعادة بناء الـ patch باستخدام _fc محلية بدلاً من flattenChildren الخارجية — البناء ناجح وWOUTER_ROUTES موجود في dist
+
+## 🚀 هجرة المنصة — أبريل 2026
+- [x] إنشاء Dockerfile للمشروع (multi-stage build)
+- [x] إنشاء docker-compose.yml مع MySQL وNginx
+- [x] إنشاء env.example.txt بكل المتغيرات المطلوبة
+- [x] إنشاء nginx.conf لـ reverse proxy مع SSL
+- [x] إنشاء MIGRATION.md — دليل كامل 8 خطوات مع كود استبدال LLM/صور/إشعارات
+- [x] توثيق كل نقاط التبعية على Manus وبدائلها المستقلة

@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+  # ===== منصة خيال =====
+  khayal:
+    build: .
+    container_name: khayal-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - khayal-network
+    volumes:
+      - ./drizzle:/app/drizzle:ro
+
+  # ===== قاعدة البيانات =====
+  mysql:
+    image: mysql:8.0
+    container_name: khayal-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-khayal_root_2026}
+      MYSQL_DATABASE: khayal
+      MYSQL_USER: ${MYSQL_USER:-khayal}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-khayal_pass_2026}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-khayal_root_2026}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - khayal-network
+
+  # ===== Nginx Reverse Proxy (اختياري) =====
+  nginx:
+    image: nginx:alpine
+    container_name: khayal-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - khayal
+    networks:
+      - khayal-network
+    profiles:
+      - production
+
+networks:
+  khayal-network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+    driver: local
