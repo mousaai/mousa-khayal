@@ -1,16 +1,28 @@
 /**
  * AuthGate.tsx
- * مكوّن يحمي التطبيق بالكامل — يتحقق من مصادقة Mousa.ai قبل عرض أي محتوى
- * وفق دليل تكامل KHAYAL — khayal.mousa.ai
- *
- * الحالات:
- *   loading  → شاشة تحميل مع spinner
- *   error    → شاشة خطأ مع رابط الذهاب لـ mousa.ai
- *   !user    → إعادة توجيه تلقائية لـ mousa.ai
- *   user     → عرض children
+ * مكوّن مفتوح — لا يتطلب مصادقة Mousa.ai
+ * المنصة متاحة للجميع بدون قيود دخول
  */
-import React, { createContext, useContext } from "react";
-import { useMousaAuth, type MousaUser } from "@/hooks/useMousaAuth";
+import React, { createContext, useContext, useState, useCallback } from "react";
+
+export interface MousaUser {
+  userId: number;
+  openId: string;
+  name: string;
+  email: string;
+  creditBalance: number;
+  platform: string;
+}
+
+// مستخدم افتراضي مفتوح
+const OPEN_USER: MousaUser = {
+  userId: 0,
+  openId: "guest",
+  name: "زائر",
+  email: "",
+  creditBalance: 999999,
+  platform: "khayal",
+};
 
 // ─── Context ──────────────────────────────────────────────────────────────────
 
@@ -29,97 +41,30 @@ export function useAuth(): AuthContextType {
   return ctx;
 }
 
-// ─── AuthGate ─────────────────────────────────────────────────────────────────
+// ─── AuthGate — مفتوح بالكامل ─────────────────────────────────────────────────
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const { user, loading, error, deductCredits, refreshBalance, logout } = useMousaAuth();
+  const [balance, setBalance] = useState(999999);
 
-  // ── حالة التحميل ──────────────────────────────────────────────────────────
-  if (loading) {
-    return (
-      <div
-        dir="rtl"
-        style={{
-          minHeight: "100vh",
-          background: "#080E1A",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "'IBM Plex Arabic', sans-serif",
-          color: "#E8E0D0",
-          gap: 16,
-        }}
-      >
-        {/* Spinner */}
-        <div
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: "50%",
-            border: "3px solid rgba(212,160,23,0.2)",
-            borderTop: "3px solid #D4A017",
-            animation: "spin 0.8s linear infinite",
-          }}
-        />
-        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        <div style={{ color: "#D4A017", fontWeight: 700, fontSize: "1.2rem" }}>
-          mousa.ai
-        </div>
-        <div style={{ color: "#8A9BB0", fontSize: "0.9rem" }}>
-          جاري التحقق من هويتك...
-        </div>
-      </div>
-    );
-  }
+  const user: MousaUser = { ...OPEN_USER, creditBalance: balance };
 
-  // ── حالة الخطأ أو غياب المستخدم ──────────────────────────────────────────
-  if (error || !user) {
-    return (
-      <div
-        dir="rtl"
-        style={{
-          minHeight: "100vh",
-          background: "#080E1A",
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "center",
-          justifyContent: "center",
-          fontFamily: "'IBM Plex Arabic', sans-serif",
-          color: "#E8E0D0",
-          gap: 16,
-          padding: 24,
-          textAlign: "center",
-        }}
-      >
-        <div style={{ fontSize: "3rem" }}>🔐</div>
-        <div style={{ color: "#D4A017", fontWeight: 700, fontSize: "1.2rem" }}>
-          mousa.ai
-        </div>
-        <div style={{ color: "#E8E0D0" }}>
-          {error || "يجب الدخول عبر mousa.ai"}
-        </div>
-        <div style={{ color: "#8A9BB0", fontSize: "0.85rem" }}>
-          جاري إعادة التوجيه...
-        </div>
-        <a
-          href="https://www.mousa.ai"
-          style={{
-            padding: "10px 24px",
-            background: "rgba(212,160,23,0.15)",
-            border: "1px solid rgba(212,160,23,0.4)",
-            borderRadius: 8,
-            color: "#D4A017",
-            textDecoration: "none",
-          }}
-        >
-          الذهاب لـ mousa.ai
-        </a>
-      </div>
-    );
-  }
+  const deductCredits = useCallback(
+    async (amount: number, _description?: string): Promise<{ newBalance: number }> => {
+      const newBalance = Math.max(0, balance - amount);
+      setBalance(newBalance);
+      return { newBalance };
+    },
+    [balance]
+  );
 
-  // ── المستخدم مصادق عليه — عرض التطبيق ───────────────────────────────────
+  const refreshBalance = useCallback(async (): Promise<number> => {
+    return balance;
+  }, [balance]);
+
+  const logout = useCallback(() => {
+    // لا شيء — المنصة مفتوحة
+  }, []);
+
   return (
     <AuthContext.Provider value={{ user, deductCredits, refreshBalance, logout }}>
       {children}
