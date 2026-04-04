@@ -63,9 +63,9 @@ const STYLES: Record<DesignStyle, { label: string; icon: string; desc: string }>
 };
 
 const TYPES: Record<DesignType, { label: string; icon: string; cost: number }> = {
-  exterior: { label: "واجهة خارجية", icon: "🏛️", cost: 50 },
-  interior: { label: "تصميم داخلي", icon: "🛋️", cost: 50 },
-  floor_plan: { label: "مسقط أفقي", icon: "📐", cost: 40 },
+  exterior: { label: "واجهة خارجية", icon: "🏛️", cost: 35 },
+  interior: { label: "تصميم داخلي", icon: "🛋️", cost: 35 },
+  floor_plan: { label: "مسقط أفقي", icon: "📐", cost: 25 },
 };
 
 // ─── مكوّن بطاقة التصميم ─────────────────────────────────────

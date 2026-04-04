@@ -20,33 +20,51 @@ const MOUSA_API_KEY = process.env.MOUSA_API_KEY ?? "khayal@mousa30";
 const MOUSA_PLATFORM_ID = process.env.MOUSA_PLATFORM_ID ?? "khayal";
 
 /**
- * التسعيرة المعتمدة — مارس 2026
- * (كل كريدت = $0.01 | هامش ربح 25–40%)
+ * التسعيرة المعتمدة — أبريل 2026
+ * (كل كريدت = $0.01 | هامش ربح 40–90%)
  *
- * Standard (صور فقط، بدون Runway):
- *   scene:         30 كريدت = $0.30  (تكلفة فعلية $0.215)
- *   script_only:    5 كريدت = $0.05  (تكلفة فعلية $0.010)
+ * ══════════════════════════════════════════════════════════
+ * الفئة الأولى — Standard (صور فقط، بدون Runway)
+ * ══════════════════════════════════════════════════════════
+ *   script_only:   10 كريدت = $0.10  (تكلفة فعلية $0.010 | هامش 90%)
+ *   scene:         20 كريدت = $0.20  (تكلفة فعلية $0.130 | هامش 54%)
  *
- * Cinema (صور + Runway + ElevenLabs):
- *   film_short:   450 كريدت = $4.50  (تكلفة فعلية $3.445 — 6 مشاهد)
- *   film_medium: 1100 كريدت = $11.00 (تكلفة فعلية $8.585 — 15 مشهد)
- *   film_long:   3200 كريدت = $32.00 (تكلفة فعلية $25.700 — 45 مشهد)
- *   autonomous:   400 كريدت = $4.00  (تكلفة فعلية $2.875 — 5 مشاهد)
- *   surprise:     400 كريدت = $4.00  (تكلفة فعلية $2.875 — 5 مشاهد)
+ * ══════════════════════════════════════════════════════════
+ * الفئة الثانية — Studio (استوديو التصاميم المعمارية)
+ * ══════════════════════════════════════════════════════════
+ *   design_floor_plan: 25 كريدت = $0.25  (مسقط أفقي)
+ *   design_exterior:   35 كريدت = $0.35  (واجهة خارجية)
+ *   design_interior:   35 كريدت = $0.35  (تصميم داخلي)
+ *   design_refine:     20 كريدت = $0.20  (تعديل تصميم موجود)
+ *
+ * ══════════════════════════════════════════════════════════
+ * الفئة الثالثة — Cinema (صور + Runway + ElevenLabs)
+ * ══════════════════════════════════════════════════════════
+ *   film_short:   350 كريدت = $3.50  (تكلفة فعلية $2.100 — 6 مشاهد  | هامش 40%)
+ *   film_medium:  900 كريدت = $9.00  (تكلفة فعلية $5.400 — 15 مشهد | هامش 40%)
+ *   film_long:   2500 كريدت = $25.00 (تكلفة فعلية $15.00 — 45 مشهد | هامش 40%)
+ *   autonomous:   300 كريدت = $3.00  (تكلفة فعلية $1.800 — 5 مشاهد  | هامش 40%)
+ *   surprise:     300 كريدت = $3.00  (تكلفة فعلية $1.800 — 5 مشاهد  | هامش 40%)
  */
 export const SESSION_COSTS = {
   // Standard — صور سينمائية فقط
-  scene:        30,    // مشهد واحد: 3–8 صور، بدون Runway
-  script_only:   5,    // سيناريو نصي فقط، بدون صور أو فيديو
+  scene:        20,    // مشهد واحد: 3–8 صور، بدون Runway
+  script_only:  10,    // سيناريو نصي فقط، بدون صور أو فيديو
+
+  // Studio — استوديو التصاميم المعمارية
+  design_floor_plan: 25,  // مسقط أفقي معماري
+  design_exterior:   35,  // واجهة خارجية
+  design_interior:   35,  // تصميم داخلي
+  design_refine:     20,  // تعديل تصميم موجود (+مرجع)
 
   // Cinema — إنتاج كامل بـ Runway + ElevenLabs
-  film_short:  450,    // فيلم قصير: 15–60 ثانية (6 مشاهد)
-  film_medium: 1100,   // فيلم متوسط: 1–3 دقائق (15 مشهد)
-  film_long:   3200,   // فيلم طويل: 3–10 دقائق (45 مشهد)
-  autonomous:   400,   // خيال تقرر: 5 مشاهد تلقائية
-  surprise:     400,   // فاجئني: 5 مشاهد تلقائية
+  film_short:  350,    // فيلم قصير: 15–60 ثانية (6 مشاهد)
+  film_medium:  900,   // فيلم متوسط: 1–3 دقائق (15 مشهد)
+  film_long:   2500,   // فيلم طويل: 3–10 دقائق (45 مشهد)
+  autonomous:   300,   // خيال تقرر: 5 مشاهد تلقائية
+  surprise:     300,   // فاجئني: 5 مشاهد تلقائية
 
-  default:      30,    // افتراضي (مشهد واحد)
+  default:       20,   // افتراضي (مشهد واحد)
 } as const;
 
 export type SessionType = keyof typeof SESSION_COSTS;
@@ -301,13 +319,20 @@ export async function guardMousaBalance(
  * يجب تحديثها عند تغيير التسعيرة
  */
 export const KHAYAL_SERVICES = [
-  { name: "scene",       cost: SESSION_COSTS.scene },
-  { name: "script_only", cost: SESSION_COSTS.script_only },
-  { name: "film_short",  cost: SESSION_COSTS.film_short },
-  { name: "film_medium", cost: SESSION_COSTS.film_medium },
-  { name: "film_long",   cost: SESSION_COSTS.film_long },
-  { name: "autonomous",  cost: SESSION_COSTS.autonomous },
-  { name: "surprise",    cost: SESSION_COSTS.surprise },
+  // Standard
+  { name: "scene",              cost: SESSION_COSTS.scene },
+  { name: "script_only",        cost: SESSION_COSTS.script_only },
+  // Studio
+  { name: "design_floor_plan",  cost: SESSION_COSTS.design_floor_plan },
+  { name: "design_exterior",    cost: SESSION_COSTS.design_exterior },
+  { name: "design_interior",    cost: SESSION_COSTS.design_interior },
+  { name: "design_refine",      cost: SESSION_COSTS.design_refine },
+  // Cinema
+  { name: "film_short",         cost: SESSION_COSTS.film_short },
+  { name: "film_medium",        cost: SESSION_COSTS.film_medium },
+  { name: "film_long",          cost: SESSION_COSTS.film_long },
+  { name: "autonomous",         cost: SESSION_COSTS.autonomous },
+  { name: "surprise",           cost: SESSION_COSTS.surprise },
 ] as const;
 
 /** نتيجة pricing-webhook */
@@ -338,12 +363,12 @@ export async function notifyMousaPricing(): Promise<MousaPricingWebhookResult> {
 
   const body = {
     services: KHAYAL_SERVICES.map((s) => ({ name: s.name, cost: s.cost })),
-    minCost: SESSION_COSTS.script_only,   // 5 — أقل عملية ممكنة
-    maxCost: SESSION_COSTS.film_long,     // 3200 — أعلى عملية ممكنة
-    baseCost: SESSION_COSTS.scene,        // 30 — التكلفة الافتراضية
+    minCost: SESSION_COSTS.script_only,   // 10 — أقل عملية ممكنة
+    maxCost: SESSION_COSTS.film_long,     // 2500 — أعلى عملية ممكنة
+    baseCost: SESSION_COSTS.scene,        // 20 — التكلفة الافتراضية
     description:
-      "خيال — منصة الإنتاج السينمائي بالذكاء الاصطناعي. " +
-      "سيناريو: 5 | مشهد: 30 | فيلم قصير: 450 | متوسط: 1100 | طويل: 3200 | تلقائي: 400",
+      "خيال — منصة الإنتاج السينمائي والتصميم المعماري بالذكاء الاصطناعي. " +
+      "سيناريو: 10 | مشهد: 20 | تصميم معماري: 25–35 | فيلم قصير: 350 | متوسط: 900 | طويل: 2500 | تلقائي: 300",
   };
 
   try {

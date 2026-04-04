@@ -23,25 +23,25 @@ beforeEach(() => {
 });
 
 // ─── 1. SESSION_COSTS ─────────────────────────────────────────────────────────
-describe("SESSION_COSTS — التسعيرة المتدرجة", () => {
-  it("scene = 30 كريدت", () => {
-    expect(SESSION_COSTS.scene).toBe(30);
+describe("SESSION_COSTS — التسعيرة المتدرجة (أبريل 2026)", () => {
+  it("scene = 20 كريدت", () => {
+    expect(SESSION_COSTS.scene).toBe(20);
   });
 
-  it("film_short = 40 كريدت", () => {
-    expect(SESSION_COSTS.film_short).toBe(450);
+  it("film_short = 350 كريدت", () => {
+    expect(SESSION_COSTS.film_short).toBe(350);
   });
 
-  it("film_long = 50 كريدت (maxCost)", () => {
-    expect(SESSION_COSTS.film_long).toBe(3200);
+  it("film_long = 2500 كريدت (maxCost)", () => {
+    expect(SESSION_COSTS.film_long).toBe(2500);
   });
 
-  it("film_epic = 50 كريدت (maxCost)", () => {
-    expect(SESSION_COSTS.film_medium).toBe(1100);
+  it("film_medium = 900 كريدت", () => {
+    expect(SESSION_COSTS.film_medium).toBe(900);
   });
 
-  it("default = 30 كريدت", () => {
-    expect(SESSION_COSTS.default).toBe(30);
+  it("default = 20 كريدت", () => {
+    expect(SESSION_COSTS.default).toBe(20);
   });
 
   it("getCostForSession يعيد التكلفة الصحيحة لكل نوع", () => {
@@ -58,8 +58,8 @@ describe("SESSION_COSTS — التسعيرة المتدرجة", () => {
 
 // ─── 2. Utility Functions ─────────────────────────────────────────────────────
 describe("Utility Functions", () => {
-  it("getCreditsPerSession يعيد 30", () => {
-    expect(getCreditsPerSession()).toBe(30);
+  it("getCreditsPerSession يعيد 20", () => {
+    expect(getCreditsPerSession()).toBe(20);
   });
 
   it("getMousaPlatformId يعيد khayal", () => {

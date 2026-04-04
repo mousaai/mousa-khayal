@@ -826,3 +826,12 @@
 - [x] إنشاء nginx.conf لـ reverse proxy مع SSL
 - [x] إنشاء MIGRATION.md — دليل كامل 8 خطوات مع كود استبدال LLM/صور/إشعارات
 - [x] توثيق كل نقاط التبعية على Manus وبدائلها المستقلة
+
+## 💰 تحديث نظام التسعيرة — أبريل 2026
+
+- [x] تحديث SESSION_COSTS في mousaCreditsService.ts بالأسعار الجديدة المفصّلة
+- [x] تحديث DESIGN_TYPES في designRouter.ts بأسعار الاستوديو الجديدة
+- [x] تحديث PRICING_TABLE في CreditsWidget.tsx لعرض الأسعار الجديدة
+- [x] تحديث KHAYAL_SERVICES لـ 11 خدمة شاملة Studio
+- [x] تحديث notifyMousaPricing بالأسعار والخدمات الجديدة
+- [x] تحديث جميع الاختبارات (247/247 نجحت)

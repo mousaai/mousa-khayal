@@ -62,21 +62,21 @@ export const DESIGN_TYPES = {
     label: "واجهة خارجية",
     labelEn: "Exterior Facade",
     prompt: "exterior facade architectural render",
-    cost: 50,
+    cost: 35,
     icon: "🏛️",
   },
   interior: {
     label: "تصميم داخلي",
     labelEn: "Interior Design",
     prompt: "interior design render, photorealistic",
-    cost: 50,
+    cost: 35,
     icon: "🛋️",
   },
   floor_plan: {
     label: "مسقط أفقي",
     labelEn: "Floor Plan",
     prompt: "architectural floor plan drawing, top-down view, clean technical drawing",
-    cost: 40,
+    cost: 25,
     icon: "📐",
   },
 } as const;
@@ -106,8 +106,8 @@ export function buildArabicPrompt(input: {
 // حساب تكلفة التصميم
 // ═══════════════════════════════════════════════════════════════
 function calculateCost(type: keyof typeof DESIGN_TYPES, hasReference: boolean): number {
-  const baseCost = DESIGN_TYPES[type]?.cost || 50;
-  return hasReference ? baseCost + 10 : baseCost; // +10 كريدت للتعديل
+  const baseCost = DESIGN_TYPES[type]?.cost || 35;
+  return hasReference ? baseCost + 5 : baseCost; // +5 كريدت للتعديل بمرجع
 }
 
 // ═══════════════════════════════════════════════════════════════

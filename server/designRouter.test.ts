@@ -40,26 +40,26 @@ vi.mock("./storage", () => ({
 
 describe("Design Router — Helper Functions", () => {
   describe("calculateCost", () => {
-    it("يحسب تكلفة الواجهة الخارجية بدون مرجع = 50", () => {
-      // exterior بدون referenceImage = 50
+    it("يحسب تكلفة الواجهة الخارجية بدون مرجع = 35", () => {
+      // exterior بدون referenceImage = 35
       const cost = calculateCostHelper("exterior", false);
-      expect(cost).toBe(50);
+      expect(cost).toBe(35);
     });
 
-    it("يحسب تكلفة التصميم الداخلي بدون مرجع = 50", () => {
+    it("يحسب تكلفة التصميم الداخلي بدون مرجع = 35", () => {
       const cost = calculateCostHelper("interior", false);
-      expect(cost).toBe(50);
+      expect(cost).toBe(35);
     });
 
-    it("يحسب تكلفة المسقط الأفقي = 40", () => {
+    it("يحسب تكلفة المسقط الأفقي = 25", () => {
       const cost = calculateCostHelper("floor_plan", false);
-      expect(cost).toBe(40);
+      expect(cost).toBe(25);
     });
 
-    it("يضيف 10 كريدت إضافية عند وجود صورة مرجعية", () => {
+    it("يضيف 5 كريدت إضافية عند وجود صورة مرجعية", () => {
       const costWithRef = calculateCostHelper("exterior", true);
       const costWithoutRef = calculateCostHelper("exterior", false);
-      expect(costWithRef).toBe(costWithoutRef + 10);
+      expect(costWithRef).toBe(costWithoutRef + 5);
     });
   });
 
@@ -143,14 +143,14 @@ const DESIGN_STYLES_HELPER: Record<string, { label: string; promptKeywords: stri
 };
 
 const DESIGN_TYPES_HELPER: Record<string, { label: string; cost: number; promptPrefix: string }> = {
-  exterior: { label: "واجهة خارجية", cost: 50, promptPrefix: "exterior architectural rendering" },
-  interior: { label: "تصميم داخلي", cost: 50, promptPrefix: "interior design rendering" },
-  floor_plan: { label: "مسقط أفقي", cost: 40, promptPrefix: "architectural floor plan" },
+  exterior: { label: "واجهة خارجية", cost: 35, promptPrefix: "exterior architectural rendering" },
+  interior: { label: "تصميم داخلي", cost: 35, promptPrefix: "interior design rendering" },
+  floor_plan: { label: "مسقط أفقي", cost: 25, promptPrefix: "architectural floor plan" },
 };
 
 function calculateCostHelper(type: string, hasReference: boolean): number {
-  const base = DESIGN_TYPES_HELPER[type]?.cost || 50;
-  return hasReference ? base + 10 : base;
+  const base = DESIGN_TYPES_HELPER[type]?.cost || 35;
+  return hasReference ? base + 5 : base;
 }
 
 function buildArabicPromptHelper(params: {

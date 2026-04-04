@@ -1,8 +1,9 @@
 /**
  * CreditsWidget.tsx — مؤشر رصيد MOUSA.AI في منصة خيال
- * التسعيرة المعتمدة (مارس 2026):
- *   مشهد: 30 | سيناريو: 5 | فيلم قصير: 450 | فيلم متوسط: 1100 | فيلم طويل: 3200
- *   خيال تقرر / فاجئني: 400
+ * التسعيرة المعتمدة (أبريل 2026):
+ *   Standard: سيناريو: 10 | مشهد: 20
+ *   Studio: مسقط: 25 | واجهة/داخلي: 35 | تعديل: 20
+ *   Cinema: فيلم قصير: 350 | متوسط: 900 | طويل: 2500 | تلقائي: 300
  */
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/components/AuthGate";
@@ -16,15 +17,22 @@ interface CreditsWidgetProps {
   className?: string;
 }
 
-// التسعيرة المعتمدة للعرض في الواجهة
+// التسعيرة المعتمدة للعرض في الواجهة — أبريل 2026
 const PRICING_TABLE = [
-  { key: "scene",       labelAr: "مشهد سينمائي",     labelEn: "Cinematic Scene",    cost: 30,   tier: "standard" },
-  { key: "script_only", labelAr: "سيناريو نصي",       labelEn: "Script Only",        cost: 5,    tier: "standard" },
-  { key: "film_short",  labelAr: "فيلم قصير (15–60ث)", labelEn: "Short Film",        cost: 450,  tier: "cinema"   },
-  { key: "film_medium", labelAr: "فيلم متوسط (1–3د)",  labelEn: "Medium Film",       cost: 1100, tier: "cinema"   },
-  { key: "film_long",   labelAr: "فيلم طويل (3–10د)",  labelEn: "Long Film",         cost: 3200, tier: "cinema"   },
-  { key: "autonomous",  labelAr: "خيال تقرر",          labelEn: "AI Decides",        cost: 400,  tier: "cinema"   },
-  { key: "surprise",    labelAr: "فاجئني",             labelEn: "Surprise Me",       cost: 400,  tier: "cinema"   },
+  // Standard — صور فقط
+  { key: "script_only",        labelAr: "سيناريو نصي",         labelEn: "Script Only",      cost: 10,   tier: "standard" },
+  { key: "scene",              labelAr: "مشهد سينمائي",       labelEn: "Cinematic Scene",  cost: 20,   tier: "standard" },
+  // Studio — تصاميم معمارية
+  { key: "design_floor_plan",  labelAr: "مسقط أفقي",           labelEn: "Floor Plan",       cost: 25,   tier: "studio"   },
+  { key: "design_exterior",    labelAr: "واجهة خارجية",         labelEn: "Exterior Facade",  cost: 35,   tier: "studio"   },
+  { key: "design_interior",    labelAr: "تصميم داخلي",         labelEn: "Interior Design",  cost: 35,   tier: "studio"   },
+  { key: "design_refine",      labelAr: "تعديل تصميم",          labelEn: "Refine Design",    cost: 20,   tier: "studio"   },
+  // Cinema — فيديو Runway
+  { key: "film_short",         labelAr: "فيلم قصير (15–60ث)",   labelEn: "Short Film",       cost: 350,  tier: "cinema"   },
+  { key: "film_medium",        labelAr: "فيلم متوسط (1–3د)",   labelEn: "Medium Film",      cost: 900,  tier: "cinema"   },
+  { key: "film_long",          labelAr: "فيلم طويل (3–10د)",   labelEn: "Long Film",        cost: 2500, tier: "cinema"   },
+  { key: "autonomous",         labelAr: "خيال تقرر",            labelEn: "AI Decides",       cost: 300,  tier: "cinema"   },
+  { key: "surprise",           labelAr: "فاجئني",               labelEn: "Surprise Me",      cost: 300,  tier: "cinema"   },
 ] as const;
 
 export default function CreditsWidget({ compact = false, className = "" }: CreditsWidgetProps) {
@@ -50,9 +58,9 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
 
   const balance = balanceData?.balance ?? null;
   const canGenerate = balanceData?.canGenerate ?? true;
-  const minCost = 5; // script_only
-  const isLow = balance !== null && balance < 450; // أقل من فيلم قصير
-  const isEmpty = balance !== null && balance < 30; // أقل من مشهد واحد
+  const minCost = 10; // script_only
+  const isLow = balance !== null && balance < 350; // أقل من فيلم قصير
+  const isEmpty = balance !== null && balance < 20; // أقل من مشهد واحد
 
   if (compact) {
     return (
@@ -128,6 +136,18 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
                   {lang === "AR" ? p.labelAr : p.labelEn}
                 </span>
                 <span className="text-[11px] font-mono font-bold text-blue-300/70">{p.cost}</span>
+              </div>
+            ))}
+            {/* Studio */}
+            <div className="text-[9px] text-white/30 uppercase tracking-widest mt-2 mb-1">
+              {lang === "AR" ? "Studio — تصاميم معمارية" : "Studio — Arch. Designs"}
+            </div>
+            {PRICING_TABLE.filter(p => p.tier === "studio").map(p => (
+              <div key={p.key} className="flex items-center justify-between">
+                <span className="text-[11px] text-white/50">
+                  {lang === "AR" ? p.labelAr : p.labelEn}
+                </span>
+                <span className="text-[11px] font-mono font-bold text-green-300/70">{p.cost}</span>
               </div>
             ))}
             {/* Cinema */}

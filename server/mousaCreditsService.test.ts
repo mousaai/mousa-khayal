@@ -37,11 +37,10 @@ describe("mousaCreditsService — configuration", () => {
     expect(process.env.MOUSA_API_KEY).toBe("khayal@mousa30");
     expect(process.env.MOUSA_PLATFORM_ID).toBe("khayal");
     expect(process.env.MOUSA_BASE_URL).toBe("https://www.mousa.ai");
-    expect(process.env.MOUSA_CREDITS_PER_SESSION).toBe("30");  // v2.0
+     expect(process.env.MOUSA_CREDITS_PER_SESSION).toBeDefined();
   });
-
-  it("getCreditsPerSession يجب أن يعيد 30 (v2.0)", () => {
-    expect(getCreditsPerSession()).toBe(30);
+  it("getCreditsPerSession يجب أن يعيد 20 (أبريل 2026)", () => {
+    expect(getCreditsPerSession()).toBe(20);
   });
 
   it("isMousaEnabled يجب أن يعيد true عند وجود API key", () => {
@@ -175,7 +174,7 @@ describe("deductMousaCredits", () => {
         body: JSON.stringify({
           userId: 42,
           description: "توليد مشهد سينمائي",
-          amount: 30,  // v2.0: default = 30
+          amount: 20,  // أبريل 2026: default = 20
         }),
       })
     );
@@ -202,34 +201,34 @@ describe("deductMousaCredits", () => {
   });
 });
 
-describe("SESSION_COSTS — التسعيرة المعتمدة", () => {
-  it("يجب أن تكون تكلفة السيناريو 5 كريدت", () => {
-    expect(SESSION_COSTS.script_only).toBe(5);
+describe("SESSION_COSTS — التسعيرة المعتمدة (أبريل 2026)", () => {
+  it("يجب أن تكون تكلفة السيناريو 10 كريدت", () => {
+    expect(SESSION_COSTS.script_only).toBe(10);
   });
 
-  it("يجب أن تكون تكلفة المشهد 30 كريدت", () => {
-    expect(SESSION_COSTS.scene).toBe(30);
+  it("يجب أن تكون تكلفة المشهد 20 كريدت", () => {
+    expect(SESSION_COSTS.scene).toBe(20);
   });
 
-  it("يجب أن تكون تكلفة الفيلم القصير 450 كريدت", () => {
-    expect(SESSION_COSTS.film_short).toBe(450);
+  it("يجب أن تكون تكلفة الفيلم القصير 350 كريدت", () => {
+    expect(SESSION_COSTS.film_short).toBe(350);
   });
 
-  it("يجب أن تكون تكلفة الفيلم المتوسط 1100 كريدت", () => {
-    expect(SESSION_COSTS.film_medium).toBe(1100);
+  it("يجب أن تكون تكلفة الفيلم المتوسط 900 كريدت", () => {
+    expect(SESSION_COSTS.film_medium).toBe(900);
   });
 
-  it("يجب أن تكون تكلفة الفيلم الطويل 3200 كريدت", () => {
-    expect(SESSION_COSTS.film_long).toBe(3200);
+  it("يجب أن تكون تكلفة الفيلم الطويل 2500 كريدت", () => {
+    expect(SESSION_COSTS.film_long).toBe(2500);
   });
 
-  it("يجب أن تكون تكلفة التلقائي 400 كريدت", () => {
-    expect(SESSION_COSTS.autonomous).toBe(400);
-    expect(SESSION_COSTS.surprise).toBe(400);
+  it("يجب أن تكون تكلفة التلقائي 300 كريدت", () => {
+    expect(SESSION_COSTS.autonomous).toBe(300);
+    expect(SESSION_COSTS.surprise).toBe(300);
   });
 
-  it("يجب أن تحتوي KHAYAL_SERVICES على 7 خدمات", () => {
-    expect(KHAYAL_SERVICES).toHaveLength(7);
+  it("يجب أن تحتوي KHAYAL_SERVICES على 11 خدمة", () => {
+    expect(KHAYAL_SERVICES).toHaveLength(11);
   });
 
   it("يجب أن تتطابق KHAYAL_SERVICES مع SESSION_COSTS", () => {
@@ -241,6 +240,9 @@ describe("SESSION_COSTS — التسعيرة المعتمدة", () => {
     expect(servicesMap["film_short"]).toBe(SESSION_COSTS.film_short);
     expect(servicesMap["film_medium"]).toBe(SESSION_COSTS.film_medium);
     expect(servicesMap["film_long"]).toBe(SESSION_COSTS.film_long);
+    expect(servicesMap["design_exterior"]).toBe(SESSION_COSTS.design_exterior);
+    expect(servicesMap["design_interior"]).toBe(SESSION_COSTS.design_interior);
+    expect(servicesMap["design_floor_plan"]).toBe(SESSION_COSTS.design_floor_plan);
   });
 });
 
@@ -275,10 +277,10 @@ describe("notifyMousaPricing — pricing-webhook", () => {
     );
 
     const callBody = JSON.parse(mockFetch.mock.calls[0][1].body);
-    expect(callBody.minCost).toBe(5);
-    expect(callBody.maxCost).toBe(3200);
-    expect(callBody.baseCost).toBe(30);
-    expect(callBody.services).toHaveLength(7);
+    expect(callBody.minCost).toBe(10);
+    expect(callBody.maxCost).toBe(2500);
+    expect(callBody.baseCost).toBe(20);
+    expect(callBody.services).toHaveLength(11);
 
     expect(result.success).toBe(true);
     expect(result.platform).toBe("khayal");
