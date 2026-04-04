@@ -36,7 +36,7 @@ const PRICING_TABLE = [
 ] as const;
 
 export default function CreditsWidget({ compact = false, className = "" }: CreditsWidgetProps) {
-  const { user, isGuest } = useAuth();
+  const { user, isGuest, isFallback } = useAuth();
   const { t, lang } = useLanguage();
   const [showPricing, setShowPricing] = useState(false);
 
@@ -47,13 +47,44 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
   const { data: balanceData, isLoading } = trpc.credits.getBalance.useQuery(
     { userId: user?.userId },
     {
-      enabled: !isGuest && !!user?.userId && status?.enabled === true,
+      enabled: !isGuest && !isFallback && !!user?.userId && status?.enabled === true,
       staleTime: 30_000,
       refetchInterval: 60_000,
     }
   );
 
   if (!status?.enabled) return null;
+
+  // مستخدم fallback (200 كريدت مجاني بسبب تعذّر الاتصال بـ Mousa)
+  if (isFallback) {
+    if (compact) {
+      return (
+        <div className={`flex items-center gap-1.5 ${className}`}>
+          <Coins className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="text-xs text-emerald-400 font-mono font-bold">{user.creditBalance}</span>
+          <span className="text-[10px] text-emerald-400/60">{lang === 'AR' ? 'مجاني' : 'free'}</span>
+        </div>
+      );
+    }
+    return (
+      <div className={`rounded-xl border border-emerald-500/20 bg-emerald-950/10 p-3 ${className}`}>
+        <div className="flex items-center gap-2">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
+            <Coins className="w-4 h-4 text-emerald-400" />
+          </div>
+          <div>
+            <div className="flex items-baseline gap-1">
+              <span className="text-lg font-bold font-mono text-emerald-300">{user.creditBalance}</span>
+              <span className="text-xs text-emerald-400/60">{lang === 'AR' ? 'كريدت مجاني' : 'Free Credits'}</span>
+            </div>
+            <div className="text-[10px] text-white/30">
+              {lang === 'AR' ? 'يُجدَّد عند استعادة الاتصال بحسابك' : 'Restored when account reconnects'}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // للزوار: عرض زر تسجيل الدخول
   if (isGuest) {
