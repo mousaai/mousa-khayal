@@ -1,33 +1,30 @@
 /**
  * AuthGate.tsx
- * مكوّن مفتوح — لا يتطلب مصادقة Mousa.ai
- * المنصة متاحة للجميع بدون قيود دخول
+ * مكوّن مختلط — زوار مفتوحون + مستخدمون مربوطون بـ Mousa.ai
+ *
+ * الزوار (بدون تسجيل): يرون المنصة بحرية لكن عند استخدام ميزة مدفوعة يُطلب منهم تسجيل الدخول
+ * المستخدمون (مسجلون عبر Mousa): رصيدهم حقيقي من Mousa.ai ويُخصم منه بتسعيرة خيال
  */
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext } from "react";
+import { useMousaAuth, type MousaUser } from "@/hooks/useMousaAuth";
 
-export interface MousaUser {
-  userId: number;
-  openId: string;
-  name: string;
-  email: string;
-  creditBalance: number;
-  platform: string;
-}
+export type { MousaUser };
 
-// مستخدم افتراضي مفتوح
-const OPEN_USER: MousaUser = {
+// مستخدم زائر افتراضي (بدون رصيد حقيقي)
+const GUEST_USER: MousaUser = {
   userId: 0,
   openId: "guest",
   name: "زائر",
   email: "",
-  creditBalance: 999999,
+  creditBalance: 0,
   platform: "khayal",
 };
 
-// ─── Context ──────────────────────────────────────────────────────────────────
+// ─── Context ─────────────────────────────────────────────────────────────────
 
 interface AuthContextType {
-  user: MousaUser;
+  user: MousaUser;        // زائر أو مستخدم مسجّل
+  isGuest: boolean;       // true إذا لم يسجّل الدخول
   deductCredits: (amount: number, description?: string) => Promise<{ newBalance: number }>;
   refreshBalance: () => Promise<number>;
   logout: () => void;
@@ -41,32 +38,63 @@ export function useAuth(): AuthContextType {
   return ctx;
 }
 
-// ─── AuthGate — مفتوح بالكامل ─────────────────────────────────────────────────
+// ─── AuthGate ────────────────────────────────────────────────────────────────────────────────
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
-  const [balance, setBalance] = useState(999999);
+  const { user: mousaUser, loading, deductCredits: mousaDeduct, refreshBalance: mousaRefresh, logout: mousaLogout } = useMousaAuth();
 
-  const user: MousaUser = { ...OPEN_USER, creditBalance: balance };
+  // المستخدم الفعلي: إذا لم يسجّل نستخدم الزائر الافتراضي
+  const user = mousaUser ?? GUEST_USER;
+  const isGuest = !mousaUser;
 
-  const deductCredits = useCallback(
-    async (amount: number, _description?: string): Promise<{ newBalance: number }> => {
-      const newBalance = Math.max(0, balance - amount);
-      setBalance(newBalance);
-      return { newBalance };
-    },
-    [balance]
-  );
+  // خصم الكريدت: للمسجّلين فقط عبر Mousa API
+  async function deductCredits(amount: number, description?: string): Promise<{ newBalance: number }> {
+    if (isGuest) {
+      throw new Error("يجب تسجيل الدخول عبر mousa.ai لاستخدام هذه الميزة");
+    }
+    return mousaDeduct(amount, description);
+  }
 
-  const refreshBalance = useCallback(async (): Promise<number> => {
-    return balance;
-  }, [balance]);
+  async function refreshBalance(): Promise<number> {
+    if (isGuest) return 0;
+    return mousaRefresh();
+  }
 
-  const logout = useCallback(() => {
-    // لا شيء — المنصة مفتوحة
-  }, []);
+  function logout() {
+    mousaLogout();
+  }
+
+  // تحميل أولي فقط (< 300ms عادةً)
+  if (loading) {
+    return (
+      <div
+        dir="rtl"
+        style={{
+          minHeight: "100vh",
+          background: "#080E1A",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "'IBM Plex Arabic', sans-serif",
+        }}
+      >
+        <div
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: "50%",
+            border: "3px solid rgba(212,160,23,0.2)",
+            borderTop: "3px solid #D4A017",
+            animation: "spin 0.8s linear infinite",
+          }}
+        />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+      </div>
+    );
+  }
 
   return (
-    <AuthContext.Provider value={{ user, deductCredits, refreshBalance, logout }}>
+    <AuthContext.Provider value={{ user, isGuest, deductCredits, refreshBalance, logout }}>
       {children}
     </AuthContext.Provider>
   );

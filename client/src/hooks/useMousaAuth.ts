@@ -1,15 +1,12 @@
 /**
  * useMousaAuth.ts
  * Hook لمصادقة المستخدمين القادمين من mousa.ai
- * وفق دليل تكامل KHAYAL — khayal.mousa.ai
  *
- * السيناريو الكامل:
- *   1. المستخدم يضغط على خيال من لوحة Mousa.ai
- *   2. يُعاد توجيهه إلى: https://khayal.mousa.ai/?token=<JWT>
- *   3. هذا الـ hook يقرأ الـ token، يتحقق منه عبر /api/platform/verify-token
- *   4. إذا نجح: يُخزن بيانات المستخدم في localStorage (صالح 24 ساعة)
- *   5. إذا TOKEN_EXPIRED: يُعاد توجيه المستخدم لـ https://www.mousa.ai
- *   6. إذا لم يكن هناك token ولا جلسة محفوظة: يُعاد التوجيه لـ mousa.ai
+ * السيناريو:
+ *   - زائر بدون token: user = null — المنصة مفتوحة (لا توجيه)
+ *   - زائر بـ ?token=: يتحقق من Mousa.ai ويحفظ الجلسة
+ *   - جلسة محفوظة: يستعيدها مباشرة
+ *   - انتهاء صلاحية الجلسة: يمسحها ويعود لوضع زائر
  */
 import { useState, useEffect } from "react";
 
@@ -68,16 +65,13 @@ export function useMousaAuth() {
       const token = urlParams.get("token");
 
       if (!token) {
+        // زائر بدون token — المنصة مفتوحة له بدون مصادقة
         setState({
           user: null,
           loading: false,
-          error: "يجب الدخول عبر mousa.ai",
+          error: null,
           token: null,
         });
-        // إعادة توجيه بعد 1.5 ثانية
-        setTimeout(() => {
-          window.location.href = "https://www.mousa.ai";
-        }, 1500);
         return;
       }
 
@@ -95,15 +89,13 @@ export function useMousaAuth() {
 
       if (errorMsg.includes("TOKEN_EXPIRED") || errorMsg.includes("انتهت صلاحية")) {
         clearSession();
+        // عودة لوضع زائر بدل من التوجيه لـ mousa.ai
         setState({
           user: null,
           loading: false,
-          error: "انتهت صلاحية الجلسة",
+          error: null,
           token: null,
         });
-        setTimeout(() => {
-          window.location.href = "https://www.mousa.ai";
-        }, 1500);
         return;
       }
 
@@ -213,7 +205,13 @@ export function useMousaAuth() {
 
   function logout() {
     clearSession();
-    window.location.href = "https://www.mousa.ai";
+    // عودة لوضع زائر بدل من التوجيه للخارج
+    setState({
+      user: null,
+      loading: false,
+      error: null,
+      token: null,
+    });
   }
 
   return {

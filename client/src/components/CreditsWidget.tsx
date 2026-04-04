@@ -36,7 +36,7 @@ const PRICING_TABLE = [
 ] as const;
 
 export default function CreditsWidget({ compact = false, className = "" }: CreditsWidgetProps) {
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
   const { t, lang } = useLanguage();
   const [showPricing, setShowPricing] = useState(false);
 
@@ -47,14 +47,53 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
   const { data: balanceData, isLoading } = trpc.credits.getBalance.useQuery(
     { userId: user?.userId },
     {
-      enabled: !!user?.userId && status?.enabled === true,
+      enabled: !isGuest && !!user?.userId && status?.enabled === true,
       staleTime: 30_000,
       refetchInterval: 60_000,
     }
   );
 
   if (!status?.enabled) return null;
-  if (!user) return null;
+
+  // للزوار: عرض زر تسجيل الدخول
+  if (isGuest) {
+    if (compact) {
+      return (
+        <a
+          href="https://www.mousa.ai?ref=khayal"
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`flex items-center gap-1.5 text-xs text-yellow-400/70 hover:text-yellow-400 transition-colors ${className}`}
+        >
+          <Coins className="w-3.5 h-3.5" />
+          <span className="font-mono">{lang === "AR" ? "سجّل دخول" : "Login"}</span>
+        </a>
+      );
+    }
+    return (
+      <div className={`rounded-xl border border-yellow-500/20 bg-yellow-950/10 p-3 ${className}`}>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+            <Coins className="w-4 h-4 text-yellow-400" />
+          </div>
+          <div>
+            <div className="text-xs text-white/60 font-medium">
+              {lang === "AR" ? "سجّل دخولك لاستخدام الكريدت" : "Login to use credits"}
+            </div>
+            <div className="text-[10px] text-white/30 font-mono">MOUSA.AI</div>
+          </div>
+        </div>
+        <Button
+          size="sm"
+          className="w-full h-7 text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30"
+          onClick={() => window.open("https://www.mousa.ai?ref=khayal", "_blank")}
+        >
+          <ExternalLink className="w-3 h-3 mr-1" />
+          {lang === "AR" ? "سجّل دخول عبر MOUSA.AI" : "Login via MOUSA.AI"}
+        </Button>
+      </div>
+    );
+  }
 
   const balance = balanceData?.balance ?? null;
   const canGenerate = balanceData?.canGenerate ?? true;

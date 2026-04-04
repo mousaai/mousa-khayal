@@ -153,7 +153,7 @@ function DesignCard({
 
 // ─── الصفحة الرئيسية ─────────────────────────────────────────
 export default function DesignStudio() {
-  const { user } = useAuth();
+  const { user, isGuest } = useAuth();
 
   // حالة النموذج
   const [prompt, setPrompt] = useState("");
@@ -175,7 +175,7 @@ export default function DesignStudio() {
   // ── tRPC queries & mutations ──────────────────────────────
   const { data: myDesigns, refetch: refetchDesigns, isLoading: loadingDesigns } = trpc.design.getMyDesigns.useQuery(
     { limit: 50, offset: 0 },
-    { enabled: !!user }
+    { enabled: !isGuest && !!user }
   );
 
   const generateMutation = trpc.design.generate.useMutation({
