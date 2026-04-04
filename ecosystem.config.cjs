@@ -6,7 +6,7 @@ module.exports = {
       NODE_ENV: "production",
       PORT: "3006",
       JWT_SECRET: "gUZSqUcmSESjwVurZ47xye",
-      DATABASE_URL: "mysql://3RYRgiKBksaJ9ku.eff254cfce12:8Hmi5APhIhZsYO1P269W@gateway03.us-east-1.prod.aws.tidbcloud.com:4000/6PpfERRQXfuwb7GGi2gFrK?ssl={"rejectUnauthorized":true}",
+      DATABASE_URL: "mysql://3RYRgiKBksaJ9ku.eff254cfce12:8Hmi5APhIhZsYO1P269W@gateway03.us-east-1.prod.aws.tidbcloud.com:4000/6PpfERRQXfuwb7GGi2gFrK?sslaccept=strict",
       OAUTH_SERVER_URL: "https://api.manus.im",
       OWNER_OPEN_ID: "KwRg52bYbwq6pk2Z3iTWwk",
       VITE_APP_ID: "6PpfERRQXfuwb7GGi2gFrK",
