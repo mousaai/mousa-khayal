@@ -2,17 +2,31 @@
  * AuthGate.tsx
  * مكوّن مفتوح بالكامل — لا حجب، لا إعادة توجيه
  *
- * الحالات:
- *   - زائر (بدون token): يدخل مباشرة، لا رصيد Mousa
- *   - مستخدم مسجّل (token صحيح): رصيد حقيقي من Mousa.ai
- *   - مستخدم fallback (فشل الاتصال بـ Mousa): 200 كريدت مجاني تلقائياً
+ * FREE_MODE = true : كل زائر يحصل على رصيد غير محدود مجاناً بدون أي قيود
+ * FREE_MODE = false: مصادقة Mousa عادية (زائر / مسجّل / fallback 200 كريدت)
+ *
+ * لإعادة تفعيل نظام الكريدت: غيّر FREE_MODE إلى false
  */
 import React, { createContext, useContext } from "react";
 import { useMousaAuth, type MousaUser } from "@/hooks/useMousaAuth";
 
 export type { MousaUser };
 
-// مستخدم زائر افتراضي (بدون رصيد)
+/** تغيير هذا لإعادة تفعيل نظام الكريدت */
+const FREE_MODE = true;
+
+// مستخدم مجاني (FREE_MODE) — رصيد غير محدود
+const FREE_USER: MousaUser = {
+  userId: 0,
+  openId: "free",
+  name: "زائر",
+  email: "",
+  creditBalance: 999999,
+  platform: "khayal",
+  isFallback: false,
+};
+
+// مستخدم زائر عادي (بدون رصيد)
 const GUEST_USER: MousaUser = {
   userId: 0,
   openId: "guest",
@@ -28,6 +42,7 @@ interface AuthContextType {
   user: MousaUser;
   isGuest: boolean;       // true إذا لم يسجّل الدخول (لا token)
   isFallback: boolean;    // true إذا كان الرصيد مجانياً بسبب تعذّر الاتصال
+  isFreeMode: boolean;    // true في وضع المجاني الكامل
   deductCredits: (amount: number, description?: string) => Promise<{ newBalance: number }>;
   refreshBalance: () => Promise<number>;
   logout: () => void;
@@ -52,14 +67,32 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     logout: mousaLogout,
   } = useMousaAuth();
 
+  // ─── FREE_MODE: تجاوز كل منطق Mousa ─────────────────────────────────────
+  if (FREE_MODE) {
+    return (
+      <AuthContext.Provider
+        value={{
+          user: FREE_USER,
+          isGuest: false,
+          isFallback: false,
+          isFreeMode: true,
+          // خصم وهمي — لا يُرسَل لأي API
+          deductCredits: async (_amount) => ({ newBalance: 999999 }),
+          refreshBalance: async () => 999999,
+          logout: () => {},
+        }}
+      >
+        {children}
+      </AuthContext.Provider>
+    );
+  }
+
+  // ─── الوضع العادي (FREE_MODE = false) ────────────────────────────────────
+
   const user = mousaUser ?? GUEST_USER;
   const isGuest = !mousaUser;
   const isFallback = mousaUser?.isFallback ?? false;
 
-  // خصم الكريدت:
-  // - زائر: يُطلب منه تسجيل الدخول
-  // - fallback: خصم محلي من الـ 200 كريدت المجانية
-  // - مستخدم حقيقي: خصم عبر Mousa API
   async function deductCredits(amount: number, description?: string): Promise<{ newBalance: number }> {
     if (isGuest) {
       throw new Error("يجب تسجيل الدخول لاستخدام هذه الميزة");
@@ -106,7 +139,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, isGuest, isFallback, deductCredits, refreshBalance, logout }}>
+    <AuthContext.Provider value={{ user, isGuest, isFallback, isFreeMode: false, deductCredits, refreshBalance, logout }}>
       {children}
     </AuthContext.Provider>
   );

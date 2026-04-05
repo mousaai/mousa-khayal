@@ -43,13 +43,21 @@ describe("mousaCreditsService — configuration", () => {
     expect(getCreditsPerSession()).toBe(20);
   });
 
-  it("isMousaEnabled يجب أن يعيد true عند وجود API key", () => {
-    expect(isMousaEnabled()).toBe(true);
+  it("isMousaEnabled يعيد false في FREE_MODE", () => {
+    // FREE_MODE = true → isEnabled() تعيد false دائماً
+    expect(isMousaEnabled()).toBe(false);
   });
 });
 
 describe("verifyMousaToken", () => {
-  it("يجب أن يُرسل طلب POST صحيح ويعيد بيانات المستخدم (v2.0)", async () => {
+  it("يعيد {result:null, error:null} في FREE_MODE (معطّل)", async () => {
+    const { result, error } = await verifyMousaToken("test-token-123");
+    expect(result).toBeNull();
+    expect(error).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it.skip("يجب أن يُرسل طلب POST صحيح ويعيد بيانات المستخدم (v2.0) [FREE_MODE]", async () => {
     const mockResponse = {
       valid: true,
       userId: 42,
@@ -85,7 +93,7 @@ describe("verifyMousaToken", () => {
     expect(result?.creditBalance).toBe(200);  // v2.0
   });
 
-  it("يجب أن يعيد error عند فشل الطلب (v2.0)", async () => {
+  it.skip("يجب أن يعيد error عند فشل الطلب (v2.0) [FREE_MODE]", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: false,
       status: 401,
@@ -96,7 +104,7 @@ describe("verifyMousaToken", () => {
     expect(error?.code).toBe("INVALID_TOKEN");
   });
 
-  it("يجب أن يعيد {result:null, error:null} عند خطأ الشبكة", async () => {
+  it.skip("يجب أن يعيد {result:null, error:null} عند خطأ الشبكة [FREE_MODE]", async () => {
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
     const { result, error } = await verifyMousaToken("token");
     expect(result).toBeNull();
@@ -105,7 +113,13 @@ describe("verifyMousaToken", () => {
 });
 
 describe("checkMousaBalance", () => {
-  it("يجب أن يُرسل طلب GET صحيح ويعيد الرصيد", async () => {
+  it("يعيد null في FREE_MODE (معطّل)", async () => {
+    const result = await checkMousaBalance(42);
+    expect(result).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it.skip("يجب أن يُرسل طلب GET صحيح ويعيد الرصيد [FREE_MODE]", async () => {
     const mockBalance = {
       balance: 150,
       sufficient: true,
@@ -134,7 +148,7 @@ describe("checkMousaBalance", () => {
     expect(result?.sufficient).toBe(true);
   });
 
-  it("يجب أن يعيد sufficient=false عند نقص الرصيد", async () => {
+  it.skip("يجب أن يعيد sufficient=false عند نقص الرصيد [FREE_MODE]", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -152,7 +166,13 @@ describe("checkMousaBalance", () => {
 });
 
 describe("deductMousaCredits", () => {
-  it("يجب أن يُرسل طلب POST صحيح ويخصم الكريدتس", async () => {
+  it("يعيد null في FREE_MODE (معطّل)", async () => {
+    const result = await deductMousaCredits(42, "توليد مشهد");
+    expect(result).toBeNull();
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it.skip("يجب أن يُرسل طلب POST صحيح ويخصم الكريدتس [FREE_MODE]", async () => {
     const mockDeduct = {
       success: true,
       newBalance: 175,
@@ -184,7 +204,7 @@ describe("deductMousaCredits", () => {
     expect(result?.newBalance).toBe(175);
   });
 
-  it("يجب أن يعيد upgradeUrl عند نقص الرصيد", async () => {
+  it.skip("يجب أن يعيد upgradeUrl عند نقص الرصيد [FREE_MODE]", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -310,7 +330,13 @@ describe("notifyMousaPricing — pricing-webhook", () => {
 });
 
 describe("guardMousaBalance", () => {
-  it("يجب أن يسمح بالعملية عند كفاية الرصيد", async () => {
+  it("يسمح دائماً في FREE_MODE", async () => {
+    const result = await guardMousaBalance(42, "default");
+    expect(result.allowed).toBe(true);
+    expect(mockFetch).not.toHaveBeenCalled();
+  });
+
+  it.skip("يجب أن يسمح بالعملية عند كفاية الرصيد [FREE_MODE]", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -325,7 +351,7 @@ describe("guardMousaBalance", () => {
     expect(result.balance).toBe(200);
   });
 
-  it("يجب أن يمنع العملية ويعيد upgradeUrl عند نقص الرصيد", async () => {
+  it.skip("يجب أن يمنع العملية ويعيد upgradeUrl عند نقص الرصيد [FREE_MODE]", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -340,7 +366,7 @@ describe("guardMousaBalance", () => {
     expect(result.upgradeUrl).toContain("mousa.ai/pricing");
   });
 
-  it("يجب أن يسمح بالعملية عند خطأ الشبكة (fail-open)", async () => {
+  it.skip("يجب أن يسمح بالعملية عند خطأ الشبكة (fail-open) [FREE_MODE]", async () => {
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
     const result = await guardMousaBalance(42);
     expect(result.allowed).toBe(true);

@@ -74,7 +74,7 @@ describe("Utility Functions", () => {
 });
 
 // ─── 3. verifyMousaToken ──────────────────────────────────────────────────────
-describe("verifyMousaToken — Token Handoff v2.0", () => {
+describe.skip("verifyMousaToken — Token Handoff v2.0 [FREE_MODE]", () => {
   it("يعيد result عند نجاح التحقق", async () => {
     const mockUser = {
       valid: true,
@@ -132,7 +132,7 @@ describe("verifyMousaToken — Token Handoff v2.0", () => {
 });
 
 // ─── 4. checkMousaBalance ─────────────────────────────────────────────────────
-describe("checkMousaBalance — v2.0 (balance فقط)", () => {
+describe.skip("checkMousaBalance — v2.0 (balance فقط) [FREE_MODE]", () => {
   it("يعيد balance صحيح من API", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -165,7 +165,7 @@ describe("checkMousaBalance — v2.0 (balance فقط)", () => {
 });
 
 // ─── 5. deductMousaCredits ────────────────────────────────────────────────────
-describe("deductMousaCredits — v2.0 (amount + usage_factors)", () => {
+describe.skip("deductMousaCredits — v2.0 (amount + usage_factors) [FREE_MODE]", () => {
   it("يخصم بـ amount محدد", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
@@ -251,7 +251,7 @@ describe("deductMousaCredits — v2.0 (amount + usage_factors)", () => {
 });
 
 // ─── 6. guardMousaBalance ─────────────────────────────────────────────────────
-describe("guardMousaBalance — فحص مسبق قبل التوليد", () => {
+describe.skip("guardMousaBalance — فحص مسبق قبل التوليد [FREE_MODE]", () => {
   it("يسمح عند رصيد كافٍ", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,

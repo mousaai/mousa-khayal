@@ -117,8 +117,14 @@ export interface MousaDeductResult {
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
+/**
+ * FREE_MODE: عند تعيينه true تُعطَّل جميع قيود الكريدت وتُفتح المنصة مجاناً
+ * لإعادة تفعيل الكريدت: غيّر FREE_MODE إلى false
+ */
+const FREE_MODE = true;
 
 function isEnabled(): boolean {
+  if (FREE_MODE) return false; // وضع مجاني — لا خصم ولا قيود
   return Boolean(MOUSA_API_KEY && MOUSA_BASE_URL);
 }
 
