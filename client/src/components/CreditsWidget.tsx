@@ -36,7 +36,7 @@ const PRICING_TABLE = [
 ] as const;
 
 export default function CreditsWidget({ compact = false, className = "" }: CreditsWidgetProps) {
-  const { user, isGuest, isFallback } = useAuth();
+  const { user, isGuest, isFallback, isFreeMode } = useAuth();
   const { t, lang } = useLanguage();
   const [showPricing, setShowPricing] = useState(false);
 
@@ -53,6 +53,7 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
     }
   );
 
+  // في FREE_MODE لا يُعرض الـ widget أصلاً (isEnabled = false)
   if (!status?.enabled) return null;
 
   // مستخدم fallback (200 كريدت مجاني بسبب تعذّر الاتصال بـ Mousa)
@@ -86,8 +87,8 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
     );
   }
 
-  // للزوار: عرض زر تسجيل الدخول
-  if (isGuest) {
+  // للزوار: عرض زر تسجيل الدخول (معطّل في FREE_MODE)
+  if (isGuest && !isFreeMode) {
     if (compact) {
       return (
         <a

@@ -43,14 +43,7 @@ export function useMousaTokenHandoff() {
           status: "expired",
           redirectUrl: data.redirectUrl ?? "https://www.mousa.ai/dashboard",
         });
-        toast.error("انتهت صلاحية جلستك — يرجى تسجيل الدخول مجدداً من Mousa.ai", {
-          action: {
-            label: "تسجيل الدخول",
-            onClick: () =>
-              window.location.assign(data.redirectUrl ?? "https://www.mousa.ai/dashboard"),
-          },
-          duration: 10_000,
-        });
+        // في FREE_MODE: لا يُعرض طلب تسجيل الدخول — المنصة مفتوحة للجميع
       } else {
         setState({ status: "invalid" });
       }

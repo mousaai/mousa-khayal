@@ -121,8 +121,7 @@ const PIPELINE_STAGES = [
 // ─── المكوّن الرئيسي ──────────────────────────────────────────
 
 export default function VideoProductionPanel() {
-  const { user, isGuest } = useAuth();
-  const isAuthenticated = !isGuest;
+  const { user } = useAuth();
   const authLoading = false;
   const [description, setDescription] = useState("");
   const [language, setLanguage] = useState<"ar" | "en">("ar");
@@ -188,7 +187,6 @@ export default function VideoProductionPanel() {
 
   // ── كتابة السيناريو ──
   const handleWriteScript = async () => {
-    if (isGuest) { window.open("https://www.mousa.ai?ref=khayal", "_blank"); return; }
     if (!description.trim()) return;
     setStep("writing_script");
     setError(null);
@@ -225,7 +223,6 @@ export default function VideoProductionPanel() {
 
   // ── الإنتاج السريع ──
   const handleQuickProduce = async () => {
-    if (isGuest) { window.open("https://www.mousa.ai?ref=khayal", "_blank"); return; }
     if (!description.trim()) return;
     setStep("producing");
     setProgress(0);

@@ -208,7 +208,6 @@ function ChatBubble({ msg, onVideoComplete }: {
 
 export default function KhayalChat() {
   const { user } = useAuth();
-  const isAuthenticated = !!user;
   const authLoading = false; // AuthGate يضمن وجود user
   const [messages, setMessages] = useState<KhayalChatMessage[]>([
     {
@@ -267,7 +266,6 @@ export default function KhayalChat() {
   }, []);
 
   const handleSend = useCallback(async () => {
-    if (!isAuthenticated && !authLoading) { window.location.href = getLoginUrl(); return; }
     const text = input.trim();
     if (!text || isProcessing) return;
 
