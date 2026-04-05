@@ -864,3 +864,9 @@
 - [x] إنشاء ecosystem.config.cjs لـ PM2 مع PORT=3007
 - [x] التأكد من وجود @ffmpeg-installer/ffmpeg في dependencies الرئيسية (موجود بالفعل)
 - [ ] إضافة سكريبت postinstall للتحقق من تثبيت ffmpeg
+
+## 🔧 إصلاح مشكلة السيرفر (تقرير 5 أبريل 2026)
+
+- [x] إنشاء .npmrc مع enable-pre-post-scripts=true (يحل مشكلة sharp وpdfkit)
+- [x] التأكيد: ecosystem.config.cjs يستخدم PORT=3007 (صحيح)
+- [x] التأكيد: @ffmpeg-installer/ffmpeg موجود في dependencies الرئيسية
