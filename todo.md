@@ -870,3 +870,10 @@
 - [x] إنشاء .npmrc مع enable-pre-post-scripts=true (يحل مشكلة sharp وpdfkit)
 - [x] التأكيد: ecosystem.config.cjs يستخدم PORT=3007 (صحيح)
 - [x] التأكيد: @ffmpeg-installer/ffmpeg موجود في dependencies الرئيسية
+
+## مهام ما قبل تفعيل الدفع
+
+- [x] المهمة 1: تقليل مدة JWT Token من ONE_YEAR_MS إلى 1 ساعة (ONE_HOUR_MS)
+- [x] المهمة 2: إضافة Webhook Receiver على POST /api/internal/events
+- [x] المهمة 3: إضافة X-Idempotency-Key على طلبات deduct-credits
+- [x] المهمة 4: تحديث Rate Limiting على Nginx وتحسين حدود tRPC

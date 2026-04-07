@@ -15,6 +15,8 @@
  *   minCost: 10 | maxCost: 50
  */
 
+import { randomUUID } from "crypto";
+
 const MOUSA_BASE_URL = process.env.MOUSA_BASE_URL ?? "https://www.mousa.ai";
 const MOUSA_API_KEY = process.env.MOUSA_API_KEY ?? "khayal@mousa30";
 const MOUSA_PLATFORM_ID = process.env.MOUSA_PLATFORM_ID ?? "khayal";
@@ -242,10 +244,15 @@ export async function deductMousaCredits(
     body.amount = finalAmount;
   }
 
+  // Idempotency Key: يمنع تكرار الخصم عند إعادة المحاولة
+  const idempotencyKey = `khayal_${randomUUID()}`;
   try {
     const res = await fetch(`${MOUSA_BASE_URL}/api/platform/deduct-credits`, {
       method: "POST",
-      headers: MOUSA_HEADERS,
+      headers: {
+        ...MOUSA_HEADERS,
+        "X-Idempotency-Key": idempotencyKey,
+      },
       body: JSON.stringify(body),
     });
 
