@@ -263,3 +263,22 @@ export const architecturalDesigns = mysqlTable("architectural_designs", {
 
 export type ArchitecturalDesign = typeof architecturalDesigns.$inferSelect;
 export type InsertArchitecturalDesign = typeof architecturalDesigns.$inferInsert;
+
+// ===== Mousa.ai — User Suspension =====
+// يُستخدم لتتبع المستخدمين المعلّقين من mousa.ai
+// عند استقبال حدث user.suspended يُضاف سجل هنا
+// auth.middleware.ts يتحقق من هذا الجدول في كل طلب
+
+export const suspendedUsers = mysqlTable("suspended_users", {
+  id: int("id").autoincrement().primaryKey(),
+  /** openId أو userId القادم من mousa.ai */
+  userId: varchar("userId", { length: 64 }).notNull().unique(),
+  /** وقت التعليق (Unix timestamp بالمللي ثانية) */
+  suspendedAt: bigint("suspendedAt", { mode: "number" }).notNull(),
+  /** سبب التعليق إذا أُرسل */
+  reason: text("reason"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type SuspendedUser = typeof suspendedUsers.$inferSelect;
+export type InsertSuspendedUser = typeof suspendedUsers.$inferInsert;

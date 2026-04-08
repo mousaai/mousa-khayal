@@ -2,21 +2,40 @@
  * useMousaAuth.ts
  * Hook لمصادقة المستخدمين القادمين من mousa.ai
  *
+ * ⚠️ الأمان: جميع الاستدعاءات تمر عبر السيرفر (tRPC)
+ *    PLATFORM_API_KEY محمي في server/mousaCreditsService.ts — لا يُكشف للـ browser أبداً
+ *
  * السيناريوهات:
  *   1. زائر بدون token: user = null — المنصة مفتوحة (لا توجيه، لا حجب)
- *   2. زائر بـ ?token=: يتحقق من Mousa.ai ويحفظ الجلسة
+ *   2. زائر بـ ?token=: يتحقق عبر trpc.credits.verifyToken (server-side)
  *   3. جلسة محفوظة: يستعيدها مباشرة
  *   4. فشل الاتصال بـ Mousa (network / timeout / server error / أي خطأ):
  *      → يمنح المستخدم 200 كريدت مجاني ويستمر بدون انقطاع
  *   5. انتهاء صلاحية الجلسة: يمسحها ويعود لوضع زائر
+ *   6. user.suspended: يُعاد توجيهه فوراً لـ mousa.ai/suspended
  */
 import { useState, useEffect } from "react";
+import { createTRPCProxyClient, httpBatchLink } from "@trpc/client";
+import superjson from "superjson";
+import type { AppRouter } from "../../../server/routers";
 
-const MOUSA_API_URL = "https://www.mousa.ai";
+// tRPC vanilla client — للاستخدام خارج React hooks (server-side calls)
+const trpcVanilla = createTRPCProxyClient<AppRouter>({
+  links: [
+    httpBatchLink({
+      url: "/api/trpc",
+      transformer: superjson,
+      fetch(input, init) {
+        return globalThis.fetch(input, { ...(init ?? {}), credentials: "include" });
+      },
+    }),
+  ],
+});
+
 const STORAGE_KEY = "mousa_user_session";
 const TOKEN_KEY = "mousa_auth_token";
 const THIS_PLATFORM = "khayal";
-const PLATFORM_API_KEY = "khayal@mousa30";
+const MOUSA_SUSPENDED_URL = "https://www.mousa.ai/suspended";
 
 /** كريدت مجاني يُمنح تلقائياً عند تعذّر الوصول لحساب Mousa */
 const FREE_FALLBACK_CREDITS = 200;
@@ -77,9 +96,9 @@ export function useMousaAuth() {
         return;
       }
 
-      // 3. التحقق من الـ token مع Mousa
+      // 3. التحقق من الـ token عبر السيرفر (tRPC)
       try {
-        const user = await verifyToken(token);
+        const user = await verifyTokenViaServer(token);
         saveSession(token, user);
         // إزالة token من URL بعد التحقق الناجح
         const cleanUrl = window.location.pathname + window.location.hash;
@@ -87,6 +106,13 @@ export function useMousaAuth() {
         setState({ user, loading: false, error: null, token });
       } catch (verifyErr) {
         const errorMsg = (verifyErr as Error).message;
+
+        // معلّق → إعادة توجيه فورية
+        if (errorMsg.includes("USER_SUSPENDED")) {
+          clearSession();
+          window.location.href = MOUSA_SUSPENDED_URL;
+          return;
+        }
 
         if (errorMsg.includes("TOKEN_EXPIRED") || errorMsg.includes("انتهت صلاحية")) {
           clearSession();
@@ -125,43 +151,24 @@ export function useMousaAuth() {
     };
   }
 
-  async function verifyToken(token: string): Promise<MousaUser> {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 8000); // 8 ثوانٍ timeout
-
-    try {
-      const response = await fetch(`${MOUSA_API_URL}/api/platform/verify-token`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${PLATFORM_API_KEY}`,
-          "X-Platform-ID": THIS_PLATFORM,
-        },
-        body: JSON.stringify({ token }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        if (data.code === "TOKEN_EXPIRED") throw new Error("TOKEN_EXPIRED");
-        throw new Error(data.error || "فشل التحقق من الهوية");
-      }
-
-      const data = await response.json();
-      return {
-        userId: data.userId,
-        openId: data.openId,
-        name: data.name,
-        email: data.email,
-        creditBalance: data.creditBalance,
-        platform: data.platform,
-      };
-    } catch (err) {
-      clearTimeout(timeout);
-      throw err;
+  /**
+   * التحقق عبر السيرفر (tRPC) — PLATFORM_API_KEY محمي server-side
+   */
+  async function verifyTokenViaServer(token: string): Promise<MousaUser> {
+    const result = await trpcVanilla.credits.verifyToken.mutate({ token });
+    if (!result.success) {
+      if (result.code === "TOKEN_EXPIRED") throw new Error("TOKEN_EXPIRED");
+      if (result.code === "USER_SUSPENDED") throw new Error("USER_SUSPENDED");
+      throw new Error(result.error || "فشل التحقق من الهوية");
     }
+    return {
+      userId: result.userId!,
+      openId: result.openId!,
+      name: result.name!,
+      email: result.email!,
+      creditBalance: result.creditBalance!,
+      platform: result.platform ?? THIS_PLATFORM,
+    };
   }
 
   async function deductCredits(
@@ -180,60 +187,22 @@ export function useMousaAuth() {
       return { newBalance };
     }
 
-    // مستخدم حقيقي: خصم عبر Mousa API مع fallback محلي عند الفشل
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
-
-      const response = await fetch(`${MOUSA_API_URL}/api/platform/deduct-credits`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${PLATFORM_API_KEY}`,
-          "X-Platform-ID": THIS_PLATFORM,
-        },
-        body: JSON.stringify({
-          userId: state.user.userId,
-          amount,
-          description: description || "استخدام منصة خيال",
-        }),
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeout);
-
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || "فشل خصم الكريدت");
-      }
-
-      const data = await response.json();
-      // تحديث الرصيد في state و localStorage
-      setState((prev) => ({
-        ...prev,
-        user: prev.user ? { ...prev.user, creditBalance: data.newBalance } : null,
-      }));
-      if (state.token && state.user) {
-        saveSession(state.token, { ...state.user, creditBalance: data.newBalance });
-      }
-      return { newBalance: data.newBalance };
-    } catch {
-      // فشل الاتصال بـ Mousa أثناء الخصم → خصم محلي فقط (لا توقف)
-      const newBalance = Math.max(0, state.user.creditBalance - amount);
-      setState((prev) => ({
-        ...prev,
-        user: prev.user ? { ...prev.user, creditBalance: newBalance } : null,
-      }));
-      return { newBalance };
-    }
+    // مستخدم حقيقي: الخصم يتم عبر السيرفر (server/mousaCreditsService.ts)
+    // PLATFORM_API_KEY محمي تماماً — لا نستدعي mousa.ai من الـ browser
+    // الخصم الفعلي يتم في videoRouter/khayalRouter عبر deductMousaCredits
+    const newBalance = Math.max(0, state.user.creditBalance - amount);
+    setState((prev) => ({
+      ...prev,
+      user: prev.user ? { ...prev.user, creditBalance: newBalance } : null,
+    }));
+    return { newBalance };
   }
 
   async function refreshBalance(): Promise<number> {
     if (!state.user || !state.token) return 0;
     if (state.user.isFallback) return state.user.creditBalance;
-
     try {
-      const user = await verifyToken(state.token);
+      const user = await verifyTokenViaServer(state.token);
       setState((prev) => ({
         ...prev,
         user: prev.user ? { ...prev.user, creditBalance: user.creditBalance } : null,
@@ -248,9 +217,9 @@ export function useMousaAuth() {
   }
 
   async function refreshBalanceInBackground(token: string, currentUser: MousaUser) {
-    if (currentUser.isFallback) return; // لا تحديث للـ fallback
+    if (currentUser.isFallback) return;
     try {
-      const user = await verifyToken(token);
+      const user = await verifyTokenViaServer(token);
       setState((prev) => ({
         ...prev,
         user: prev.user ? { ...prev.user, creditBalance: user.creditBalance } : null,
@@ -259,6 +228,24 @@ export function useMousaAuth() {
     } catch {}
   }
 
+  /** إنهاء الجلسة فوراً عند تعليق المستخدم من mousa.ai */
+  function handleSuspension() {
+    clearSession();
+    window.location.href = MOUSA_SUSPENDED_URL;
+  }
+
+  // الاستماع لأحداث التعليق عبر BroadcastChannel (من Webhook handler)
+  useEffect(() => {
+    if (typeof BroadcastChannel === "undefined") return;
+    const channel = new BroadcastChannel("mousa_events");
+    channel.onmessage = (event) => {
+      if (event.data?.type === "user.suspended") {
+        handleSuspension();
+      }
+    };
+    return () => channel.close();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   function logout() {
     clearSession();
     setState({ user: null, loading: false, error: null, token: null });
@@ -266,6 +253,7 @@ export function useMousaAuth() {
 
   return {
     ...state,
+    isAuthenticated: !!state.user,
     deductCredits,
     refreshBalance,
     logout,

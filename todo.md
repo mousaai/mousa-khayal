@@ -877,3 +877,10 @@
 - [x] المهمة 2: إضافة Webhook Receiver على POST /api/internal/events
 - [x] المهمة 3: إضافة X-Idempotency-Key على طلبات deduct-credits
 - [x] المهمة 4: تحديث Rate Limiting على Nginx وتحسين حدود tRPC
+
+## 🔐 مهام Mousa.ai — أبريل 2026
+
+- [ ] إضافة alias /api/internal/events في internal.routes.ts
+- [x] إضافة جدول suspended_users في قاعدة البيانات
+- [ ] تطبيق معالج user.suspended في internal.routes.ts
+- [ ] التحقق من الـ suspension في auth.middleware.ts لرفض الجلسة فوراً

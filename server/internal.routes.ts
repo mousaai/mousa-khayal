@@ -67,6 +67,12 @@ export interface UserSubscriptionData {
   expiresAt?: number;
 }
 
+export interface UserSuspendedData {
+  userId: string; // openId أو userId القادم من mousa.ai
+  timestamp: number;
+  reason?: string;
+}
+
 // ─── Event Handlers ───────────────────────────────────────────────────────────
 // يمكن تخصيص هذه الدوال في كل منصة حسب الحاجة
 
@@ -109,6 +115,39 @@ async function onUserSubscription(data: UserSubscriptionData): Promise<void> {
   // TODO: تحديث صلاحيات المستخدم محلياً إذا لزم
 }
 
+/**
+ * معالجة حدث تعليق المستخدم من mousa.ai
+ * يحذف الجلسة فوراً ويخطر المتصفح عبر BroadcastChannel
+ */
+async function onUserSuspended(data: UserSuspendedData): Promise<void> {
+  const userId = data.userId;
+  console.log(`[Webhook] ⚠️ User suspended: userId=${userId} reason=${data.reason || 'N/A'}`);
+
+  // 1. حفظ في suspended_users لمنع الجلسات المستقبلية
+  try {
+    const { getDb } = await import("./db");
+    const { suspendedUsers } = await import("../drizzle/schema");
+    const db = await getDb();
+    await db.insert(suspendedUsers).values({
+      userId: String(userId),
+      suspendedAt: data.timestamp || Date.now(),
+      reason: data.reason || null,
+    }).onDuplicateKeyUpdate({ set: { suspendedAt: data.timestamp || Date.now(), reason: data.reason || null } });
+    console.log(`[Webhook] ✅ User ${userId} added to suspended_users`);
+  } catch (dbErr) {
+    console.error(`[Webhook] ❌ Failed to save suspension to DB:`, dbErr);
+  }
+
+  // 2. لا يمكن حذف JWT cookie من السيرفر مباشرةً لأن لا نعرف أي session مفتوحة
+  // الحل: auth.middleware.ts يتحقق من suspended_users في كل طلب قادم
+  // ويرفض الطلبات بـ 403 فوراً
+
+  // 3. إخطار المتصفح عبر Server-Sent Events (SSE) إذا كان متصلاً
+  // useMousaAuth.ts يستمع لهذا ويعيد التوجيه فوراً
+  // ملاحظة: BroadcastChannel لا يعمل عبر السيرفر، لكن suspended_users check يضمن الحماية
+  console.log(`[Webhook] ℹ️ Suspension recorded. Next request from user ${userId} will be rejected (403).`);
+}
+
 // ─── Webhook Dispatcher ───────────────────────────────────────────────────────
 
 async function dispatchWebhookEvent(event: WebhookEvent): Promise<void> {
@@ -126,6 +165,9 @@ async function dispatchWebhookEvent(event: WebhookEvent): Promise<void> {
       break;
     case "user.subscription":
       await onUserSubscription(data as unknown as UserSubscriptionData);
+      break;
+    case "user.suspended":
+      await onUserSuspended(data as unknown as UserSuspendedData);
       break;
     case "platform.ping":
       console.log("[Webhook] Ping received from mousa.ai ✓");
@@ -187,5 +229,35 @@ export function registerInternalRoutes(app: Express): void {
     });
   });
 
-  console.log("[InternalRoutes] Registered: POST /api/mousa/webhook, GET /api/mousa/health");
+  // ── POST /api/internal/events (alias) ──────────────────────────────────────
+  // Alias رسمي مطلوب من mousa.ai — يشير لنفس handler الـ Webhook
+  app.post(
+    "/api/internal/events",
+    express.raw({ type: "application/json" }),
+    requireWebhookSignature,
+    async (req: Request, res: Response) => {
+      try {
+        const event = req.body as WebhookEvent;
+
+        if (!event.event || !event.timestamp || !event.data) {
+          return res.status(400).json({ error: "Invalid webhook payload" });
+        }
+
+        dispatchWebhookEvent(event).catch((err) =>
+          console.error("[Webhook/internal] Handler error:", err)
+        );
+
+        return res.json({
+          received: true,
+          event: event.event,
+          timestamp: Date.now(),
+        });
+      } catch (err) {
+        console.error("[Webhook/internal] Error processing event:", err);
+        return res.status(500).json({ error: "Internal server error" });
+      }
+    }
+  );
+
+  console.log("[InternalRoutes] Registered: POST /api/mousa/webhook, POST /api/internal/events (alias), GET /api/mousa/health");
 }

@@ -78,6 +78,13 @@
       "when": 1775070381295,
       "tag": "0010_workable_tigra",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "5",
+      "when": 1775663152271,
+      "tag": "0011_elite_black_tom",
+      "breakpoints": true
     }
   ]
 }
