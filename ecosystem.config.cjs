@@ -11,6 +11,7 @@ module.exports = {
       env: {
         NODE_ENV: "production",
         PORT: 3007,
+        WEBHOOK_SECRET: "816350e1619ed3ad26351ebfcfc3c65f9ba22929941767e4bbaa9f16b5cdeca7",
       },
       error_file: "/var/log/pm2/khayal-error.log",
       out_file: "/var/log/pm2/khayal-out.log",
