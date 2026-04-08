@@ -41,11 +41,12 @@ describe("Task 2: Webhook Receiver", () => {
     expect(typeof registerWebhookRoutes).toBe("function");
   });
 
-  it("index.ts should import registerWebhookRoutes", async () => {
+  it("index.ts should import registerInternalRoutes (official Mousa.ai)", async () => {
     const fs = await import("fs");
     const content = fs.readFileSync("server/_core/index.ts", "utf-8");
-    expect(content).toContain("registerWebhookRoutes");
-    expect(content).toContain("/api/internal/events");
+    // تم استبدال registerWebhookRoutes بالملف الرسمي registerInternalRoutes
+    expect(content).toContain("registerInternalRoutes");
+    expect(content).toContain("/api/mousa/webhook");
   });
 
   it("webhookRouter should handle platform.ping event", async () => {

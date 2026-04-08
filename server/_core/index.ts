@@ -4,7 +4,7 @@ import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes } from "./oauth";
-import { registerWebhookRoutes } from "../webhookRouter";
+import { registerInternalRoutes } from "../internal.routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
@@ -125,13 +125,15 @@ async function startServer() {
   app.use('/api/trpc/video.quickProduce', productionLimiter);
   app.use('/api/trpc/video.autonomousProduce', productionLimiter);
   app.use('/api/trpc/video.surpriseProduce', productionLimiter);
+  // ⚠️ Mousa.ai Internal Routes — يجب قبل express.json() لأن webhook يحتاج raw body
+  // POST /api/mousa/webhook  ← أحداث Mousa.ai (credits, user events)
+  // GET  /api/mousa/health   ← health check
+  registerInternalRoutes(app);
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
   // OAuth callback under /api/oauth/callback
   registerOAuthRoutes(app);
-  // Webhook Receiver: POST /api/internal/events (Mousa.ai events)
-  registerWebhookRoutes(app);
   // Media endpoints (transcribe + upload)
   app.use(mediaRoutes);
   // SSE: بث حالة المهام الحية
