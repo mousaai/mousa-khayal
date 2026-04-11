@@ -474,7 +474,7 @@ export const khayalRouter = router({
     }),
 
   // ── توليد المشهد الكامل ──
-  generateScene: protectedProcedure
+  generateScene: publicProcedure
     .input(z.object({
       description: z.string().min(2),
       scenarioType: z.string().optional(),
