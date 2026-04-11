@@ -23,11 +23,13 @@ vi.stubGlobal("fetch", mockFetch);
 
 beforeEach(() => {
   mockFetch.mockReset();
-  // تعيين env vars للاختبار
-  process.env.MOUSA_API_KEY = "khayal@mousa30";
-  process.env.MOUSA_PLATFORM_ID = "khayal";
+  // تعيين env vars للاختبار — PLATFORM_API_KEY هو المفتاح الصحيح
+  process.env.PLATFORM_API_KEY = "test-platform-api-key-64chars-for-testing-purposes-only-1234";
+  process.env.PLATFORM_ID = "khayal";
   process.env.MOUSA_BASE_URL = "https://www.mousa.ai";
-  process.env.MOUSA_CREDITS_PER_SESSION = "30";  // v2.0
+  process.env.MOUSA_API_KEY = "khayal@mousa30"; // محتفظ للتوافق
+  process.env.MOUSA_PLATFORM_ID = "khayal";
+  process.env.MOUSA_CREDITS_PER_SESSION = "30";
 });
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -43,18 +45,23 @@ describe("mousaCreditsService — configuration", () => {
     expect(getCreditsPerSession()).toBe(20);
   });
 
-  it("isMousaEnabled يعيد false في FREE_MODE", () => {
-    // FREE_MODE = true → isEnabled() تعيد false دائماً
-    expect(isMousaEnabled()).toBe(false);
+  it("isMousaEnabled يعيد true عند توفر PLATFORM_API_KEY", () => {
+    // PLATFORM_API_KEY متوفر → isEnabled() تعيد true
+    expect(isMousaEnabled()).toBe(true);
   });
 });
 
 describe("verifyMousaToken", () => {
-  it("يعيد {result:null, error:null} في FREE_MODE (معطّل)", async () => {
+  it("يستدعي fetch عند وجود PLATFORM_API_KEY", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      status: 401,
+      json: async () => ({ error: "الـ token غير صالح", code: "INVALID_TOKEN" }),
+    });
     const { result, error } = await verifyMousaToken("test-token-123");
     expect(result).toBeNull();
-    expect(error).toBeNull();
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(error?.code).toBe("INVALID_TOKEN");
+    expect(mockFetch).toHaveBeenCalledOnce();
   });
 
   it.skip("يجب أن يُرسل طلب POST صحيح ويعيد بيانات المستخدم (v2.0) [FREE_MODE]", async () => {
@@ -113,10 +120,14 @@ describe("verifyMousaToken", () => {
 });
 
 describe("checkMousaBalance", () => {
-  it("يعيد null في FREE_MODE (معطّل)", async () => {
+  it("يستدعي fetch عند وجود PLATFORM_API_KEY", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ balance: 200, upgradeUrl: "https://www.mousa.ai/pricing?ref=khayal" }),
+    });
     const result = await checkMousaBalance(42);
-    expect(result).toBeNull();
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(result?.balance).toBe(200);
+    expect(mockFetch).toHaveBeenCalledOnce();
   });
 
   it.skip("يجب أن يُرسل طلب GET صحيح ويعيد الرصيد [FREE_MODE]", async () => {
@@ -166,10 +177,15 @@ describe("checkMousaBalance", () => {
 });
 
 describe("deductMousaCredits", () => {
-  it("يعيد null في FREE_MODE (معطّل)", async () => {
-    const result = await deductMousaCredits(42, "توليد مشهد");
-    expect(result).toBeNull();
-    expect(mockFetch).not.toHaveBeenCalled();
+  it("يستدعي fetch عند وجود PLATFORM_API_KEY", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, newBalance: 180, deducted: 20, platform: "khayal" }),
+    });
+    const result = await deductMousaCredits(42, "توليد مشهد", { amount: 20 });
+    expect(result?.success).toBe(true);
+    expect(result?.newBalance).toBe(180);
+    expect(mockFetch).toHaveBeenCalledOnce();
   });
 
   it.skip("يجب أن يُرسل طلب POST صحيح ويخصم الكريدتس [FREE_MODE]", async () => {
@@ -290,7 +306,7 @@ describe("notifyMousaPricing — pricing-webhook", () => {
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({
-          Authorization: "Bearer khayal@mousa30",
+          Authorization: expect.stringMatching(/^Bearer /),
           "X-Platform-ID": "khayal",
         }),
       })
@@ -330,10 +346,15 @@ describe("notifyMousaPricing — pricing-webhook", () => {
 });
 
 describe("guardMousaBalance", () => {
-  it("يسمح دائماً في FREE_MODE", async () => {
+  it("يستدعي fetch ويسمح عند كفاية الرصيد", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ balance: 200, upgradeUrl: "https://www.mousa.ai/pricing?ref=khayal" }),
+    });
     const result = await guardMousaBalance(42, "default");
     expect(result.allowed).toBe(true);
-    expect(mockFetch).not.toHaveBeenCalled();
+    expect(result.balance).toBe(200);
+    expect(mockFetch).toHaveBeenCalledOnce();
   });
 
   it.skip("يجب أن يسمح بالعملية عند كفاية الرصيد [FREE_MODE]", async () => {
