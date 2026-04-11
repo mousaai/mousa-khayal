@@ -884,3 +884,11 @@
 - [x] إضافة جدول suspended_users في قاعدة البيانات
 - [ ] تطبيق معالج user.suspended في internal.routes.ts
 - [ ] التحقق من الـ suspension في auth.middleware.ts لرفض الجلسة فوراً
+
+## 🔗 ربط بيانات المستخدمين الحقيقية من mousa.ai — أبريل 2026
+- [x] تحديث AuthGate: إزالة FREE_MODE وتفعيل الربط الحقيقي مع fallback للزوار
+- [x] تحديث PLATFORM_API_KEY في mousaCreditsService (كان يستخدم MOUSA_API_KEY الخاطئ)
+- [x] تحديث env.ts لإضافة متغيرات mousa.ai الكاملة
+- [x] CreditsWidget يعرض رصيد حقيقي من mousa.ai عند الدخول بـ token (enabled: true)
+- [x] CreditsWidget يعرض زر 'سجّل دخول' للزوار دائماً مع رابط mousa.ai
+- [x] اختبار API: credits.getStatus يعيد enabled:true وgetBalance يعيد الرصيد الحقيقي

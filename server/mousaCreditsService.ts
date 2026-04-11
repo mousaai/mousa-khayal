@@ -17,9 +17,10 @@
 
 import { randomUUID } from "crypto";
 
-const MOUSA_BASE_URL = process.env.MOUSA_BASE_URL ?? "https://www.mousa.ai";
-const MOUSA_API_KEY = process.env.MOUSA_API_KEY ?? "khayal@mousa30";
-const MOUSA_PLATFORM_ID = process.env.MOUSA_PLATFORM_ID ?? "khayal";
+const MOUSA_BASE_URL = process.env.MOUSA_BASE_URL ?? process.env.MOUSA_API_BASE ?? "https://www.mousa.ai";
+// PLATFORM_API_KEY هو المفتاح الصحيح المُعتمد من Manus لـ mousa.ai
+const MOUSA_API_KEY = process.env.PLATFORM_API_KEY ?? process.env.MOUSA_API_KEY ?? "";
+const MOUSA_PLATFORM_ID = process.env.PLATFORM_ID ?? process.env.MOUSA_PLATFORM_ID ?? "khayal";
 
 /**
  * التسعيرة المعتمدة — أبريل 2026
@@ -120,13 +121,10 @@ export interface MousaDeductResult {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 /**
- * FREE_MODE: عند تعيينه true تُعطَّل جميع قيود الكريدت وتُفتح المنصة مجاناً
- * لإعادة تفعيل الكريدت: غيّر FREE_MODE إلى false
+ * isEnabled: يتحقق من توفر PLATFORM_API_KEY لتفعيل تكامل mousa.ai
+ * إذا لم يكن المفتاح متاحاً → وضع مفتوح (fail-open) بدون خصم
  */
-const FREE_MODE = true;
-
 function isEnabled(): boolean {
-  if (FREE_MODE) return false; // وضع مجاني — لا خصم ولا قيود
   return Boolean(MOUSA_API_KEY && MOUSA_BASE_URL);
 }
 
@@ -148,7 +146,10 @@ export async function verifyMousaToken(token: string): Promise<{
   result: MousaVerifyResult | null;
   error: MousaVerifyError | null;
 }> {
-  if (!isEnabled()) return { result: null, error: null };
+  if (!isEnabled()) {
+    console.warn('[MousaCredits] verify-token skipped: PLATFORM_API_KEY not configured');
+    return { result: null, error: null };
+  }
 
   try {
     const res = await fetch(`${MOUSA_BASE_URL}/api/platform/verify-token`, {

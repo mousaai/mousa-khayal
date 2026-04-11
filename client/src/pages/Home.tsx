@@ -266,8 +266,8 @@ export default function Home() {
   const { lang: activeLang, setLang: setActiveLang, t: lang, isRTL, detectLangFromText } = useLanguage();
 
   // ــ المصادقة ــ
-  const { user, isFreeMode } = useAuth();
-  const isAuthenticated = isFreeMode || !!user; // FREE_MODE: دائماً true
+  const { user, isGuest } = useAuth();
+  const isAuthenticated = true; // المنصة مفتوحة للجميع
   const authLoading = false; // AuthGate يضمن وجود user قبل عرض الصفحة
 
   // ــ Mousa Token Handoff: استقبال ?token= من URL تلقائياً ــ
@@ -1087,7 +1087,7 @@ export default function Home() {
   };
 
   // ــ شاشة تسجيل الدخول (معطّلة نهائياً في FREE_MODE) ــ
-  if (!authLoading && !isAuthenticated && !isFreeMode) {
+  if (!authLoading && !isAuthenticated) {
     return (
       <div
         className="relative min-h-screen overflow-hidden bg-[#020408] flex items-center justify-center"

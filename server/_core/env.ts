@@ -9,4 +9,10 @@ export const ENV = {
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
   runwayApiKey: process.env.RUNWAY_API_KEY ?? "",
+  // Mousa.ai platform integration — PLATFORM_API_KEY هو المفتاح الصحيح
+  platformApiKey: process.env.PLATFORM_API_KEY ?? "",
+  platformId: process.env.PLATFORM_ID ?? "khayal",
+  mousaBaseUrl: process.env.MOUSA_BASE_URL ?? process.env.MOUSA_API_BASE ?? "https://www.mousa.ai",
+  mousaWebhookSecret: process.env.MOUSA_WEBHOOK_SECRET ?? "",
+  mousaCreditsPerSession: parseInt(process.env.MOUSA_CREDITS_PER_SESSION ?? "25", 10),
 };
