@@ -1,102 +1,171 @@
-// Preconfigured storage helpers for Manus WebDev templates
-// Uses the Biz-provided storage proxy (Authorization: Bearer <token>)
+/**
+ * storage.ts — Cloudflare R2 مباشرة (مستقل عن مانوس)
+ *
+ * يحافظ على نفس الواجهة (storagePut / storageGet) حتى لا يحتاج أي ملف آخر للتغيير.
+ * Fallback: Manus Storage proxy إذا لم تتوفر R2 credentials
+ */
+import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { ENV } from "./_core/env";
 
-import { ENV } from './_core/env';
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Cloudflare R2 Client
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-type StorageConfig = { baseUrl: string; apiKey: string };
-
-function getStorageConfig(): StorageConfig {
-  const baseUrl = ENV.forgeApiUrl;
-  const apiKey = ENV.forgeApiKey;
-
-  if (!baseUrl || !apiKey) {
-    throw new Error(
-      "Storage proxy credentials missing: set BUILT_IN_FORGE_API_URL and BUILT_IN_FORGE_API_KEY"
-    );
-  }
-
-  return { baseUrl: baseUrl.replace(/\/+$/, ""), apiKey };
-}
-
-function buildUploadUrl(baseUrl: string, relKey: string): URL {
-  const url = new URL("v1/storage/upload", ensureTrailingSlash(baseUrl));
-  url.searchParams.set("path", normalizeKey(relKey));
-  return url;
-}
-
-async function buildDownloadUrl(
-  baseUrl: string,
-  relKey: string,
-  apiKey: string
-): Promise<string> {
-  const downloadApiUrl = new URL(
-    "v1/storage/downloadUrl",
-    ensureTrailingSlash(baseUrl)
+function isR2Configured(): boolean {
+  return !!(
+    ENV.r2AccountId &&
+    ENV.r2AccessKeyId &&
+    ENV.r2SecretAccessKey &&
+    ENV.r2BucketName
   );
-  downloadApiUrl.searchParams.set("path", normalizeKey(relKey));
-  const response = await fetch(downloadApiUrl, {
-    method: "GET",
-    headers: buildAuthHeaders(apiKey),
-  });
-  return (await response.json()).url;
 }
 
-function ensureTrailingSlash(value: string): string {
-  return value.endsWith("/") ? value : `${value}/`;
+let _r2Client: S3Client | null = null;
+
+function getR2Client(): S3Client {
+  if (!_r2Client) {
+    _r2Client = new S3Client({
+      region: "auto",
+      endpoint: `https://${ENV.r2AccountId}.r2.cloudflarestorage.com`,
+      credentials: {
+        accessKeyId: ENV.r2AccessKeyId,
+        secretAccessKey: ENV.r2SecretAccessKey,
+      },
+    });
+  }
+  return _r2Client;
 }
 
 function normalizeKey(relKey: string): string {
   return relKey.replace(/^\/+/, "");
 }
 
-function toFormData(
-  data: Buffer | Uint8Array | string,
-  contentType: string,
-  fileName: string
-): FormData {
-  const blob =
-    typeof data === "string"
-      ? new Blob([data], { type: contentType })
-      : new Blob([data as any], { type: contentType });
-  const form = new FormData();
-  form.append("file", blob, fileName || "file");
-  return form;
+/** بناء URL عام للملف في R2 */
+function buildPublicUrl(key: string): string {
+  if (ENV.r2PublicUrl) {
+    const base = ENV.r2PublicUrl.replace(/\/+$/, "");
+    return `${base}/${key}`;
+  }
+  // URL مباشر عبر R2 endpoint (يتطلب bucket public أو presigned)
+  return `https://${ENV.r2AccountId}.r2.cloudflarestorage.com/${ENV.r2BucketName}/${key}`;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Manus Storage Fallback
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function isManusFallbackConfigured(): boolean {
+  return !!(ENV.forgeApiUrl && ENV.forgeApiKey);
 }
 
 function buildAuthHeaders(apiKey: string): HeadersInit {
   return { Authorization: `Bearer ${apiKey}` };
 }
 
-export async function storagePut(
+function toFormData(data: Buffer | Uint8Array | string, contentType: string, fileName: string): FormData {
+  const blob =
+    typeof data === "string"
+      ? new Blob([data], { type: contentType })
+      : new Blob([data as unknown as ArrayBuffer], { type: contentType });
+  const form = new FormData();
+  form.append("file", blob, fileName || "file");
+  return form;
+}
+
+async function manusPut(
   relKey: string,
   data: Buffer | Uint8Array | string,
-  contentType = "application/octet-stream"
+  contentType: string
 ): Promise<{ key: string; url: string }> {
-  const { baseUrl, apiKey } = getStorageConfig();
+  const baseUrl = ENV.forgeApiUrl.replace(/\/+$/, "");
   const key = normalizeKey(relKey);
-  const uploadUrl = buildUploadUrl(baseUrl, key);
+  const uploadUrl = new URL(`v1/storage/upload`, `${baseUrl}/`);
+  uploadUrl.searchParams.set("path", key);
   const formData = toFormData(data, contentType, key.split("/").pop() ?? key);
-  const response = await fetch(uploadUrl, {
+  const response = await fetch(uploadUrl.toString(), {
     method: "POST",
-    headers: buildAuthHeaders(apiKey),
+    headers: buildAuthHeaders(ENV.forgeApiKey),
     body: formData,
   });
-
   if (!response.ok) {
     const message = await response.text().catch(() => response.statusText);
-    throw new Error(
-      `Storage upload failed (${response.status} ${response.statusText}): ${message}`
-    );
+    throw new Error(`Manus Storage upload failed (${response.status}): ${message}`);
   }
   const url = (await response.json()).url;
   return { key, url };
 }
 
-export async function storageGet(relKey: string): Promise<{ key: string; url: string; }> {
-  const { baseUrl, apiKey } = getStorageConfig();
+async function manusGet(relKey: string): Promise<{ key: string; url: string }> {
+  const baseUrl = ENV.forgeApiUrl.replace(/\/+$/, "");
   const key = normalizeKey(relKey);
-  return {
-    key,
-    url: await buildDownloadUrl(baseUrl, key, apiKey),
-  };
+  const downloadApiUrl = new URL(`v1/storage/downloadUrl`, `${baseUrl}/`);
+  downloadApiUrl.searchParams.set("path", key);
+  const response = await fetch(downloadApiUrl.toString(), {
+    method: "GET",
+    headers: buildAuthHeaders(ENV.forgeApiKey),
+  });
+  const url = (await response.json()).url;
+  return { key, url };
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Public API
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+export async function storagePut(
+  relKey: string,
+  data: Buffer | Uint8Array | string,
+  contentType = "application/octet-stream"
+): Promise<{ key: string; url: string }> {
+  const key = normalizeKey(relKey);
+
+  if (isR2Configured()) {
+    // ━━ Cloudflare R2 مباشرة ━━
+    const client = getR2Client();
+    const body = typeof data === "string" ? Buffer.from(data) : data;
+
+    await client.send(
+      new PutObjectCommand({
+        Bucket: ENV.r2BucketName,
+        Key: key,
+        Body: body,
+        ContentType: contentType,
+      })
+    );
+
+    const url = buildPublicUrl(key);
+    return { key, url };
+  }
+
+  if (isManusFallbackConfigured()) {
+    // ━━ Manus Storage كـ fallback ━━
+    return manusPut(relKey, data, contentType);
+  }
+
+  throw new Error("لا توجد credentials للتخزين: يرجى ضبط CLOUDFLARE_R2_* أو BUILT_IN_FORGE_API_*");
+}
+
+export async function storageGet(
+  relKey: string,
+  expiresIn = 3600
+): Promise<{ key: string; url: string }> {
+  const key = normalizeKey(relKey);
+
+  if (isR2Configured()) {
+    // ━━ Cloudflare R2: presigned URL ━━
+    const client = getR2Client();
+    const command = new GetObjectCommand({
+      Bucket: ENV.r2BucketName,
+      Key: key,
+    });
+    const url = await getSignedUrl(client, command, { expiresIn });
+    return { key, url };
+  }
+
+  if (isManusFallbackConfigured()) {
+    return manusGet(relKey);
+  }
+
+  throw new Error("لا توجد credentials للتخزين");
 }

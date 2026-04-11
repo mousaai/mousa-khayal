@@ -904,3 +904,13 @@
 - [ ] تحسين system prompt ليلتزم بالموضوع الرئيسي للوصف بدقة
 - [ ] إضافة قاعدة: الموضوع الرئيسي في الوصف يجب أن يكون العنصر المحوري في كل مشهد
 - [ ] نشر التحديث على السيرفر الخارجي
+
+## التحرر الكامل من مانوس — أبريل 2026
+
+- [x] استبدال Manus LLM بـ Google Gemini 2.5 Flash (drop-in replacement في llm.ts)
+- [x] استبدال Manus Image Service بـ Google Imagen 3 + Gemini Flash fallback (imageGeneration.ts)
+- [x] استبدال Manus Storage بـ Cloudflare R2 مباشرة عبر AWS SDK (storage.ts)
+- [x] استبدال Voice Transcription بـ Google Gemini Audio (voiceTranscription.ts)
+- [x] إضافة GOOGLE_AI_KEY في env.ts والـ secrets
+- [x] 277 اختبار vitest ناجح بعد جميع التغييرات
+- [x] نسبة الاعتماد على مانوس: 100% → ~10% (OAuth فقط لمستخدمي مانوس)

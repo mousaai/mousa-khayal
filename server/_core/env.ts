@@ -7,6 +7,14 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  // Google AI — مستقل عن مانوس
+  googleAiKey: process.env.GOOGLE_AI_KEY ?? "",
+  // Cloudflare R2 — تخزين مستقل
+  r2AccountId: process.env.CLOUDFLARE_R2_ACCOUNT_ID ?? "",
+  r2AccessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ?? "",
+  r2SecretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY ?? "",
+  r2BucketName: process.env.CLOUDFLARE_R2_BUCKET_NAME ?? "",
+  r2PublicUrl: process.env.CLOUDFLARE_R2_PUBLIC_URL ?? "",
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
   runwayApiKey: process.env.RUNWAY_API_KEY ?? "",
   // Mousa.ai platform integration — PLATFORM_API_KEY هو المفتاح الصحيح
