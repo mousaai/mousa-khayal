@@ -216,10 +216,16 @@ async function deepAnalyzeDescription(
   ];
 
   // كشف نوع الطلب لاختيار الأسلوب المناسب
-  const isArchitectural = /مبن|بيت|فيلا|برج|مسجد|مدرسة|مستشفى|مكتب|واجهة|تصميم معماري|مخطط|طابق|building|villa|tower|mosque|facade|architectural|floor plan/i.test(description) || !!documentAnalysis;
+  // استخراج الموضوع الرئيسي من الوصف (أول كيان ذُكر)
+  const mainSubjectMatch = description.match(/^([\u0600-\u06FF\w\s]{2,30})/);
+  const mainSubject = mainSubjectMatch ? mainSubjectMatch[1].trim() : description.slice(0, 30);
+  
+  const isArchitectural = /مبن|بيت|فيلا|برج|مسجد|مدرسة|مستشفى|مكتب|واجهة|تصميم معماري|مخطط|طابق|building|villa|tower|mosque|facade|architectural|floor plan/i.test(description) && !/صقر|طائر|حيوان|نملة|أسد|نمر|ذئب|حصان|falcon|bird|animal|eagle|lion|tiger|wolf|horse/i.test(description) || !!documentAnalysis;
   const isPersonal = /تخيلني|تخيل نفسي|حولني|اجعلني|كيف أكون|imagine me|transform me/i.test(description);
-  const isNature = /غابة|بحر|نهر|جبل|صحراء|سماء|forest|ocean|mountain|desert|sky|nature/i.test(description);
-  const isFantasy = /نملة|حيوان|خيال|سحر|تحليق|طيران|ant|fly|magic|fantasy|dragon|creature/i.test(description);
+  const isNature = /غابة|بحر|نهر|جبل|صحراء|forest|ocean|mountain|desert|nature/i.test(description) && !/صقر|طائر|حيوان|نملة|أسد|نمر|ذئب|حصان|falcon|bird|animal|eagle|lion|tiger|wolf|horse/i.test(description);
+  // كشف الحيوانات والطيور كفئة مستقلة (أولوية عالية)
+  const isAnimal = /صقر|طائر|حيوان|نملة|أسد|نمر|ذئب|حصان|قط|كلب|أرنب|غزال|نسر|حمامة|بومة|ببغاء|تمساح|دلفين|حوت|falcon|bird|eagle|lion|tiger|wolf|horse|cat|dog|rabbit|deer|owl|parrot|dolphin|whale|animal|creature/i.test(description);
+  const isFantasy = !isAnimal && /خيال|سحر|تنين|magic|fantasy|dragon/i.test(description);
   const isHistorical = /تاريخ|قديم|حرب|معركة|فرسان|history|ancient|war|battle|knight/i.test(description);
 
   // بناء الـ system prompt المناسب حسب نوع الطلب
@@ -248,6 +254,16 @@ ${selectedAngles.map((a, i) => `Scene ${i + 1}: ${a.camera} | Lighting: ${LIGHTI
     promptStartRule = faceDescription
       ? `Start each prompt with: "Ultra photorealistic portrait photography, ${faceDescription},${""}"` 
       : `Start each prompt with: "Ultra photorealistic portrait photography, cinematic lighting,"`;
+  } else if (isAnimal) {
+    // حيوانات وطيور: التركيز الكامل على الكائن الحي
+    contentTypeGuidance = `WILDLIFE PHOTOGRAPHY MODE — SUBJECT FOCUS:
+- The MAIN SUBJECT is: "${mainSubject}" — it MUST be the CENTRAL element in EVERY scene
+- DO NOT add buildings, architecture, or urban elements unless explicitly mentioned
+- Generate ${sceneCount} cinematic views: close-up portrait, action shot, environmental context, dramatic angle, aerial/ground view
+- Wildlife photography style: National Geographic quality, natural habitat, dramatic lighting
+- The animal/bird must be clearly visible, detailed, and dominant in each frame
+- Show the subject's natural behavior: flying, hunting, resting, in motion`;
+    promptStartRule = `Start each prompt with: "Ultra photorealistic wildlife photography, National Geographic quality, ${mainSubject} as the main subject,"`;
   } else if (isFantasy) {
     // خيال إبداعي: حرية كاملة، لا قيود
     contentTypeGuidance = `CREATIVE FANTASY MODE — NO LIMITS:
@@ -288,9 +304,16 @@ ${SAFE_CONTENT_DIRECTIVE}
 
 ${contentTypeGuidance}
 
-AI ENRICHMENT DIRECTIVE (exceed user expectations):
+SUBJECT FIDELITY DIRECTIVE (critical — do not violate):
+- The MAIN SUBJECT of the user's description MUST appear prominently in EVERY scene
+- NEVER replace or omit the main subject with something else
+- If the user describes a falcon, EVERY scene must show a falcon — not buildings, not landscapes alone
+- If the user describes a building, EVERY scene must show that building
+- Context and environment support the main subject, they do not replace it
+
+AI ENRICHMENT DIRECTIVE (enhance, do not replace):
 - Add atmospheric depth: haze, volumetric light, lens effects
-- Add life and context appropriate to the scene
+- Add supporting context that COMPLEMENTS the main subject
 - Add micro-details that make the scene feel real
 - Each scene should feel like a frame from an award-winning film
 
@@ -548,7 +571,7 @@ export const khayalRouter = router({
             title: input.title || analysis.title || input.description.slice(0, 80),
             description: input.description,
             inputType: input.referenceImageUrl ? "mixed" : "text",
-            scenarioType: (analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine") || "imagine",
+            scenarioType: (["design", "develop", "deteriorate", "compare", "imagine"].includes(analysis.scenarioType) ? analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine" : "imagine"),
             inputData: {
               description: input.description,
               referenceImageUrl: input.referenceImageUrl,
@@ -680,7 +703,7 @@ export const khayalRouter = router({
           title: analysis.title || input.description.slice(0, 80),
           description: input.description,
           inputType: input.referenceImageUrl ? "mixed" : "text",
-          scenarioType: (analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine") || "imagine",
+          scenarioType: (["design", "develop", "deteriorate", "compare", "imagine"].includes(analysis.scenarioType) ? analysis.scenarioType as "design" | "develop" | "deteriorate" | "compare" | "imagine" : "imagine"),
           inputData: {
             description: input.description,
             durationMinutes: input.durationMinutes,
