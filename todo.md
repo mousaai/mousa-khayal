@@ -2,6 +2,12 @@
 
 ## ✅ المنجز حتى الآن
 
+- [x] نمط فضاء الكامل: loginWithMousa endpoint + session cookie حقيقي لمستخدمي موسى
+- [x] getMousaUserIdFromUser: استخراج Mousa userId من openId (mousa_{id})
+- [x] تحديث جميع guardMousaBalance/deductMousaCredits لاستخدام Mousa userId الحقيقي
+- [x] تحديث useMousaTokenHandoff.ts لاستدعاء loginWithMousa بعد verifyToken
+- [x] اختبارات vitest لنمط فضاء (276 اجتازت)
+
 - [x] تحديث اسم التطبيق إلى "خيال"
 - [x] تصميم شاشة البداية السينمائية
 - [x] schema قاعدة البيانات (projects, scenes)

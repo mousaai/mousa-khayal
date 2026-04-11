@@ -6,7 +6,7 @@
  */
 import { z } from "zod";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
-import { guardMousaBalance, deductMousaCredits, isMousaEnabled, getCreditsPerSession } from "./mousaCreditsService";
+import { guardMousaBalance, deductMousaCredits, isMousaEnabled, getCreditsPerSession, getMousaUserIdFromUser } from "./mousaCreditsService";
 import {
   VideoProducer,
   generateVideoScript,
@@ -116,24 +116,21 @@ async function runProductionJobWithDeduct(
   jobId: string,
   scriptData: any,
   optionsData: any,
-  userId: number | string
+  mousaUserId: number | null  // Mousa userId الحقيقي (من openId: mousa_{id})
 ): Promise<void> {
   await runProductionJob(jobId, scriptData, optionsData);
-  // خصم الكريدتس بعد اكتمال الإنتاج
-  if (isMousaEnabled() && userId) {
+  // خصم الكريدتس بعد اكتمال الإنتاج — فقط لمستخدمي موسى
+  if (isMousaEnabled() && mousaUserId) {
     const job = await getJobFromDB(jobId);
     if (job?.status === 'done') {
-      const numericUserId = typeof userId === 'string' ? parseInt(userId) : userId;
-      if (!isNaN(numericUserId)) {
-        // تحديد نوع الجلسة حسب عدد المشاهد
-        const sceneCount = scriptData?.sceneCount ?? 5;
-        const sessionType = sceneCount <= 6 ? 'film_short' : sceneCount <= 15 ? 'film_medium' : 'film_long';
-        await deductMousaCredits(
-          numericUserId,
-          `خيال — إنتاج فيديو: ${(scriptData.description ?? scriptData.title ?? 'فيديو').slice(0, 60)}`,
-          { sessionType }
-        ).catch(err => console.error('[videoRouter] deductMousaCredits error:', err));
-      }
+      // تحديد نوع الجلسة حسب عدد المشاهد
+      const sceneCount = scriptData?.sceneCount ?? 5;
+      const sessionType = sceneCount <= 6 ? 'film_short' : sceneCount <= 15 ? 'film_medium' : 'film_long';
+      await deductMousaCredits(
+        mousaUserId,
+        `خيال — إنتاج فيديو: ${(scriptData.description ?? scriptData.title ?? 'فيديو').slice(0, 60)}`,
+        { sessionType }
+      ).catch(err => console.error('[videoRouter] deductMousaCredits error:', err));
     }
   }
 }
@@ -310,9 +307,10 @@ export const videoRouter = router({
       sceneCount: z.number().min(3).max(10).default(6),
     }))
     .mutation(async ({ input, ctx }) => {
-      // ━━ فحص رصيد MOUSA.AI قبل توليد السيناريو ━━
-      if (isMousaEnabled() && ctx.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id, 'autonomous');
+      // فحص رصيد MOUSA.AI قبل توليد السيناريو
+      const mousaUserId = getMousaUserIdFromUser(ctx.user);
+      if (isMousaEnabled() && mousaUserId) {
+        const guard = await guardMousaBalance(mousaUserId, 'autonomous');
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",
@@ -343,9 +341,10 @@ export const videoRouter = router({
       options: productionOptionsSchema.optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
-      if (isMousaEnabled() && ctx.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id, 'autonomous');
+      // فحص رصيد MOUSA.AI قبل بدء الإنتاج
+      const mousaUserId = getMousaUserIdFromUser(ctx.user);
+      if (isMousaEnabled() && mousaUserId) {
+        const guard = await guardMousaBalance(mousaUserId, 'autonomous');
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",
@@ -370,7 +369,7 @@ export const videoRouter = router({
       // إضافة إلى الطابور الذكي — يدعم 500 مستخدم متزامن
       try {
         const { position, waitSeconds } = await new Promise<{ position: number; waitSeconds: number }>((resolve) => {
-          jobQueue.enqueue(jobId, realUserId, () => runProductionJobWithDeduct(jobId, scriptData, input.options ?? {}, ctx.user.id))
+          jobQueue.enqueue(jobId, realUserId, () => runProductionJobWithDeduct(jobId, scriptData, input.options ?? {}, mousaUserId))
             .then(resolve)
             .catch(async (err: Error) => {
               const msg = err.message.includes(':') ? err.message.split(':')[1] : err.message;
@@ -439,9 +438,10 @@ export const videoRouter = router({
       options: productionOptionsSchema.optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
-      if (isMousaEnabled() && ctx.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id, 'autonomous');
+      // فحص رصيد MOUSA.AI قبل بدء الإنتاج
+      const mousaUserId = getMousaUserIdFromUser(ctx.user);
+      if (isMousaEnabled() && mousaUserId) {
+        const guard = await guardMousaBalance(mousaUserId, 'autonomous');
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",
@@ -464,7 +464,7 @@ export const videoRouter = router({
       await createJobInDB(jobId, input.description, scriptData, input.options ?? {}, realUserId);
 
       // إضافة إلى الطابور الذكي — يدعم 500 مستخدم متزامن
-      jobQueue.enqueue(jobId, realUserId, () => runProductionJobWithDeduct(jobId, scriptData, input.options ?? {}, ctx.user.id))
+      jobQueue.enqueue(jobId, realUserId, () => runProductionJobWithDeduct(jobId, scriptData, input.options ?? {}, mousaUserId))
         .then(async ({ position, waitSeconds }) => {
           if (position > 0) {
             await updateJobInDB(jobId, {
@@ -733,9 +733,10 @@ Be specific and objective. Use English for the description as it works best with
       characterDescription: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
-      if (isMousaEnabled() && ctx.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id, 'autonomous');
+      // فحص رصيد MOUSA.AI قبل بدء الإنتاج
+      const mousaUserId = getMousaUserIdFromUser(ctx.user);
+      if (isMousaEnabled() && mousaUserId) {
+        const guard = await guardMousaBalance(mousaUserId, 'autonomous');
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",
@@ -826,9 +827,10 @@ Be specific and objective. Use English for the description as it works best with
       userId: z.string().optional(), // openId أو IP للذاكرة
     }))
     .mutation(async ({ input, ctx }) => {
-      // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
-      if (isMousaEnabled() && ctx.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id, 'autonomous');
+      // فحص رصيد MOUSA.AI قبل بدء الإنتاج
+      const mousaUserId = getMousaUserIdFromUser(ctx.user);
+      if (isMousaEnabled() && mousaUserId) {
+        const guard = await guardMousaBalance(mousaUserId, 'autonomous');
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",
@@ -950,9 +952,10 @@ Be specific and objective. Use English for the description as it works best with
       userId: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
-      // ━━ فحص رصيد MOUSA.AI قبل بدء الإنتاج ━━
-      if (isMousaEnabled() && ctx.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id, 'autonomous');
+      // فحص رصيد MOUSA.AI قبل بدء الإنتاج
+      const mousaUserId = getMousaUserIdFromUser(ctx.user);
+      if (isMousaEnabled() && mousaUserId) {
+        const guard = await guardMousaBalance(mousaUserId, 'autonomous');
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",

@@ -431,3 +431,34 @@ export function getMousaPlatformId(): string {
 export function getMousaUpgradeUrl(): string {
   return `https://www.mousa.ai/pricing?ref=${MOUSA_PLATFORM_ID}`;
 }
+
+/**
+ * استخراج Mousa userId الحقيقي من openId المخزّن في قاعدة البيانات
+ * openId المخزّن: "mousa_{mousaOpenId}" أو رقم مباشر
+ * يُستخدم لتمرير userId الصحيح لـ checkMousaBalance و deductMousaCredits
+ */
+export function extractMousaUserIdFromOpenId(openId: string): number | null {
+  if (!openId) return null;
+  // إذا كان openId رقمياً مباشراً (من Mousa)
+  const direct = parseInt(openId);
+  if (!isNaN(direct)) return direct;
+  // إذا كان بصيغة "mousa_{userId}"
+  if (openId.startsWith('mousa_')) {
+    const inner = openId.slice(6);
+    const parsed = parseInt(inner);
+    if (!isNaN(parsed)) return parsed;
+  }
+  return null;
+}
+
+/**
+ * استخراج Mousa userId من User object
+ * يدعم كلا الحالتين: مستخدم موسى (openId = mousa_...) أو مستخدم Manus عادي
+ */
+export function getMousaUserIdFromUser(user: { id: number; openId: string } | null): number | null {
+  if (!user) return null;
+  if (user.openId.startsWith('mousa_')) {
+    return extractMousaUserIdFromOpenId(user.openId.slice(6));
+  }
+  return null;
+}

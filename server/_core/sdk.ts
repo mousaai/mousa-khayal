@@ -270,7 +270,14 @@ class SDKServer {
     const signedInAt = new Date();
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // If user not in DB, sync from OAuth server automatically
+    // نمط فضاء: مستخدمو موسى لديهم openId يبدأ بـ "mousa_"
+    // لا نحتاج OAuth sync لهم — تم إنشاؤهم مسبقاً في loginWithMousa
+    if (!user && sessionUserId.startsWith('mousa_')) {
+      // إذا لم يوجد في الـ DB رغم الـ session الصالحة — الجلسة منتهية أو المستخدم حذف
+      throw ForbiddenError("Mousa session expired, please re-login via mousa.ai");
+    }
+
+    // If user not in DB, sync from OAuth server automatically (Manus users only)
     if (!user) {
       try {
         const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
