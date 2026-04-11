@@ -1,9 +1,9 @@
 /**
- * imageGeneration.ts — Google Imagen 3 مباشرة (مستقل عن مانوس)
+ * imageGeneration.ts — Google Imagen 4 مباشرة (مستقل عن مانوس)
  *
  * يحافظ على نفس الواجهة الخارجية (generateImage) حتى لا يحتاج أي ملف آخر للتغيير.
- * النموذج: imagen-3.0-generate-002 (أفضل جودة من Google)
- * Fallback: gemini-2.0-flash-preview-image-generation
+ * النموذج: imagen-4.0-generate-001 (أفضل جودة من Google - أحدث نموذج)
+ * Fallback: gemini-2.5-flash-image
  */
 import { GoogleGenAI, Modality } from "@google/genai";
 import { ENV } from "./env";
@@ -29,10 +29,10 @@ function getClient(): GoogleGenAI {
   return new GoogleGenAI({ apiKey: key });
 }
 
-/** توليد صورة جديدة باستخدام Imagen 3 */
+/** توليد صورة جديدة باستخدام Imagen 4 */
 async function generateNewImage(client: GoogleGenAI, prompt: string): Promise<{ buffer: Buffer; mimeType: string }> {
   const response = await client.models.generateImages({
-    model: "imagen-3.0-generate-002",
+    model: "imagen-4.0-generate-001",
     prompt,
     config: {
       numberOfImages: 1,
@@ -43,13 +43,13 @@ async function generateNewImage(client: GoogleGenAI, prompt: string): Promise<{ 
 
   const image = response.generatedImages?.[0]?.image;
   if (!image?.imageBytes) {
-    throw new Error("Imagen 3: لم يتم إرجاع بيانات الصورة");
+    throw new Error("Imagen 4: لم يتم إرجاع بيانات الصورة");
   }
 
   return { buffer: Buffer.from(image.imageBytes), mimeType: "image/jpeg" };
 }
 
-/** تعديل صورة أو توليد بـ Gemini Flash (fallback) */
+/** تعديل صورة أو توليد بـ Gemini 2.5 Flash Image (fallback) */
 async function generateWithGeminiFlash(
   client: GoogleGenAI,
   prompt: string,
@@ -84,7 +84,7 @@ async function generateWithGeminiFlash(
   }
 
   const response = await client.models.generateContent({
-    model: "gemini-2.0-flash-preview-image-generation",
+    model: "gemini-2.5-flash-image",
     contents: [{ role: "user", parts }],
     config: {
       responseModalities: [Modality.IMAGE, Modality.TEXT],
@@ -124,7 +124,7 @@ export async function generateImage(options: GenerateImageOptions): Promise<Gene
       imageBuffer = result.buffer;
       mimeType = result.mimeType;
     } catch (err) {
-      console.warn("[ImageGen] Imagen 3 فشل، التحويل إلى Gemini Flash:", (err as Error).message);
+      console.warn("[ImageGen] Imagen 4 فشل، التحويل إلى Gemini Flash Image:", (err as Error).message);
       const result = await generateWithGeminiFlash(client, options.prompt);
       imageBuffer = result.buffer;
       mimeType = result.mimeType;
