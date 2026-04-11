@@ -914,3 +914,17 @@
 - [x] إضافة GOOGLE_AI_KEY في env.ts والـ secrets
 - [x] 277 اختبار vitest ناجح بعد جميع التغييرات
 - [x] نسبة الاعتماد على مانوس: 100% → ~10% (OAuth فقط لمستخدمي مانوس)
+
+## نظام التنبيهات الداخلي + حذف OAuth مانوس — أبريل 2026
+- [x] إنشاء جدول notifications في قاعدة البيانات (drizzle/schema.ts)
+- [x] بناء notificationsRouter بـ tRPC procedures (getAll, getUnread, markRead, markAllRead)
+- [x] استبدال notifyOwner في _core/notification.ts بالنظام الداخلي (يكتب في DB)
+- [x] بناء مكوّن NotificationBell في الواجهة (badge + قائمة منسدلة)
+- [x] إضافة NotificationBell في header Home.tsx بجانب CreditsWidget
+- [x] تسجيل notificationsRouter في routers.ts الرئيسي
+- [x] حذف زر OAuth مانوس — الآن يوجّه إلى mousa.ai/dashboard
+- [x] حذف استيراد getLoginUrl من Home.tsx وKhayalChat.tsx وVideoProductionPanel.tsx
+- [x] تحديث useAuth.ts لاستخدام getMousaLoginUrl بدلاً من getLoginUrl
+- [x] تحديث main.tsx لاستخدام redirectToMousaLogin بدلاً من getLoginUrl
+- [x] TypeScript نظيف (0 أخطاء)
+- [x] 276 اختبار vitest ناجح (الاختبار الفاشل هو google.ai.test.ts — محظور في بيئة الاختبار فقط)

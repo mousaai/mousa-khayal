@@ -5,21 +5,32 @@ import { httpBatchLink, TRPCClientError } from "@trpc/client";
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
-import { getLoginUrl } from "./const";
 import "./index.css";
 
 const queryClient = new QueryClient();
 
-// FREE_MODE: لا إعادة توجيه للدخول — فقط تسجيل الأخطاء
+const redirectToMousaLogin = () => {
+  if (typeof window === "undefined") return;
+  window.location.href = `https://www.mousa.ai/dashboard?redirect=${encodeURIComponent(window.location.origin)}`;
+};
+
 queryClient.getQueryCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
-    console.error("[API Query Error]", event.query.state.error);
+    const error = event.query.state.error;
+    if (error instanceof TRPCClientError && error.message === UNAUTHED_ERR_MSG) {
+      redirectToMousaLogin();
+    }
+    console.error("[API Query Error]", error);
   }
 });
 
 queryClient.getMutationCache().subscribe(event => {
   if (event.type === "updated" && event.action.type === "error") {
-    console.error("[API Mutation Error]", event.mutation.state.error);
+    const error = event.mutation.state.error;
+    if (error instanceof TRPCClientError && error.message === UNAUTHED_ERR_MSG) {
+      redirectToMousaLogin();
+    }
+    console.error("[API Mutation Error]", error);
   }
 });
 

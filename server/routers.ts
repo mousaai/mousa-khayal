@@ -10,6 +10,7 @@ import { costRouter } from "./costRouter";
 import { creditsRouter } from "./creditsRouter";
 import { developerRouter } from "./developerRouter";
 import { designRouter } from "./designRouter";
+import { notificationsRouter } from "./notificationsRouter";
 import { z } from "zod";
 import { verifyMousaToken } from "./mousaCreditsService";
 import { sdk } from "./_core/sdk";
@@ -86,6 +87,7 @@ export const appRouter = router({
   credits: creditsRouter,
   developer: developerRouter,
   design: designRouter,
+  notifications: notificationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

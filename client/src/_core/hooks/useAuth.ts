@@ -1,7 +1,10 @@
-import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
+
+/** رابط تسجيل الدخول الموحّد — يوجّه إلى mousa.ai مع redirect للعودة */
+const getMousaLoginUrl = () =>
+  `https://www.mousa.ai/dashboard?redirect=${encodeURIComponent(window.location.origin)}`;
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -9,7 +12,7 @@ type UseAuthOptions = {
 };
 
 export function useAuth(options?: UseAuthOptions) {
-  const { redirectOnUnauthenticated = false, redirectPath = getLoginUrl() } =
+  const { redirectOnUnauthenticated = false, redirectPath = getMousaLoginUrl() } =
     options ?? {};
   const utils = trpc.useUtils();
 
@@ -67,7 +70,7 @@ export function useAuth(options?: UseAuthOptions) {
     if (typeof window === "undefined") return;
     if (window.location.pathname === redirectPath) return;
 
-    window.location.href = redirectPath
+    window.location.href = redirectPath;
   }, [
     redirectOnUnauthenticated,
     redirectPath,

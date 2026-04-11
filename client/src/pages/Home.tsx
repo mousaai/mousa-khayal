@@ -9,12 +9,12 @@ import { Link } from "wouter";
 import KhayalCinematicViewer from "@/components/KhayalCinematicViewer";
 import ImmersiveViewer from "@/components/ImmersiveViewer";
 import CreditsWidget from "@/components/CreditsWidget";
+import NotificationBell from "@/components/NotificationBell";
 import type { GenerationResult, DocumentAnalysis, ImmersiveResult } from "@/types/khayal";
 import { musicEngine, selectMusicMood } from "@/lib/musicEngine";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { ALL_LANGS, LANG_NAMES, LANG_FLAGS, isRTLLang } from "@/i18n/translations";
 import { useAuth } from "@/components/AuthGate";
-import { getLoginUrl } from "@/const";
 import { useMousaTokenHandoff } from "@/hooks/useMousaTokenHandoff";
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
@@ -1149,7 +1149,7 @@ export default function Home() {
 
           {/* زر تسجيل الدخول */}
           <button
-            onClick={() => { window.location.href = getLoginUrl(); }}
+            onClick={() => { window.location.href = `https://www.mousa.ai/dashboard?redirect=${encodeURIComponent(window.location.origin)}`; }}
             className="w-full py-4 rounded-2xl text-lg font-bold transition-all hover:scale-105 active:scale-95"
             style={{
               background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
@@ -1257,6 +1257,10 @@ export default function Home() {
       {/* ═══ CREDITS WIDGET ═══ */}
       <div className="absolute top-4 right-28 z-30">
         <CreditsWidget compact className="" />
+      </div>
+      {/* ═══ NOTIFICATION BELL ═══ */}
+      <div className="absolute top-4 z-30" style={{ right: 200 }}>
+        <NotificationBell />
       </div>
 
       {/* ═══ MY FILMS BUTTON ═══ */}

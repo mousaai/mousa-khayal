@@ -14,7 +14,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/components/AuthGate";
-import { getLoginUrl } from "@/const";
 import { cn } from "@/lib/utils";
 import { Send, Loader2, Sparkles, Film, ImageIcon, FileText } from "lucide-react";
 import { Streamdown } from "streamdown";

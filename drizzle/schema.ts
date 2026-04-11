@@ -282,3 +282,21 @@ export const suspendedUsers = mysqlTable("suspended_users", {
 
 export type SuspendedUser = typeof suspendedUsers.$inferSelect;
 export type InsertSuspendedUser = typeof suspendedUsers.$inferInsert;
+
+// ===== نظام التنبيهات الداخلي =====
+// تنبيهات داخلية مستقلة عن مانوس — تُعرض لصاحب المشروع في الواجهة
+export const notifications = mysqlTable("notifications", {
+  id: int("id").autoincrement().primaryKey(),
+  /** عنوان التنبيه */
+  title: varchar("title", { length: 255 }).notNull(),
+  /** محتوى التنبيه التفصيلي */
+  content: text("content").notNull(),
+  /** نوع التنبيه */
+  type: mysqlEnum("type", ["info", "success", "warning", "error"]).default("info").notNull(),
+  /** هل تمت قراءته */
+  isRead: int("isRead").default(0).notNull(),
+  /** وقت الإنشاء */
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+export type Notification = typeof notifications.$inferSelect;
+export type InsertNotification = typeof notifications.$inferInsert;
