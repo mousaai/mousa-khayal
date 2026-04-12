@@ -60,8 +60,10 @@ type UploadedFile = {
   name: string;
   type: "image" | "document";
   mimeType: string;
-  dataUrl: string;
+  dataUrl: string;   // للعرض المحلي فقط
+  uploadedUrl?: string; // رابط R2 بعد الرفع
   size: number;
+  uploading?: boolean;
 };
 
 interface Props {
@@ -110,6 +112,20 @@ export default function KhayalInput({ isGenerating, onGenerating, onGenerated }:
     },
   });
 
+  // رفع ملف إلى /api/upload والحصول على رابط R2
+  const uploadFileToServer = async (file: File): Promise<string | null> => {
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body: formData });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.url || null;
+    } catch {
+      return null;
+    }
+  };
+
   // معالجة رفع الملفات
   const handleFiles = useCallback(async (files: FileList | File[]) => {
     const fileArray = Array.from(files);
@@ -124,9 +140,23 @@ export default function KhayalInput({ isGenerating, onGenerating, onGenerated }:
         reader.onload = (e) => resolve(e.target?.result as string);
         reader.readAsDataURL(file);
       });
-      newFiles.push({ name: file.name, type: isImage ? "image" : "document", mimeType: file.type, dataUrl, size: file.size });
+      newFiles.push({ name: file.name, type: isImage ? "image" : "document", mimeType: file.type, dataUrl, size: file.size, uploading: isImage });
     }
     setUploadedFiles(prev => [...prev, ...newFiles].slice(0, 6));
+
+    // رفع الصور إلى السيرفر في الخلفية للحصول على روابط R2 حقيقية
+    for (const f of newFiles) {
+      if (f.type === "image") {
+        const blob = await (await fetch(f.dataUrl)).blob();
+        const fileObj = new File([blob], f.name, { type: f.mimeType });
+        const uploadedUrl = await uploadFileToServer(fileObj);
+        setUploadedFiles(prev => prev.map(p =>
+          p.name === f.name && p.uploading
+            ? { ...p, uploadedUrl: uploadedUrl || undefined, uploading: false }
+            : p
+        ));
+      }
+    }
   }, []);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -168,7 +198,10 @@ export default function KhayalInput({ isGenerating, onGenerating, onGenerated }:
       if (docFiles.length > 0) fullDescription += `\n\nملفات مرفقة: ${docFiles.map(f => f.name).join(", ")}`;
       if (!fullDescription.trim()) fullDescription = "مشهد إبداعي";
 
-      const referenceImageUrl = imageFiles.length > 0 ? imageFiles[0].dataUrl : undefined;
+      // استخدام رابط R2 إذا توفر وإلا التحويل للتحميل المباشر عبر السيرفر
+      const referenceImageUrl = imageFiles.length > 0
+        ? (imageFiles[0].uploadedUrl || undefined)
+        : undefined;
 
       if (useNewEngine) {
         // المحركات الجديدة: تحليل + سيناريو + صور مخصصة
@@ -417,7 +450,17 @@ export default function KhayalInput({ isGenerating, onGenerating, onGenerated }:
                   {uploadedFiles.map((file, i) => (
                     <div key={i} className="relative rounded-lg overflow-hidden group" style={{ background: "rgba(255,255,255,0.05)" }}>
                       {file.type === "image" ? (
-                        <img src={file.dataUrl} alt={file.name} className="w-full h-16 object-cover" />
+                        <div className="relative w-full h-16">
+                          <img src={file.dataUrl} alt={file.name} className="w-full h-16 object-cover" />
+                          {file.uploading && (
+                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            </div>
+                          )}
+                          {!file.uploading && file.uploadedUrl && (
+                            <div className="absolute bottom-0.5 right-0.5 w-3 h-3 bg-green-500 rounded-full" />
+                          )}
+                        </div>
                       ) : (
                         <div className="w-full h-16 flex flex-col items-center justify-center gap-1">
                           <span className="text-xl">📄</span>
