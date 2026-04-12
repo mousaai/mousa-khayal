@@ -57,6 +57,18 @@ router.post("/api/transcribe", upload.single("audio"), async (req, res) => {
 });
 
 // ===== رفع ملف (صورة أو مستند) =====
+// ── تشخيص مؤقت: فحص متغيرات R2 في الإنتاج ──
+router.get("/api/debug/storage", (req, res) => {
+  res.json({
+    r2AccountId: process.env.CLOUDFLARE_R2_ACCOUNT_ID ? `${process.env.CLOUDFLARE_R2_ACCOUNT_ID.slice(0, 8)}...` : 'MISSING',
+    r2AccessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ? `${process.env.CLOUDFLARE_R2_ACCESS_KEY_ID.slice(0, 8)}...` : 'MISSING',
+    r2SecretKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY ? 'SET' : 'MISSING',
+    r2BucketName: process.env.CLOUDFLARE_R2_BUCKET_NAME || 'MISSING',
+    r2PublicUrl: process.env.CLOUDFLARE_R2_PUBLIC_URL || 'MISSING',
+    nodeEnv: process.env.NODE_ENV,
+  });
+});
+
 router.post("/api/upload", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
