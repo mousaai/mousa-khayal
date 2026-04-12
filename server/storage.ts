@@ -3,9 +3,13 @@
  *
  * يحافظ على نفس الواجهة (storagePut / storageGet) حتى لا يحتاج أي ملف آخر للتغيير.
  * Fallback: Manus Storage proxy إذا لم تتوفر R2 credentials
+ *
+ * بعد تفعيل Public Development URL على bucket khayal-media:
+ * - storagePut تُعيد رابطاً عاماً دائماً (pub-XXX.r2.dev/key)
+ * - storageGet تُعيد نفس الرابط العام الدائم
+ * - لا حاجة لـ presigned URLs بعد الآن
  */
-import { S3Client, PutObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { ENV } from "./_core/env";
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -41,13 +45,13 @@ function normalizeKey(relKey: string): string {
   return relKey.replace(/^\/+/, "");
 }
 
-/** بناء URL عام للملف في R2 */
+/** بناء URL عام دائم للملف في R2 */
 function buildPublicUrl(key: string): string {
   if (ENV.r2PublicUrl) {
     const base = ENV.r2PublicUrl.replace(/\/+$/, "");
     return `${base}/${key}`;
   }
-  // URL مباشر عبر R2 endpoint (يتطلب bucket public أو presigned)
+  // fallback: R2 public dev URL بناءً على account ID
   return `https://${ENV.r2AccountId}.r2.cloudflarestorage.com/${ENV.r2BucketName}/${key}`;
 }
 
@@ -134,10 +138,8 @@ export async function storagePut(
       })
     );
 
-    // إنشاء presigned URL صالح لـ 7 أيام (604800 ثانية)
-    // لأن الـ bucket خاص ولا يدعم الوصول العام المباشر
-    const getCmd = new GetObjectCommand({ Bucket: ENV.r2BucketName, Key: key });
-    const url = await getSignedUrl(client, getCmd, { expiresIn: 604800 });
+    // الآن bucket عام — نُعيد رابطاً عاماً دائماً بدلاً من presigned URL
+    const url = buildPublicUrl(key);
     return { key, url };
   }
 
@@ -151,18 +153,13 @@ export async function storagePut(
 
 export async function storageGet(
   relKey: string,
-  expiresIn = 3600
+  _expiresIn = 3600
 ): Promise<{ key: string; url: string }> {
   const key = normalizeKey(relKey);
 
   if (isR2Configured()) {
-    // ━━ Cloudflare R2: presigned URL ━━
-    const client = getR2Client();
-    const command = new GetObjectCommand({
-      Bucket: ENV.r2BucketName,
-      Key: key,
-    });
-    const url = await getSignedUrl(client, command, { expiresIn });
+    // ━━ Cloudflare R2: رابط عام دائم (bucket عام الآن) ━━
+    const url = buildPublicUrl(key);
     return { key, url };
   }
 

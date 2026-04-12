@@ -9,13 +9,14 @@
  * 5. محرك الفيلم الإخراجي بمدة محددة
  */
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { generateImage } from "./_core/imageGeneration";
 import { invokeLLM } from "./_core/llm";
 import { getDb } from "./db";
 import { khayalProjects, khayalScenes } from "../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
-import { analyzeDocument } from "./documentAnalyzer";
+import { analyzeDocument, analyzeImageDocument } from "./documentAnalyzer";
 import type { DocumentAnalysisResult } from "./documentAnalyzer";
 import { checkContent, SAFE_CONTENT_DIRECTIVE } from "./contentFilter";
 import { analyzeDomain, buildDomainPrompt, quickDetectDomain } from "./domainEngine";
@@ -1150,6 +1151,36 @@ Respond ONLY with valid JSON:
         mainElements: analysis.keyThemes,
         unifiedConcept: input.description,
       };
+    }),
+
+  // ══════════════════════════════════════════════════════════════
+  // معاينة تحليل الصورة قبل التوليد
+  // ══════════════════════════════════════════════════════════════
+  previewImageAnalysis: publicProcedure
+    .input(z.object({
+      imageUrl: z.string().url(),
+    }))
+    .mutation(async ({ input }) => {
+      try {
+        const analysis = await analyzeImageDocument(input.imageUrl);
+        const summaryResult = await invokeLLM({
+          messages: [
+            {
+              role: "system",
+              content: `أنت مساعد ذكي. لخّص تحليل الصورة التالي في 2-3 جمل قصيرة بالعربية، مع ذكر أبرز ما تحتويه الصورة وكيف يمكن استخدامها كمرجع بصري في توليد فيلم. كن موجزاً ومفيداً.`,
+            },
+            {
+              role: "user",
+              content: `التحليل الكامل:\n${analysis}`,
+            },
+          ],
+        });
+        const summary = summaryResult.choices?.[0]?.message?.content || analysis.slice(0, 200);
+        return { analysis, summary };
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : "فشل تحليل الصورة";
+        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: msg });
+      }
     }),
 });
 

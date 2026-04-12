@@ -82,6 +82,9 @@ export default function KhayalInput({ isGenerating, onGenerating, onGenerated }:
   const [useNewEngine, setUseNewEngine] = useState(true); // استخدام المحركات الجديدة
   const [visualMode, setVisualMode] = useState<"free" | "cinematic" | "realistic" | "precise">("cinematic");
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [uploadProgress, setUploadProgress] = useState<Record<string, number>>({});
+  const [imagePreview, setImagePreview] = useState<{ url: string; analysis: string } | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
 
   // كشف نوع المحتوى تلقائياً عند الكتابة
   useEffect(() => {
@@ -112,18 +115,30 @@ export default function KhayalInput({ isGenerating, onGenerating, onGenerated }:
     },
   });
 
-  // رفع ملف إلى /api/upload والحصول على رابط R2
-  const uploadFileToServer = async (file: File): Promise<string | null> => {
-    try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload", { method: "POST", body: formData });
-      if (!res.ok) return null;
-      const data = await res.json();
-      return data.url || null;
-    } catch {
-      return null;
-    }
+  // رفع ملف إلى /api/upload مع تتبع التقدم
+  const uploadFileToServer = (file: File, fileName: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        const xhr = new XMLHttpRequest();
+        xhr.open("POST", "/api/upload");
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            const pct = Math.round((e.loaded / e.total) * 100);
+            setUploadProgress(prev => ({ ...prev, [fileName]: pct }));
+          }
+        };
+        xhr.onload = () => {
+          setUploadProgress(prev => { const n = { ...prev }; delete n[fileName]; return n; });
+          if (xhr.status >= 200 && xhr.status < 300) {
+            try { resolve(JSON.parse(xhr.responseText).url || null); } catch { resolve(null); }
+          } else { resolve(null); }
+        };
+        xhr.onerror = () => { setUploadProgress(prev => { const n = { ...prev }; delete n[fileName]; return n; }); resolve(null); };
+        xhr.send(formData);
+      } catch { resolve(null); }
+    });
   };
 
   // معالجة رفع الملفات
@@ -149,7 +164,7 @@ export default function KhayalInput({ isGenerating, onGenerating, onGenerated }:
       if (f.type === "image") {
         const blob = await (await fetch(f.dataUrl)).blob();
         const fileObj = new File([blob], f.name, { type: f.mimeType });
-        const uploadedUrl = await uploadFileToServer(fileObj);
+        const uploadedUrl = await uploadFileToServer(fileObj, f.name);
         setUploadedFiles(prev => prev.map(p =>
           p.name === f.name && p.uploading
             ? { ...p, uploadedUrl: uploadedUrl || undefined, uploading: false }
@@ -198,10 +213,15 @@ export default function KhayalInput({ isGenerating, onGenerating, onGenerated }:
       if (docFiles.length > 0) fullDescription += `\n\nملفات مرفقة: ${docFiles.map(f => f.name).join(", ")}`;
       if (!fullDescription.trim()) fullDescription = "مشهد إبداعي";
 
-      // استخدام رابط R2 إذا توفر وإلا التحويل للتحميل المباشر عبر السيرفر
-      const referenceImageUrl = imageFiles.length > 0
-        ? (imageFiles[0].uploadedUrl || undefined)
-        : undefined;
+      // دعم صور متعددة كمراجع — الصورة الأولى للتوافق، والباقي تُدمج في الوصف
+      const uploadedImageUrls = imageFiles
+        .filter(f => f.uploadedUrl)
+        .map(f => f.uploadedUrl as string);
+      const referenceImageUrl = uploadedImageUrls[0] || undefined;
+      // إذا كان هناك أكثر من صورة، أضف وصفاً لها في النص
+      if (uploadedImageUrls.length > 1) {
+        fullDescription += `\n\n[مراجع بصرية متعددة: ${uploadedImageUrls.length} صور — استخدم أسلوبها وألوانها وتناسقها]`;
+      }
 
       if (useNewEngine) {
         // المحركات الجديدة: تحليل + سيناريو + صور مخصصة
@@ -453,8 +473,17 @@ export default function KhayalInput({ isGenerating, onGenerating, onGenerated }:
                         <div className="relative w-full h-16">
                           <img src={file.dataUrl} alt={file.name} className="w-full h-16 object-cover" />
                           {file.uploading && (
-                            <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-1">
+                              {uploadProgress[file.name] !== undefined ? (
+                                <>
+                                  <span className="text-white text-xs font-bold">{uploadProgress[file.name]}%</span>
+                                  <div className="w-10 h-1 bg-white/20 rounded-full overflow-hidden">
+                                    <div className="h-full bg-white rounded-full transition-all duration-300" style={{ width: `${uploadProgress[file.name]}%` }} />
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                              )}
                             </div>
                           )}
                           {!file.uploading && file.uploadedUrl && (
