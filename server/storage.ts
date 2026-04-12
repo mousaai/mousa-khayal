@@ -134,7 +134,10 @@ export async function storagePut(
       })
     );
 
-    const url = buildPublicUrl(key);
+    // إنشاء presigned URL صالح لـ 7 أيام (604800 ثانية)
+    // لأن الـ bucket خاص ولا يدعم الوصول العام المباشر
+    const getCmd = new GetObjectCommand({ Bucket: ENV.r2BucketName, Key: key });
+    const url = await getSignedUrl(client, getCmd, { expiresIn: 604800 });
     return { key, url };
   }
 

@@ -928,3 +928,8 @@
 - [x] تحديث main.tsx لاستخدام redirectToMousaLogin بدلاً من getLoginUrl
 - [x] TypeScript نظيف (0 أخطاء)
 - [x] 276 اختبار vitest ناجح (الاختبار الفاشل هو google.ai.test.ts — محظور في بيئة الاختبار فقط)
+
+## 🔴 إصلاح عرض الصور — Presigned URLs (أبريل 2026)
+- [x] فحص بنية التخزين في mousa.ai وتحديد bucket المستخدم
+- [x] تطبيق Presigned URLs لإصلاح عرض الصور الخاصة في R2 (صالح 7 أيام)
+- [ ] إضافة /api/image-proxy endpoint للصور بدلاً من الروابط المباشرة
