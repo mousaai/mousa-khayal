@@ -962,3 +962,11 @@
 - [x] إضافة CLOUDFLARE_R2_PUBLIC_URL = https://pub-e56d13155b5a436d9df39f96ea86b218.r2.dev
 - [x] تحديث storage.ts: storagePut و storageGet تُعيدان روابط عامة دائمة بدلاً من presigned URLs
 - [x] اختبارات storage.public-url.test.ts: 3/3 ناجحة
+
+## ✅ تحويل محرك توليد الصور إلى Replicate — أبريل 2026
+
+- [x] إضافة REPLICATE_API_TOKEN إلى env.ts
+- [x] إعادة كتابة imageGeneration.ts: Replicate Flux 1.1 Pro (رئيسي) + Gemini Flash (احتياطي)
+- [x] تصحيح output_format من jpeg إلى jpg في Replicate API
+- [x] اختبار Replicate بنجاح — الصور تُولَّد في ثوانٍ من رصيد $40
+- [x] إضافة مؤشر تحميل ورسالة خطأ واضحة عند رفع الصور المرجعية

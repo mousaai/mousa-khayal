@@ -189,6 +189,8 @@ export default function Home() {
   // ── مرفقات ──
   const [uploadedImageUrl, setUploadedImageUrl] = useState<string | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const [documentAnalysis, setDocumentAnalysis] = useState<DocumentAnalysis | null>(null);
   const [showUrlInput, setShowUrlInput] = useState(false);
   const [urlInput, setUrlInput] = useState("");
@@ -827,13 +829,26 @@ export default function Home() {
     const file = e.target.files?.[0];
     if (!file || !file.type.startsWith("image/")) return;
     setUploadedFileName(file.name);
+    setUploadedImageUrl(null);
+    setUploadError(null);
+    setIsUploadingImage(true);
     const fd = new FormData();
     fd.append("file", file);
     try {
       const res = await fetch("/api/upload", { method: "POST", body: fd });
       const data = await res.json();
-      if (data.url) setUploadedImageUrl(data.url);
-    } catch { /* ignore */ }
+      if (data.url) {
+        setUploadedImageUrl(data.url);
+      } else {
+        setUploadError("فشل رفع الصورة — حاول مرة أخرى");
+        setUploadedFileName(null);
+      }
+    } catch {
+      setUploadError("تعذّر الاتصال بالخادم — تحقق من اتصالك");
+      setUploadedFileName(null);
+    } finally {
+      setIsUploadingImage(false);
+    }
     setShowAttachMenu(false);
   };
 
@@ -1424,6 +1439,34 @@ export default function Home() {
               className="w-full bg-transparent text-white placeholder-white/20 resize-none outline-none px-5 pt-4 pb-2 text-base leading-relaxed"
               style={{ fontFamily: "'Tajawal', 'Cairo', sans-serif", minHeight: 80, maxHeight: 200 }}
             />
+
+            {/* ── مؤشر رفع الصورة ── */}
+            {isUploadingImage && (
+              <div className="px-5 pb-2 flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs animate-pulse"
+                  style={{ background: "rgba(96,165,250,0.1)", border: "1px solid rgba(96,165,250,0.3)", color: "#60a5fa" }}>
+                  <svg className="animate-spin" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" opacity="0.3"/>
+                    <path d="M21 12a9 9 0 00-9-9"/>
+                  </svg>
+                  <span>جاري رفع الصورة...</span>
+                </div>
+              </div>
+            )}
+
+            {/* ── خطأ الرفع ── */}
+            {uploadError && !isUploadingImage && (
+              <div className="px-5 pb-2 flex items-center gap-2">
+                <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs"
+                  style={{ background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.3)", color: "#f87171" }}>
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  <span>{uploadError}</span>
+                  <button onClick={() => setUploadError(null)} className="opacity-50 hover:opacity-100 mr-1">✕</button>
+                </div>
+              </div>
+            )}
 
             {/* ── Attachments preview ── */}
             {(uploadedImageUrl || documentAnalysis || urlInput) && (

@@ -17,6 +17,7 @@ export const ENV = {
   r2PublicUrl: process.env.CLOUDFLARE_R2_PUBLIC_URL ?? "",
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
   runwayApiKey: process.env.RUNWAY_API_KEY ?? "",
+  replicateApiToken: process.env.REPLICATE_API_TOKEN ?? "",
   // Mousa.ai platform integration — PLATFORM_API_KEY هو المفتاح الصحيح
   platformApiKey: process.env.PLATFORM_API_KEY ?? "",
   platformId: process.env.PLATFORM_ID ?? "khayal",
