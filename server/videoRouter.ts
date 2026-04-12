@@ -181,8 +181,8 @@ async function resumeStaleJobs() {
   try {
     const db = await getDb();
     if (!db) return;
-    // Runway يحتاج 5-15 دقيقة لكل مشهد — نعطيه 20 دقيقة قبل اعتباره متوقفاً
-    const twentyMinutesAgo = new Date(Date.now() - 20 * 60 * 1000);
+    // Runway يحتاج 5-15 دقيقة لكل مشهد — نعطيه 5 دقائق بعد إعادة التشغيل
+    const twentyMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
     const staleJobs = await db
       .select()
       .from(videoJobsTable)
@@ -280,8 +280,13 @@ async function runProductionJob(
   }
 }
 
-// بدء فحص المهام المتوقفة كل 5 دقائق
+// بدء فحص المهام المتوقفة كل 5 دقائق + استدعاء فوري عند بدء السيرفر
 setInterval(resumeStaleJobs, 5 * 60 * 1000);
+// استئناف فوري بعد 30 ثانية من بدء السيرفر (لاسترداد المهام المتوقفة بسبب إعادة التشغيل)
+setTimeout(() => {
+  console.log('[videoRouter] فحص المهام المتوقفة عند بدء التشغيل...');
+  resumeStaleJobs();
+}, 30_000);
 
 async function getJobFromDB(jobId: string) {
   const db = await getDb();
