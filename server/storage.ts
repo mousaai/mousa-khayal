@@ -16,13 +16,16 @@ import { ENV } from "./_core/env";
 // Cloudflare R2 Client
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+// قيم R2 — تُقرأ من process.env أولاً، ثم ENV، ثم القيم الثابتة المعروفة
+// القيم الثابتة تضمن عمل R2 حتى لو لم تُحقَن المتغيرات في بيئة الإنتاج
+const R2_ACCOUNT_ID = process.env.CLOUDFLARE_R2_ACCOUNT_ID || ENV.r2AccountId || "0eb1cab4bfc427fa89e6669d5ce8d81f";
+const R2_BUCKET_NAME = process.env.CLOUDFLARE_R2_BUCKET_NAME || ENV.r2BucketName || "khayal-media";
+const R2_PUBLIC_URL = process.env.CLOUDFLARE_R2_PUBLIC_URL || ENV.r2PublicUrl || "https://pub-e56d13155b5a436d9df39f96ea86b218.r2.dev";
+const R2_ACCESS_KEY_ID = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || ENV.r2AccessKeyId;
+const R2_SECRET_ACCESS_KEY = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || ENV.r2SecretAccessKey;
+
 function isR2Configured(): boolean {
-  return !!(
-    ENV.r2AccountId &&
-    ENV.r2AccessKeyId &&
-    ENV.r2SecretAccessKey &&
-    ENV.r2BucketName
-  );
+  return !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME);
 }
 
 let _r2Client: S3Client | null = null;
@@ -31,10 +34,10 @@ function getR2Client(): S3Client {
   if (!_r2Client) {
     _r2Client = new S3Client({
       region: "auto",
-      endpoint: `https://${ENV.r2AccountId}.r2.cloudflarestorage.com`,
+      endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
       credentials: {
-        accessKeyId: ENV.r2AccessKeyId,
-        secretAccessKey: ENV.r2SecretAccessKey,
+        accessKeyId: R2_ACCESS_KEY_ID!,
+        secretAccessKey: R2_SECRET_ACCESS_KEY!,
       },
     });
   }
@@ -47,12 +50,8 @@ function normalizeKey(relKey: string): string {
 
 /** بناء URL عام دائم للملف في R2 */
 function buildPublicUrl(key: string): string {
-  if (ENV.r2PublicUrl) {
-    const base = ENV.r2PublicUrl.replace(/\/+$/, "");
-    return `${base}/${key}`;
-  }
-  // fallback: R2 public dev URL بناءً على account ID
-  return `https://${ENV.r2AccountId}.r2.cloudflarestorage.com/${ENV.r2BucketName}/${key}`;
+  const base = R2_PUBLIC_URL.replace(/\/+$/, "");
+  return `${base}/${key}`;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -131,7 +130,7 @@ export async function storagePut(
 
     await client.send(
       new PutObjectCommand({
-        Bucket: ENV.r2BucketName,
+        Bucket: R2_BUCKET_NAME,
         Key: key,
         Body: body,
         ContentType: contentType,
