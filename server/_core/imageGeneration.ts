@@ -1,14 +1,21 @@
 /**
- * imageGeneration.ts — Replicate Flux Pro (رئيسي) + Google Gemini Flash (احتياطي)
+ * imageGeneration.ts — Replicate Flux (رئيسي) + Google Gemini Flash (احتياطي)
  *
  * يحافظ على نفس الواجهة الخارجية (generateImage) حتى لا يحتاج أي ملف آخر للتغيير.
- * النموذج الرئيسي: black-forest-labs/flux-1.1-pro (أفضل جودة للمعمار والصور الشخصية)
- * للتعديل (image-to-image): black-forest-labs/flux-1.1-pro (يدعم image_prompt)
- * Fallback: Google Gemini Flash Image (في حال فشل Replicate)
+ *
+ * النماذج المتاحة:
+ *   - "schnell"  → black-forest-labs/flux-schnell   (3-5 ثوانٍ، تكلفة أقل 10x، للمعاينة)
+ *   - "pro"      → black-forest-labs/flux-1.1-pro   (10-20 ثانية، أعلى جودة، للإنتاج)
+ *
+ * image_prompt_strength يُضبط تلقائياً:
+ *   - 0.15-0.25 → كلمات "تخيلني / صورني / أنا" (الحفاظ على الهوية)
+ *   - 0.30-0.40 → تعديل أسلوب عام (تطبيق الأسلوب مع الحفاظ على الهيكل)
  */
 import { ENV } from "./env";
 import { storagePut } from "../storage";
 import { trackImageGen } from "../costTracker";
+
+export type ImageQuality = "schnell" | "pro";
 
 export type GenerateImageOptions = {
   prompt: string;
@@ -17,11 +24,26 @@ export type GenerateImageOptions = {
     b64Json?: string;
     mimeType?: string;
   }>;
+  /** جودة التوليد: "schnell" للمعاينة السريعة، "pro" للإنتاج (افتراضي: "pro") */
+  quality?: ImageQuality;
 };
 
 export type GenerateImageResponse = {
   url?: string;
 };
+
+// ── كشف قوة التحويل الشخصي من الـ prompt ─────────────────────────────────
+function detectImagePromptStrength(prompt: string): number {
+  const lower = prompt.toLowerCase();
+  // كلمات تدل على تحويل شخصي — نحافظ على الهوية أكثر
+  const personalKeywords = [
+    "تخيلني", "صورني", "أنا في", "أنا ب", "ضعني في", "حولني",
+    "imagine me", "put me in", "place me in", "i am in", "me as",
+    "me in", "my face", "وجهي", "شخصيتي",
+  ];
+  const isPersonal = personalKeywords.some(kw => lower.includes(kw));
+  return isPersonal ? 0.2 : 0.35;
+}
 
 // ── مساعد: انتظار نتيجة Replicate prediction ──────────────────────────────
 async function waitForReplicate(predictionId: string, token: string, maxWaitMs = 120_000): Promise<string> {
@@ -44,30 +66,40 @@ async function waitForReplicate(predictionId: string, token: string, maxWaitMs =
   throw new Error("Replicate: انتهت مهلة الانتظار");
 }
 
-// ── توليد صورة جديدة بـ Replicate Flux 1.1 Pro ────────────────────────────
-async function generateWithFluxPro(
+// ── توليد صورة بـ Replicate (Schnell أو Pro) ──────────────────────────────
+async function generateWithFlux(
   prompt: string,
+  quality: ImageQuality,
   referenceImageUrl?: string
 ): Promise<{ imageUrl: string }> {
   const token = ENV.replicateApiToken;
   if (!token) throw new Error("REPLICATE_API_TOKEN is not configured");
 
+  const isSchnell = quality === "schnell";
+  const modelPath = isSchnell
+    ? "black-forest-labs/flux-schnell"
+    : "black-forest-labs/flux-1.1-pro";
+
   const input: Record<string, unknown> = {
     prompt,
     aspect_ratio: "16:9",
     output_format: "jpg",
-    output_quality: 90,
-    safety_tolerance: 5,
+    output_quality: isSchnell ? 80 : 90,
+    ...(isSchnell ? {} : { safety_tolerance: 5 }),
+    ...(isSchnell ? { num_inference_steps: 4 } : {}),
   };
 
-  // image-to-image: إذا كان هناك صورة مرجعية
-  if (referenceImageUrl) {
+  // image-to-image: إذا كان هناك صورة مرجعية (فقط في Pro — Schnell لا يدعمه)
+  if (referenceImageUrl && !isSchnell) {
     input.image_prompt = referenceImageUrl;
-    input.image_prompt_strength = 0.3; // 0.3 = يحافظ على الهوية مع تطبيق الأسلوب الجديد
+    input.image_prompt_strength = detectImagePromptStrength(prompt);
   }
 
-  // إرسال الطلب مع Prefer: wait للنتيجة الفورية (حتى 60 ثانية)
-  const res = await fetch("https://api.replicate.com/v1/models/black-forest-labs/flux-1.1-pro/predictions", {
+  const apiUrl = isSchnell
+    ? "https://api.replicate.com/v1/models/black-forest-labs/flux-schnell/predictions"
+    : "https://api.replicate.com/v1/models/black-forest-labs/flux-1.1-pro/predictions";
+
+  const res = await fetch(apiUrl, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${token}`,
@@ -83,13 +115,13 @@ async function generateWithFluxPro(
     throw new Error(`Replicate API error ${res.status}: ${JSON.stringify(data)}`);
   }
 
-  // إذا جاءت النتيجة فوراً
+  // نتيجة فورية
   if (data.status === "succeeded") {
     const output = Array.isArray(data.output) ? data.output[0] : data.output;
     if (output) return { imageUrl: output };
   }
 
-  // إذا لا تزال processing، انتظر
+  // لا تزال processing
   if (data.id) {
     const imageUrl = await waitForReplicate(data.id, token);
     return { imageUrl };
@@ -158,21 +190,22 @@ async function generateWithGeminiFlashFallback(
 
 // ── الدالة الرئيسية ────────────────────────────────────────────────────────
 export async function generateImage(options: GenerateImageOptions): Promise<GenerateImageResponse> {
+  const quality: ImageQuality = options.quality ?? "pro";
   const isEditing = options.originalImages && options.originalImages.length > 0;
   const referenceImageUrl = options.originalImages?.find(img => img.url && !img.url.startsWith("data:"))?.url;
 
   let imageUrl: string | undefined;
   let imageBuffer: Buffer | undefined;
   let mimeType = "image/jpeg";
-  let usedProvider = "replicate";
+  let usedProvider = `replicate-flux-${quality}`;
 
-  // المحاولة الأولى: Replicate Flux 1.1 Pro
+  // المحاولة الأولى: Replicate Flux (Schnell أو Pro)
   try {
-    const result = await generateWithFluxPro(options.prompt, referenceImageUrl);
+    const result = await generateWithFlux(options.prompt, quality, referenceImageUrl);
     imageUrl = result.imageUrl;
-    console.log("[ImageGen] ✅ Replicate Flux 1.1 Pro نجح");
+    console.log(`[ImageGen] ✅ Replicate Flux ${quality} نجح`);
   } catch (err) {
-    console.warn("[ImageGen] ⚠️ Replicate فشل، التحويل إلى Gemini Flash:", (err as Error).message);
+    console.warn(`[ImageGen] ⚠️ Replicate Flux ${quality} فشل، التحويل إلى Gemini Flash:`, (err as Error).message);
     usedProvider = "gemini";
 
     // Fallback: Google Gemini Flash Image
@@ -210,8 +243,9 @@ export async function generateImage(options: GenerateImageOptions): Promise<Gene
   if (!imageBuffer) throw new Error("لم يتم الحصول على بيانات الصورة");
 
   // رفع الصورة إلى R2 للتخزين الدائم
+  const ext = mimeType.includes("png") ? "png" : mimeType.includes("webp") ? "webp" : "jpg";
   const { url: storedUrl } = await storagePut(
-    `generated/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`,
+    `generated/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`,
     imageBuffer,
     mimeType
   );
