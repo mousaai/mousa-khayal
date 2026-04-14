@@ -312,4 +312,31 @@ router.post("/api/sso/relink", async (req, res) => {
   });
 });
 
+// ─── GET /api/pricing ────────────────────────────────────────────────────────
+/**
+ * يُعيد جدول أسعار المنصة للمزامنة مع mousa.ai
+ * يُستخدم من mousa.ai لتحديث عرض الأسعار في الواجهة
+ */
+router.get("/api/pricing", (_req, res) => {
+  const CREDIT_TO_SAR = 10; // 10 كريدت = 1 ريال سعودي
+  return res.json({
+    platform: process.env.PLATFORM_ID || "khayal",
+    currency: "SAR",
+    conversionRate: { credits: CREDIT_TO_SAR, currency: "SAR", amount: 1 },
+    services: [
+      { id: "scene",        name: "مشهد واحد",                  credits: 20   },
+      { id: "scene_hd",     name: "مشهد HD",                    credits: 30   },
+      { id: "script_only",  name: "سيناريو فقط",                credits: 5    },
+      { id: "film_short",   name: "فيلم قصير (حتى 5 مشاهد)",   credits: 350  },
+      { id: "film_medium",  name: "فيلم متوسط (حتى 10 مشاهد)", credits: 700  },
+      { id: "film_long",    name: "فيلم طويل (حتى 20 مشهد)",   credits: 1400 },
+      { id: "autonomous",   name: "جلسة ذاتية كاملة",           credits: 200  },
+      { id: "surprise",     name: "جلسة مفاجأة",                credits: 100  },
+      { id: "design_basic", name: "تصميم أساسي",                credits: 40   },
+      { id: "design_full",  name: "تصميم كامل",                 credits: 80   },
+    ],
+    updatedAt: new Date().toISOString(),
+  });
+});
+
 export default router;
