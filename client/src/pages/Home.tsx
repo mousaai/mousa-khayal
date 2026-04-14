@@ -16,6 +16,7 @@ import { useLanguage } from "@/i18n/LanguageContext";
 import { ALL_LANGS, LANG_NAMES, LANG_FLAGS, isRTLLang } from "@/i18n/translations";
 import { useAuth } from "@/components/AuthGate";
 import { useMousaTokenHandoff } from "@/hooks/useMousaTokenHandoff";
+import CreditConfirmDialog from "@/components/CreditConfirmDialog";
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
 const PORTAL_SCENES = [
@@ -268,12 +269,16 @@ export default function Home() {
   const { lang: activeLang, setLang: setActiveLang, t: lang, isRTL, detectLangFromText } = useLanguage();
 
   // ــ المصادقة ــ
-  const { user, isGuest } = useAuth();
+  const { user, isGuest, isFallback } = useAuth();
   const isAuthenticated = true; // المنصة مفتوحة للجميع
   const authLoading = false; // AuthGate يضمن وجود user قبل عرض الصفحة
 
   // ــ Mousa Token Handoff: استقبال ?token= من URL تلقائياً ــ
   const { handoffState, isExpired, redirectToMousa } = useMousaTokenHandoff();
+
+  // ── نافذة تأكيد الكريدت ──
+  const [creditConfirmOpen, setCreditConfirmOpen] = useState(false);
+  const [pendingGenerateAction, setPendingGenerateAction] = useState<(() => void) | null>(null);
 
   // ── Refs ──
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -896,9 +901,24 @@ export default function Home() {
     if (isGenerating || isGeneratingScript) return;
 
     const finalDesc = urlInput ? `${desc}\n\nرابط مرجعي: ${urlInput}` : desc;
-    const langCode = ["AR", "FA", "UR", "HE"].includes(activeLang) ? "ar" : "en";
+    const langCode: "ar" | "en" = ["AR", "FA", "UR", "HE"].includes(activeLang) ? "ar" : "en";
 
+    // ── فلتر المحتوى أولاً ──
     await checkAndGenerate(finalDesc, async () => {
+      // ── عرض نافذة تأكيد الكريدت للمستخدمين غير الضيوف ──
+      if (!isGuest) {
+        setCreditConfirmOpen(true);
+        setPendingGenerateAction(() => () => doGenerate(finalDesc, langCode));
+        return;
+      }
+      // الزوار: توليد مباشرة بدون تأكيد
+      doGenerate(finalDesc, langCode);
+    });
+  };
+
+  // ــ تنفيذ التوليد الفعلي (بعد التأكيد) ــ
+  const doGenerate = async (finalDesc: string, langCode: "ar" | "en") => {
+    await (async () => {
       const intent = detectedIntent || "image";
 
       // ── وضع خيال ذاتية (AUTO) — خيال تقرر كل شيء ──
@@ -2114,7 +2134,7 @@ export default function Home() {
                         setVideoJob(null);
                         // إعادة الإنتاج تلقائياً
                         try {
-                          const langCode = ["AR", "FA", "UR", "HE"].includes(activeLang) ? "ar" : "en";
+                          const langCode: "ar" | "en" = ["AR", "FA", "UR", "HE"].includes(activeLang) ? "ar" : "en";
                           const result = await quickProduceMutation.mutateAsync({
                             description: prompt.trim(),
                             language: langCode,
@@ -2402,6 +2422,26 @@ export default function Home() {
         </div>
 
       </div>
+
+      {/* ═══ CREDIT CONFIRM DIALOG ═══ */}
+      <CreditConfirmDialog
+        open={creditConfirmOpen}
+        mode={outputMode}
+        sceneCount={5}
+        creditBalance={user.creditBalance}
+        isFallback={isFallback}
+        onConfirm={() => {
+          setCreditConfirmOpen(false);
+          if (pendingGenerateAction) {
+            pendingGenerateAction();
+            setPendingGenerateAction(null);
+          }
+        }}
+        onCancel={() => {
+          setCreditConfirmOpen(false);
+          setPendingGenerateAction(null);
+        }}
+      />
 
       {/* ═══ CSS ANIMATIONS ═══ */}
       <style>{`
