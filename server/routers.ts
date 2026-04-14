@@ -11,6 +11,7 @@ import { creditsRouter } from "./creditsRouter";
 import { developerRouter } from "./developerRouter";
 import { designRouter } from "./designRouter";
 import { notificationsRouter } from "./notificationsRouter";
+import { mousaRouter } from "./mousaRouter";
 import { z } from "zod";
 import { verifyMousaToken } from "./mousaCreditsService";
 import { sdk } from "./_core/sdk";
@@ -49,12 +50,16 @@ export const appRouter = router({
         const mousaOpenId = `mousa_${result.openId}`;
 
         // إنشاء/تحديث المستخدم في قاعدة البيانات المحلية
+        // نحفظ mousaUserId (الرقمي) وmousaBalance لعرض الرصيد الحقيقي
         await db.upsertUser({
           openId: mousaOpenId,
           name: result.name || null,
           email: result.email || null,
           loginMethod: "mousa",
           lastSignedIn: new Date(),
+          mousaUserId: typeof result.userId === 'number' ? result.userId : null,
+          mousaBalance: typeof result.creditBalance === 'number' ? result.creditBalance : null,
+          mousaLastSync: new Date(),
         });
 
         // إنشاء session token محلي
@@ -88,6 +93,7 @@ export const appRouter = router({
   developer: developerRouter,
   design: designRouter,
   notifications: notificationsRouter,
+  mousa: mousaRouter,
 });
 
 export type AppRouter = typeof appRouter;

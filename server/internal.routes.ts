@@ -84,8 +84,18 @@ async function onCreditsDeducted(data: CreditsDeductedData): Promise<void> {
   console.log(
     `[Webhook] Credits deducted: user=${data.userId} amount=${data.amount} balance=${data.newBalance}`
   );
-  // TODO: تحديث الـ cache المحلي إذا وُجد
-  // TODO: إرسال إشعار WebSocket للمستخدم إذا كان متصلاً
+  try {
+    const { getDb } = await import("./db");
+    const { users } = await import("../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const db = await getDb();
+    await db.update(users)
+      .set({ mousaBalance: data.newBalance, mousaLastSync: new Date() })
+      .where(eq(users.mousaUserId, data.userId));
+    console.log(`[Webhook] ✅ Balance updated for mousaUserId=${data.userId} → ${data.newBalance}`);
+  } catch (err) {
+    console.error("[Webhook] Failed to update local balance:", err);
+  }
 }
 
 /**
@@ -95,6 +105,18 @@ async function onCreditsGranted(data: CreditsGrantedData): Promise<void> {
   console.log(
     `[Webhook] Credits granted: user=${data.userId} amount=${data.amount} balance=${data.newBalance}`
   );
+  try {
+    const { getDb } = await import("./db");
+    const { users } = await import("../drizzle/schema");
+    const { eq } = await import("drizzle-orm");
+    const db = await getDb();
+    await db.update(users)
+      .set({ mousaBalance: data.newBalance, mousaLastSync: new Date() })
+      .where(eq(users.mousaUserId, data.userId));
+    console.log(`[Webhook] ✅ Balance updated for mousaUserId=${data.userId} → ${data.newBalance}`);
+  } catch (err) {
+    console.error("[Webhook] Failed to update local balance:", err);
+  }
 }
 
 /**

@@ -45,9 +45,9 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
   });
 
   const { data: balanceData, isLoading } = trpc.credits.getBalance.useQuery(
-    { userId: user?.userId },
+    {},
     {
-      enabled: !isGuest && !isFallback && !!user?.userId && status?.enabled === true,
+      enabled: !isGuest && !isFallback && status?.enabled === true,
       staleTime: 30_000,
       refetchInterval: 60_000,
     }

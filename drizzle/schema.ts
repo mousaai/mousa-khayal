@@ -20,6 +20,10 @@ export const users = mysqlTable("users", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
+  // mousa.ai integration
+  mousaUserId: int("mousaUserId"),           // userId في نظام mousa.ai
+  mousaBalance: int("mousaBalance").default(0), // آخر رصيد معروف (للعرض السريع)
+  mousaLastSync: timestamp("mousaLastSync"),   // وقت آخر مزامنة مع mousa.ai
 });
 
 export type User = typeof users.$inferSelect;

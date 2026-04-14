@@ -80,6 +80,20 @@ export async function upsertUser(user: InsertUser): Promise<void> {
       updateSet.role = 'admin';
     }
 
+    // mousa.ai integration fields
+    if (user.mousaUserId !== undefined && user.mousaUserId !== null) {
+      values.mousaUserId = user.mousaUserId;
+      updateSet.mousaUserId = user.mousaUserId;
+    }
+    if (user.mousaBalance !== undefined && user.mousaBalance !== null) {
+      values.mousaBalance = user.mousaBalance;
+      updateSet.mousaBalance = user.mousaBalance;
+    }
+    if (user.mousaLastSync !== undefined && user.mousaLastSync !== null) {
+      values.mousaLastSync = user.mousaLastSync;
+      updateSet.mousaLastSync = user.mousaLastSync;
+    }
+
     if (!values.lastSignedIn) {
       values.lastSignedIn = new Date();
     }
