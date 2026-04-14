@@ -1013,3 +1013,19 @@
 - [x] تحديث useMousaTokenHandoff.ts لاستخدام /api/sso/verify
 - [x] تحديث resolveMousaUserId في creditsRouter.ts لإزالة getMousaUserByOpenId
 - [x] إصلاح loginWithMousa في routers.ts (إزالة شرط result.valid)
+
+---
+
+## 🔄 النظام الهجين لتوليد الصور — أبريل 2026
+
+- [x] إضافة STABILITY_API_KEY إلى env.ts
+- [x] بناء imageGeneration.ts هجين مع 5 مزودين بترتيب أولوية:
+  1. Gemini 3.1 Flash Image Preview (مجاني، أعلى جودة)
+  2. Gemini 2.5 Flash Image (مجاني، سريع)
+  3. Stability AI Ultra ($0.08/صورة)
+  4. Stability AI Core ($0.03/صورة)
+  5. Replicate Flux Schnell (احتياطي)
+- [x] Fallback تلقائي عند أي خطأ 402/403/429/5xx
+- [x] اختبارات vitest: 7 اختبارات تغطي جميع سيناريوهات الـ fallback
+- [x] تحديث مفتاح Google AI (khayal-prod) في الإنتاج
+- [x] إضافة Stability AI API Key في الإنتاج

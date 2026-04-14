@@ -9,6 +9,8 @@ export const ENV = {
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
   // Google AI — مستقل عن مانوس
   googleAiKey: process.env.GOOGLE_AI_KEY ?? "",
+  // Stability AI — توليد صور احترافية
+  stabilityApiKey: process.env.STABILITY_API_KEY ?? "",
   // Cloudflare R2 — تخزين مستقل
   r2AccountId: process.env.CLOUDFLARE_R2_ACCOUNT_ID ?? "",
   r2AccessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ?? "",
