@@ -38,7 +38,8 @@ export const appRouter = router({
       .mutation(async ({ input, ctx }) => {
         const { result, error } = await verifyMousaToken(input.token);
 
-        if (error || !result?.valid) {
+        // v2.0: لا يوجد حقل valid — نتحقق من وجود userId و openId
+        if (error || !result?.userId || !result?.openId) {
           return {
             success: false,
             error: error?.error ?? "Invalid token",

@@ -3,13 +3,14 @@ import express from "express";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
+// OAuth محذوف — المنصة تستخدم mousa.ai SSO حصراً
 import { registerInternalRoutes } from "../internal.routes";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import mediaRoutes from "../mediaRoutes";
 import sseRouter from "../sseRouter";
+import ssoRoutes from "../ssoRoutes";
 import compression from "compression";
 import rateLimit, { ipKeyGenerator } from "express-rate-limit";
 
@@ -132,8 +133,9 @@ async function startServer() {
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
-  // OAuth callback under /api/oauth/callback
-  registerOAuthRoutes(app);
+  // لا يوجد Manus OAuth — المستخدمون يدخلون عبر mousa.ai SSO فقط
+  // SSO endpoints — نظام التعرف على المستخدمين عبر mousa.ai (SSO v2.0)
+  app.use(ssoRoutes);
   // Media endpoints (transcribe + upload)
   app.use(mediaRoutes);
   // SSE: بث حالة المهام الحية

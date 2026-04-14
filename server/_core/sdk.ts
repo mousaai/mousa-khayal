@@ -257,7 +257,7 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
-    // Regular authentication flow
+    // منصة خيال: نقبل فقط مستخدمي mousa.ai (openId يبدأ بـ mousa_)
     const cookies = this.parseCookies(req.headers.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
@@ -268,35 +268,17 @@ class SDKServer {
 
     const sessionUserId = session.openId;
     const signedInAt = new Date();
+
+    // نقبل فقط مستخدمي mousa.ai
+    if (!sessionUserId.startsWith('mousa_')) {
+      throw ForbiddenError("Please login via mousa.ai");
+    }
+
     let user = await db.getUserByOpenId(sessionUserId);
 
-    // نمط فضاء: مستخدمو موسى لديهم openId يبدأ بـ "mousa_"
-    // لا نحتاج OAuth sync لهم — تم إنشاؤهم مسبقاً في loginWithMousa
-    if (!user && sessionUserId.startsWith('mousa_')) {
-      // إذا لم يوجد في الـ DB رغم الـ session الصالحة — الجلسة منتهية أو المستخدم حذف
-      throw ForbiddenError("Mousa session expired, please re-login via mousa.ai");
-    }
-
-    // If user not in DB, sync from OAuth server automatically (Manus users only)
     if (!user) {
-      try {
-        const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
-        await db.upsertUser({
-          openId: userInfo.openId,
-          name: userInfo.name || null,
-          email: userInfo.email ?? null,
-          loginMethod: userInfo.loginMethod ?? userInfo.platform ?? null,
-          lastSignedIn: signedInAt,
-        });
-        user = await db.getUserByOpenId(userInfo.openId);
-      } catch (error) {
-        console.error("[Auth] Failed to sync user from OAuth:", error);
-        throw ForbiddenError("Failed to sync user info");
-      }
-    }
-
-    if (!user) {
-      throw ForbiddenError("User not found");
+      // الجلسة منتهية أو المستخدم حُذف — يجب إعادة الدخول
+      throw ForbiddenError("Session expired, please re-login via mousa.ai");
     }
 
     await db.upsertUser({

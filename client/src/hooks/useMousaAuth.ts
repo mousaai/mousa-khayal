@@ -2,35 +2,20 @@
  * useMousaAuth.ts
  * Hook لمصادقة المستخدمين القادمين من mousa.ai
  *
- * ⚠️ الأمان: جميع الاستدعاءات تمر عبر السيرفر (tRPC)
+ * ⚠️ الأمان: جميع الاستدعاءات تمر عبر السيرفر
  *    PLATFORM_API_KEY محمي في server/mousaCreditsService.ts — لا يُكشف للـ browser أبداً
  *
  * السيناريوهات:
  *   1. زائر بدون token: user = null — المنصة مفتوحة (لا توجيه، لا حجب)
- *   2. زائر بـ ?token=: يتحقق عبر trpc.credits.verifyToken (server-side)
- *   3. جلسة محفوظة: يستعيدها مباشرة
+ *   2. زائر بـ ?token=: يتحقق عبر POST /api/sso/verify (server-side)
+ *      → يُنشئ JWT cookie للجلسة المحلية
+ *   3. جلسة محفوظة: يستعيدها مباشرة + يُجدّد الرصيد في الخلفية
  *   4. فشل الاتصال بـ Mousa (network / timeout / server error / أي خطأ):
  *      → يمنح المستخدم 200 كريدت مجاني ويستمر بدون انقطاع
  *   5. انتهاء صلاحية الجلسة: يمسحها ويعود لوضع زائر
  *   6. user.suspended: يُعاد توجيهه فوراً لـ mousa.ai/suspended
  */
 import { useState, useEffect } from "react";
-import { createTRPCProxyClient, httpBatchLink } from "@trpc/client";
-import superjson from "superjson";
-import type { AppRouter } from "../../../server/routers";
-
-// tRPC vanilla client — للاستخدام خارج React hooks (server-side calls)
-const trpcVanilla = createTRPCProxyClient<AppRouter>({
-  links: [
-    httpBatchLink({
-      url: "/api/trpc",
-      transformer: superjson,
-      fetch(input, init) {
-        return globalThis.fetch(input, { ...(init ?? {}), credentials: "include" });
-      },
-    }),
-  ],
-});
 
 const STORAGE_KEY = "mousa_user_session";
 const TOKEN_KEY = "mousa_auth_token";
@@ -96,9 +81,10 @@ export function useMousaAuth() {
         return;
       }
 
-      // 3. التحقق من الـ token عبر السيرفر (tRPC)
+      // 3. التحقق من الـ token عبر POST /api/sso/verify
+      // يُنشئ JWT cookie + يجلب الرصيد الحقيقي + يحفظ المستخدم في DB
       try {
-        const user = await verifyTokenViaServer(token);
+        const user = await verifyTokenViaSSOEndpoint(token);
         saveSession(token, user);
         // إزالة token من URL بعد التحقق الناجح
         const cleanUrl = window.location.pathname + window.location.hash;
@@ -133,7 +119,6 @@ export function useMousaAuth() {
 
   /** بناء مستخدم مؤقت بـ 200 كريدت مجاني عند تعذّر التحقق */
   function buildFallbackUser(token: string): MousaUser {
-    // محاولة استخراج اسم من الـ token (JWT payload) — اختياري
     let name = "مستخدم";
     try {
       const payload = JSON.parse(atob(token.split(".")[1]));
@@ -152,15 +137,24 @@ export function useMousaAuth() {
   }
 
   /**
-   * التحقق عبر السيرفر (tRPC) — PLATFORM_API_KEY محمي server-side
+   * التحقق عبر POST /api/sso/verify
+   * يتحقق من token + يجلب الرصيد الحقيقي + يحفظ المستخدم + يُنشئ JWT cookie
    */
-  async function verifyTokenViaServer(token: string): Promise<MousaUser> {
-    const result = await trpcVanilla.credits.verifyToken.mutate({ token });
-    if (!result.success) {
+  async function verifyTokenViaSSOEndpoint(token: string): Promise<MousaUser> {
+    const response = await fetch("/api/sso/verify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include", // مهم: لاستقبال JWT cookie من السيرفر
+      body: JSON.stringify({ token }),
+    });
+    const result = await response.json();
+
+    if (!response.ok || !result.success) {
       if (result.code === "TOKEN_EXPIRED") throw new Error("TOKEN_EXPIRED");
       if (result.code === "USER_SUSPENDED") throw new Error("USER_SUSPENDED");
       throw new Error(result.error || "فشل التحقق من الهوية");
     }
+
     return {
       userId: result.userId!,
       openId: result.openId!,
@@ -171,9 +165,26 @@ export function useMousaAuth() {
     };
   }
 
+  /**
+   * تجديد الرصيد عبر GET /api/sso/status
+   * يجلب الرصيد الحقيقي من mousa.ai بدون إعادة تحقق كاملة
+   */
+  async function fetchBalanceFromServer(): Promise<number | null> {
+    try {
+      const response = await fetch("/api/sso/status", {
+        credentials: "include",
+      });
+      if (!response.ok) return null;
+      const data = await response.json();
+      return data.creditBalance ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   async function deductCredits(
     amount: number,
-    description?: string
+    _description?: string
   ): Promise<{ newBalance: number }> {
     if (!state.user) throw new Error("المستخدم غير مسجّل الدخول");
 
@@ -199,18 +210,21 @@ export function useMousaAuth() {
   }
 
   async function refreshBalance(): Promise<number> {
-    if (!state.user || !state.token) return 0;
+    if (!state.user) return 0;
     if (state.user.isFallback) return state.user.creditBalance;
     try {
-      const user = await verifyTokenViaServer(state.token);
-      setState((prev) => ({
-        ...prev,
-        user: prev.user ? { ...prev.user, creditBalance: user.creditBalance } : null,
-      }));
-      if (state.token) {
-        saveSession(state.token, { ...state.user, creditBalance: user.creditBalance });
+      const balance = await fetchBalanceFromServer();
+      if (balance !== null) {
+        setState((prev) => ({
+          ...prev,
+          user: prev.user ? { ...prev.user, creditBalance: balance } : null,
+        }));
+        if (state.token) {
+          saveSession(state.token, { ...state.user, creditBalance: balance });
+        }
+        return balance;
       }
-      return user.creditBalance;
+      return state.user?.creditBalance ?? 0;
     } catch {
       return state.user?.creditBalance ?? 0;
     }
@@ -219,12 +233,14 @@ export function useMousaAuth() {
   async function refreshBalanceInBackground(token: string, currentUser: MousaUser) {
     if (currentUser.isFallback) return;
     try {
-      const user = await verifyTokenViaServer(token);
-      setState((prev) => ({
-        ...prev,
-        user: prev.user ? { ...prev.user, creditBalance: user.creditBalance } : null,
-      }));
-      saveSession(token, { ...currentUser, creditBalance: user.creditBalance });
+      const balance = await fetchBalanceFromServer();
+      if (balance !== null) {
+        setState((prev) => ({
+          ...prev,
+          user: prev.user ? { ...prev.user, creditBalance: balance } : null,
+        }));
+        saveSession(token, { ...currentUser, creditBalance: balance });
+      }
     } catch {}
   }
 
@@ -248,6 +264,13 @@ export function useMousaAuth() {
 
   function logout() {
     clearSession();
+    // مسح JWT cookie عبر السيرفر
+    fetch("/api/trpc/auth.logout", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({}),
+    }).catch(() => {});
     setState({ user: null, loading: false, error: null, token: null });
   }
 

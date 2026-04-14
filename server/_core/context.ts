@@ -1,14 +1,12 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
-import { getMousaUserByOpenId } from "../mousa-api";
-import * as db from "../db";
 
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: User | null;
-  /** mousaUserId: معرّف المستخدم الحقيقي في موسى.ai */
+  /** mousaUserId: معرّف المستخدم الحقيقي في موسى.ai — محفوظ في DB منذ تسجيل الدخول */
   mousaUserId?: number | null;
 };
 
@@ -19,35 +17,16 @@ export async function createContext(
 
   try {
     user = await sdk.authenticateRequest(opts.req);
-  } catch (error) {
+  } catch {
     // Authentication is optional for public procedures.
     user = null;
   }
 
-  // استخراج mousaUserId الحقيقي
-  let mousaUserId: number | null = null;
-
-  if (user) {
-    // الأولوية: mousaUserId المحفوظ في DB (الـ userId الحقيقي في mousa.ai)
-    const savedMousaUserId = (user as any).mousaUserId;
-
-    if (savedMousaUserId) {
-      mousaUserId = savedMousaUserId;
-    } else {
-      // إذا لم يكن محفوظاً: نجلبه من mousa.ai بـ openId بشكل غير متزامن
-      // ونحفظه للمرة القادمة (لا ننتظر النتيجة لتسريع الطلب)
-      getMousaUserByOpenId(user.openId).then((mousaData) => {
-        if (mousaData && user) {
-          db.upsertUser({
-            openId: user.openId,
-            mousaUserId: mousaData.userId,
-            mousaBalance: mousaData.balance,
-            mousaLastSync: new Date(),
-          }).catch(() => {});
-        }
-      }).catch(() => {});
-    }
-  }
+  // mousaUserId محفوظ في DB منذ تسجيل الدخول عبر mousa.ai SSO
+  // لا نحتاج استدعاء mousa.ai في كل طلب
+  const mousaUserId: number | null = user
+    ? ((user as any).mousaUserId ?? null)
+    : null;
 
   return {
     req: opts.req,

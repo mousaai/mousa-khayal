@@ -988,3 +988,28 @@
 - [x] تحسين image-to-image: تحكم في image_prompt_strength مع كلمات تحويل شخصي
 - [x] إضافة Flux Schnell للمعاينة السريعة (3-5 ثوانٍ، تكلفة أقل 10x)
 - [x] إصلاح الصور القديمة المنتهية الصلاحية في قاعدة البيانات (25 رابط تم إصلاحه)
+
+## 🔑 إزالة Manus OAuth — أبريل 2026
+
+- [ ] إزالة registerOAuthRoutes من server/_core/index.ts
+- [ ] تحديث sdk.authenticateRequest: يقبل فقط مستخدمي mousa_ (بدون OAuth sync)
+- [ ] تحديث context.ts: إزالة استدعاء OAuth
+- [ ] تحديث AuthGate: إزالة useMousaAuth واستخدام trpc.auth.me مع SSO
+- [ ] تحديث CreditsWidget: عرض الرصيد من trpc.credits.getBalance مباشرة
+- [ ] إزالة getLoginUrl من const.ts
+- [ ] تحديث Home.tsx: إزالة زر تسجيل الدخول عبر Manus
+
+## 🔑 نظام SSO الكامل — أبريل 2026
+
+- [x] إزالة Manus OAuth من السيرفر (registerOAuthRoutes)
+- [x] تحديث sdk.authenticateRequest لقبول فقط مستخدمي mousa.ai
+- [x] تحديث context.ts لإزالة استدعاء getMousaUserByOpenId
+- [x] إنشاء server/ssoRoutes.ts — endpoints SSO الكاملة
+- [x] POST /api/sso/verify — التحقق من token وإنشاء JWT cookie
+- [x] GET /api/sso/status — حالة الجلسة الحالية والرصيد
+- [x] GET /api/sso/token — استقبال token من URL (redirect)
+- [x] POST /api/sso/relink — ربط حساب قديم بـ mousa.ai
+- [x] تحديث useMousaAuth.ts لاستخدام /api/sso/verify بدلاً من trpc.credits.verifyToken
+- [x] تحديث useMousaTokenHandoff.ts لاستخدام /api/sso/verify
+- [x] تحديث resolveMousaUserId في creditsRouter.ts لإزالة getMousaUserByOpenId
+- [x] إصلاح loginWithMousa في routers.ts (إزالة شرط result.valid)

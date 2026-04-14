@@ -15,32 +15,18 @@ import {
 } from "./mousaCreditsService";
 import {
   checkMousaBalance,
-  getMousaUserByOpenId,
   verifyMousaToken as verifyMousaTokenAPI,
 } from "./mousa-api";
 import * as db from "./db";
 
-/** جلب mousaUserId من ctx أو من mousa.ai عبر openId */
+/** جلب mousaUserId من ctx أو من user في DB */
 async function resolveMousaUserId(ctx: any): Promise<number | null> {
-  // إذا كان محفوظاً في context (من DB)
+  // mousaUserId محفوظ في DB منذ تسجيل الدخول عبر mousa.ai SSO
   if (ctx.mousaUserId) return ctx.mousaUserId;
-
-  // إذا لم يكن موجوداً: نجلبه من mousa.ai بـ openId
+  // محاولة ثانية: من user object مباشرة
   const user = ctx.user;
-  if (!user?.openId) return null;
-
-  const mousaData = await getMousaUserByOpenId(user.openId);
-  if (!mousaData) return null;
-
-  // حفظه في DB للمرة القادمة
-  db.upsertUser({
-    openId: user.openId,
-    mousaUserId: mousaData.userId,
-    mousaBalance: mousaData.balance,
-    mousaLastSync: new Date(),
-  }).catch(() => {});
-
-  return mousaData.userId;
+  if (user?.mousaUserId) return user.mousaUserId;
+  return null;
 }
 
 export const creditsRouter = router({
@@ -147,6 +133,48 @@ export const creditsRouter = router({
           redirectUrl: code === "TOKEN_EXPIRED" ? "https://www.mousa.ai/dashboard" : null,
         };
       }
+    }),
+
+  /**
+   * relinkMousa — ربط حساب Manus OAuth الحالي بـ mousa.ai
+   * يستقبل token جديد من mousa.ai ويُحدّث mousaUserId في DB
+   */
+  relinkMousa: protectedProcedure
+    .input(z.object({ token: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      const { verifyMousaToken, checkMousaBalance: checkBalance } = await import('./mousaCreditsService');
+      const { result, error } = await verifyMousaToken(input.token);
+
+      // v2.0: لا يوجد حقل valid — نتحقق من وجود userId و openId
+      if (error || !result?.userId || !result?.openId) {
+        return {
+          success: false,
+          error: error?.error ?? 'Invalid token',
+          code: error?.code ?? 'INVALID_TOKEN',
+        };
+      }
+
+      // جلب الرصيد الحقيقي
+      let realBalance = result.creditBalance;
+      try {
+        const balanceData = await checkBalance(result.userId);
+        if (balanceData !== null) realBalance = balanceData.balance;
+      } catch {}
+
+      // تحديث mousaUserId في DB للمستخدم الحالي
+      await db.upsertUser({
+        openId: ctx.user!.openId,
+        mousaUserId: result.userId,
+        mousaBalance: realBalance,
+        mousaLastSync: new Date(),
+      });
+
+      return {
+        success: true,
+        userId: result.userId,
+        creditBalance: realBalance,
+        message: 'تم ربط حسابك بـ mousa.ai بنجاح',
+      };
     }),
 
   /**
