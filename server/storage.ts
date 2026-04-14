@@ -16,32 +16,34 @@ import { ENV } from "./_core/env";
 // Cloudflare R2 Client
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-// قيم R2 — تُقرأ من process.env أولاً، ثم ENV، ثم القيم الثابتة المعروفة
-// القيم الثابتة تضمن عمل R2 حتى لو لم تُحقَن المتغيرات في بيئة الإنتاج
-const R2_ACCOUNT_ID = process.env.CLOUDFLARE_R2_ACCOUNT_ID || ENV.r2AccountId || "0eb1cab4bfc427fa89e6669d5ce8d81f";
-const R2_BUCKET_NAME = process.env.CLOUDFLARE_R2_BUCKET_NAME || ENV.r2BucketName || "khayal-media";
-const R2_PUBLIC_URL = process.env.CLOUDFLARE_R2_PUBLIC_URL || ENV.r2PublicUrl || "https://pub-e56d13155b5a436d9df39f96ea86b218.r2.dev";
-const R2_ACCESS_KEY_ID = process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || ENV.r2AccessKeyId;
-const R2_SECRET_ACCESS_KEY = process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || ENV.r2SecretAccessKey;
-
-function isR2Configured(): boolean {
-  return !!(R2_ACCOUNT_ID && R2_ACCESS_KEY_ID && R2_SECRET_ACCESS_KEY && R2_BUCKET_NAME);
+// قيم R2 — تُقرأ من process.env في وقت الاستدعاء (ليس وقت تحميل الوحدة)
+// هذا يضمن قراءة أحدث قيمة بعد تحديث المتغيرات
+function getR2Config() {
+  return {
+    accountId: process.env.CLOUDFLARE_R2_ACCOUNT_ID || "0eb1cab4bfc427fa89e6669d5ce8d81f",
+    bucketName: process.env.CLOUDFLARE_R2_BUCKET_NAME || "khayal-media",
+    publicUrl: process.env.CLOUDFLARE_R2_PUBLIC_URL || "https://pub-e56d13155b5a436d9df39f96ea86b218.r2.dev",
+    accessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID || "",
+    secretAccessKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY || "",
+  };
 }
 
-let _r2Client: S3Client | null = null;
+function isR2Configured(): boolean {
+  const cfg = getR2Config();
+  return !!(cfg.accountId && cfg.accessKeyId && cfg.secretAccessKey && cfg.bucketName);
+}
 
 function getR2Client(): S3Client {
-  if (!_r2Client) {
-    _r2Client = new S3Client({
-      region: "auto",
-      endpoint: `https://${R2_ACCOUNT_ID}.r2.cloudflarestorage.com`,
-      credentials: {
-        accessKeyId: R2_ACCESS_KEY_ID!,
-        secretAccessKey: R2_SECRET_ACCESS_KEY!,
-      },
-    });
-  }
-  return _r2Client;
+  // إنشاء client جديد في كل مرة لضمان استخدام أحدث المفاتيح
+  const cfg = getR2Config();
+  return new S3Client({
+    region: "auto",
+    endpoint: `https://${cfg.accountId}.r2.cloudflarestorage.com`,
+    credentials: {
+      accessKeyId: cfg.accessKeyId,
+      secretAccessKey: cfg.secretAccessKey,
+    },
+  });
 }
 
 function normalizeKey(relKey: string): string {
@@ -50,7 +52,7 @@ function normalizeKey(relKey: string): string {
 
 /** بناء URL عام دائم للملف في R2 */
 function buildPublicUrl(key: string): string {
-  const base = R2_PUBLIC_URL.replace(/\/+$/, "");
+  const base = getR2Config().publicUrl.replace(/\/+$/, "");
   return `${base}/${key}`;
 }
 
@@ -130,7 +132,7 @@ export async function storagePut(
 
     await client.send(
       new PutObjectCommand({
-        Bucket: R2_BUCKET_NAME,
+        Bucket: getR2Config().bucketName,
         Key: key,
         Body: body,
         ContentType: contentType,

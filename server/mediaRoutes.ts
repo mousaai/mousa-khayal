@@ -62,7 +62,7 @@ router.get("/api/debug/storage", (req, res) => {
   res.json({
     r2AccountId: process.env.CLOUDFLARE_R2_ACCOUNT_ID ? `${process.env.CLOUDFLARE_R2_ACCOUNT_ID.slice(0, 8)}...` : 'MISSING',
     r2AccessKeyId: process.env.CLOUDFLARE_R2_ACCESS_KEY_ID ? `${process.env.CLOUDFLARE_R2_ACCESS_KEY_ID.slice(0, 8)}...` : 'MISSING',
-    r2SecretKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY ? 'SET' : 'MISSING',
+    r2SecretKey: process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY ? `SET(${process.env.CLOUDFLARE_R2_SECRET_ACCESS_KEY.slice(0,8)}...)` : 'MISSING',
     r2BucketName: process.env.CLOUDFLARE_R2_BUCKET_NAME || 'MISSING',
     r2PublicUrl: process.env.CLOUDFLARE_R2_PUBLIC_URL || 'MISSING',
     nodeEnv: process.env.NODE_ENV,

@@ -74,6 +74,18 @@
 
 ---
 
+## 🔧 إصلاحات الجلسة الحالية — أبريل 2026
+
+- [x] إصلاح خصم النقاط: 20 نقطة لكل مشهد بدلاً من 20 ثابتة
+- [x] إصلاح نظام الرصيد: mousaUserId الحقيقي من mousa.ai
+- [x] إصلاح context.ts: استخدام openId لجلب mousaUserId
+- [x] إنشاء mousa-api.ts وcredit-costs.ts وmousaRouter.ts
+- [x] تحديث creditsRouter.ts لجلب الرصيد من mousa.ai مباشرة
+- [x] إصلاح storage.ts: قراءة R2 keys في وقت الاستدعاء (ليس module load)
+- [ ] إصلاح رفع الصور: R2 Secret Key لا يزال يقرأ قيمة قديمة في الإنتاج
+- [ ] إضافة نظام الإحالة (referral page)
+- [ ] عداد الكريدت قبل التوليد في نافذة التأكيد
+
 ## 🔧 إصلاحات مطلوبة
 
 - [ ] دمج cinematicEngine في downloadVideoMP4 فعلياً (الحالي يستخدم حلقة بسيطة)
