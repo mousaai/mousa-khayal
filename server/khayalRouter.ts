@@ -22,7 +22,7 @@ import { checkContent, SAFE_CONTENT_DIRECTIVE } from "./contentFilter";
 import { analyzeDomain, buildDomainPrompt, quickDetectDomain } from "./domainEngine";
 import type { DomainAnalysis } from "./domainEngine";
 import { generateScript } from "./scriptEngine";
-import { guardMousaBalance, deductMousaCredits, isMousaEnabled } from "./mousaCreditsService";
+import { guardMousaBalance, deductMousaCredits, isMousaEnabled, SESSION_COSTS } from "./mousaCreditsService";
 
 // ═══════════════════════════════════════════════════════════════
 // CAMERA ANGLES — زوايا الكاميرا المحددة لكتلة واحدة
@@ -635,9 +635,12 @@ export const khayalRouter = router({
 
       // ━━ خصم كريدتس MOUSA.AI بعد نجاح التوليد ━━
       if (isMousaEnabled() && (ctx as any)?.user?.id && successfulScenes.length > 0) {
+        // 20 نقطة لكل مشهد (SESSION_COSTS.scene = 20)
+        const totalCredits = successfulScenes.length * SESSION_COSTS.scene;
         await deductMousaCredits(
           (ctx as any).user.id,
-          `خيال — توليد ${successfulScenes.length} مشهد: ${input.description.slice(0, 60)}`
+          `خيال — توليد ${successfulScenes.length} مشهد: ${input.description.slice(0, 60)}`,
+          { amount: totalCredits }
         );
       }
 
@@ -1123,9 +1126,12 @@ Respond ONLY with valid JSON:
 
       // ━━ خصم كريدتس MOUSA.AI بعد نجاح التوليد ━━
       if (isMousaEnabled() && (ctx as any)?.user?.id && successfulScenes.length > 0) {
+        // المحرك المتقدم: 20 نقطة لكل مشهد (SESSION_COSTS.scene = 20)
+        const totalCreditsAdv = successfulScenes.length * SESSION_COSTS.scene;
         await deductMousaCredits(
           (ctx as any).user.id,
-          `خيال — توليد بالمحرك المتقدم: ${input.description.slice(0, 60)}`
+          `خيال — توليد بالمحرك المتقدم (${successfulScenes.length} مشهد): ${input.description.slice(0, 60)}`,
+          { amount: totalCreditsAdv }
         );
       }
 
