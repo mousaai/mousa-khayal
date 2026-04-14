@@ -17,10 +17,20 @@
 
 import { randomUUID } from "crypto";
 
-const MOUSA_BASE_URL = process.env.MOUSA_BASE_URL ?? process.env.MOUSA_API_BASE ?? "https://www.mousa.ai";
-// PLATFORM_API_KEY هو المفتاح الصحيح المُعتمد من Manus لـ mousa.ai
-const MOUSA_API_KEY = process.env.PLATFORM_API_KEY ?? process.env.MOUSA_API_KEY ?? "";
-const MOUSA_PLATFORM_ID = process.env.PLATFORM_ID ?? process.env.MOUSA_PLATFORM_ID ?? "khayal";
+// يُقرأ في وقت الاستدعاء (ليس عند تحميل الـ module) لضمان قراءة env vars المُحقونة
+function getMousaBaseUrl(): string {
+  return process.env.MOUSA_BASE_URL ?? process.env.MOUSA_API_BASE ?? "https://www.mousa.ai";
+}
+function getMousaApiKey(): string {
+  return process.env.PLATFORM_API_KEY ?? process.env.MOUSA_API_KEY ?? "";
+}
+function getMousaPlatformId(): string {
+  return process.env.PLATFORM_ID ?? process.env.MOUSA_PLATFORM_ID ?? "khayal";
+}
+// للتوافق مع الكود القديم
+const MOUSA_BASE_URL = getMousaBaseUrl();
+const MOUSA_API_KEY = getMousaApiKey();
+const MOUSA_PLATFORM_ID = getMousaPlatformId();
 
 /**
  * التسعيرة المعتمدة — أبريل 2026
@@ -72,11 +82,16 @@ export const SESSION_COSTS = {
 
 export type SessionType = keyof typeof SESSION_COSTS;
 
-const MOUSA_HEADERS = {
-  Authorization: `Bearer ${MOUSA_API_KEY}`,
-  "X-Platform-ID": MOUSA_PLATFORM_ID,
-  "Content-Type": "application/json",
-};
+// يُبنى في وقت الاستدعاء لضمان قراءة PLATFORM_API_KEY المُحقون في الإنتاج
+function getMousaHeaders(): Record<string, string> {
+  return {
+    Authorization: `Bearer ${getMousaApiKey()}`,
+    "X-Platform-ID": getMousaPlatformId(),
+    "Content-Type": "application/json",
+  };
+}
+// للتوافق مع الكود القديم — لكن يُفضَّل استخدام getMousaHeaders() في الاستدعاءات الجديدة
+const MOUSA_HEADERS = getMousaHeaders();
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -125,7 +140,8 @@ export interface MousaDeductResult {
  * إذا لم يكن المفتاح متاحاً → وضع مفتوح (fail-open) بدون خصم
  */
 function isEnabled(): boolean {
-  return Boolean(MOUSA_API_KEY && MOUSA_BASE_URL);
+  // يقرأ في وقت الاستدعاء لضمان قراءة PLATFORM_API_KEY المُحقون
+  return Boolean(getMousaApiKey() && getMousaBaseUrl());
 }
 
 /** يحسب تكلفة الجلسة حسب نوعها */
@@ -154,7 +170,7 @@ export async function verifyMousaToken(token: string): Promise<{
   try {
     const res = await fetch(`${MOUSA_BASE_URL}/api/platform/verify-token`, {
       method: "POST",
-      headers: MOUSA_HEADERS,
+      headers: getMousaHeaders(),
       body: JSON.stringify({ token }),
     });
 
@@ -192,7 +208,7 @@ export async function checkMousaBalance(
   try {
     const res = await fetch(
       `${MOUSA_BASE_URL}/api/platform/check-balance?userId=${userId}`,
-      { headers: MOUSA_HEADERS }
+      { headers: getMousaHeaders() }
     );
 
     if (!res.ok) {
@@ -251,7 +267,7 @@ export async function deductMousaCredits(
     const res = await fetch(`${MOUSA_BASE_URL}/api/platform/deduct-credits`, {
       method: "POST",
       headers: {
-        ...MOUSA_HEADERS,
+        ...getMousaHeaders(),
         "X-Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify(body),
@@ -388,7 +404,7 @@ export async function notifyMousaPricing(): Promise<MousaPricingWebhookResult> {
   try {
     const res = await fetch(url, {
       method: "POST",
-      headers: MOUSA_HEADERS,
+      headers: getMousaHeaders(),
       body: JSON.stringify(body),
     });
 
@@ -424,8 +440,8 @@ export function isMousaEnabled(): boolean {
   return isEnabled();
 }
 
-export function getMousaPlatformId(): string {
-  return MOUSA_PLATFORM_ID;
+export function getMousaPlatformIdPublic(): string {
+  return getMousaPlatformId();
 }
 
 export function getMousaUpgradeUrl(): string {

@@ -9,7 +9,7 @@ import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import {
   isMousaEnabled,
   getMousaUpgradeUrl,
-  getMousaPlatformId,
+  getMousaPlatformIdPublic,
   SESSION_COSTS,
   type SessionType,
 } from "./mousaCreditsService";
@@ -183,7 +183,7 @@ export const creditsRouter = router({
   getStatus: publicProcedure.query(() => {
     return {
       enabled: isMousaEnabled(),
-      platformId: getMousaPlatformId(),
+      platformId: getMousaPlatformIdPublic(),
       platformNameAr: "خيال",
       platformNameEn: "KHAYAL",
       costPerSession: SESSION_COSTS.default,
