@@ -76,7 +76,31 @@ export function useMousaAuth() {
       const token = urlParams.get("token");
 
       if (!token) {
-        // زائر بدون token — المنصة مفتوحة له بدون مصادقة
+        // زائر بدون token في URL — لكن قد يكون لديه JWT cookie محفوظ من جلسة سابقة
+        // نتحقق من /api/sso/status لاستعادة بيانات المستخدم تلقائياً
+        try {
+          const statusRes = await fetch("/api/sso/status", {
+            credentials: "include",
+          });
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            if (statusData.authenticated && statusData.userId) {
+              const restoredUser: MousaUser = {
+                userId: statusData.userId,
+                openId: statusData.openId ?? `mousa_${statusData.userId}`,
+                name: statusData.name ?? "مستخدم",
+                email: statusData.email ?? "",
+                creditBalance: statusData.creditBalance ?? 0,
+                platform: THIS_PLATFORM,
+              };
+              setState({ user: restoredUser, loading: false, error: null, token: null });
+              return;
+            }
+          }
+        } catch {
+          // فشل الاتصال — زائر عادي
+        }
+        // زائر حقيقي بدون جلسة
         setState({ user: null, loading: false, error: null, token: null });
         return;
       }

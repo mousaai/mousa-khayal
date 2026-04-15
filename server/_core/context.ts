@@ -8,6 +8,8 @@ export type TrpcContext = {
   user: User | null;
   /** mousaUserId: معرّف المستخدم الحقيقي في موسى.ai — محفوظ في DB منذ تسجيل الدخول */
   mousaUserId?: number | null;
+  /** mousaBalance: آخر رصيد معروف (يُحدَّث كل 5 دقائق في الخلفية) */
+  mousaBalance?: number | null;
 };
 
 export async function createContext(
@@ -22,10 +24,14 @@ export async function createContext(
     user = null;
   }
 
-  // mousaUserId محفوظ في DB منذ تسجيل الدخول عبر mousa.ai SSO
-  // لا نحتاج استدعاء mousa.ai في كل طلب
+  // mousaUserId و mousaBalance محفوظان في DB منذ تسجيل الدخول عبر mousa.ai SSO
+  // sdk.authenticateRequest يُحدّث الرصيد في الخلفية كل 5 دقائق تلقائياً
   const mousaUserId: number | null = user
     ? ((user as any).mousaUserId ?? null)
+    : null;
+
+  const mousaBalance: number | null = user
+    ? ((user as any).mousaBalance ?? null)
     : null;
 
   return {
@@ -33,5 +39,6 @@ export async function createContext(
     res: opts.res,
     user,
     mousaUserId,
+    mousaBalance,
   };
 }

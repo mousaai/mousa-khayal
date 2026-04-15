@@ -281,12 +281,40 @@ class SDKServer {
       throw ForbiddenError("Session expired, please re-login via mousa.ai");
     }
 
-    await db.upsertUser({
+    // تحديث lastSignedIn دائماً
+    const updatePayload: Parameters<typeof db.upsertUser>[0] = {
       openId: user.openId,
       lastSignedIn: signedInAt,
-    });
+    };
 
-    return user;
+    // مزامنة الرصيد من mousa.ai في الخلفية (كل 5 دقائق كحد أقصى)
+    if (user.mousaUserId) {
+      const lastSync = user.mousaLastSync ? new Date(user.mousaLastSync).getTime() : 0;
+      const fiveMinutes = 5 * 60 * 1000;
+      const needsSync = Date.now() - lastSync > fiveMinutes;
+      if (needsSync) {
+        // مزامنة async في الخلفية — لا تُبطئ الطلب
+        import("../mousa-api").then(({ checkMousaBalance }) => {
+          checkMousaBalance(user!.mousaUserId!)
+            .then((data) => {
+              if (data?.balance !== undefined) {
+                db.upsertUser({
+                  openId: user!.openId,
+                  mousaBalance: data.balance,
+                  mousaLastSync: new Date(),
+                }).catch(() => {});
+              }
+            })
+            .catch(() => {});
+        }).catch(() => {});
+      }
+    }
+
+    await db.upsertUser(updatePayload);
+
+    // إعادة قراءة المستخدم بعد التحديث لضمان أحدث البيانات
+    const updatedUser = await db.getUserByOpenId(sessionUserId);
+    return updatedUser ?? user;
   }
 }
 

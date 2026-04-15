@@ -1029,3 +1029,14 @@
 - [x] اختبارات vitest: 7 اختبارات تغطي جميع سيناريوهات الـ fallback
 - [x] تحديث مفتاح Google AI (khayal-prod) في الإنتاج
 - [x] إضافة Stability AI API Key في الإنتاج
+
+---
+
+## 🔴 معالجة فجوات ربط mousa.ai — أبريل 2026
+
+- [x] إصلاح sdk.ts: تزامن mousaBalance في الخلفية كل 5 دقائق تلقائياً
+- [x] إصلاح context.ts: إضافة mousaBalance إلى TrpcContext واستخراجه من المستخدم
+- [x] إصلاح useMousaAuth.ts: استعادة الجلسة من /api/sso/status عند غياب token في URL
+- [x] CreditsWidget موجود بالفعل في الـ Header (موضع top-4 right-28)
+- [x] CreditConfirmDialog موجود في جميع أزرار التوليد
+- [x] اختبارات vitest: 12 اختبار لتغطية منطق تزامن الرصيد واستعادة الجلسة
