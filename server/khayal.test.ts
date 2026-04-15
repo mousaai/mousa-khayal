@@ -52,6 +52,7 @@ vi.mock("./mousaCreditsService", () => ({
   isMousaEnabled: vi.fn().mockReturnValue(true),
   getMousaPlatformId: vi.fn().mockReturnValue("khayal"),
   getMousaUpgradeUrl: vi.fn().mockReturnValue("https://www.mousa.ai/pricing?ref=khayal"),
+  getMousaUserIdFromUser: vi.fn().mockReturnValue(12345),
   SESSION_COSTS: { scene: 30, script_only: 5, film_short: 450, film_medium: 1100, film_long: 3200, autonomous: 400, surprise: 400, default: 30 },
 }));
 

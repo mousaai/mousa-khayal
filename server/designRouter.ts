@@ -19,7 +19,7 @@ import { getDb } from "./db";
 import { architecturalDesigns } from "../drizzle/schema";
 import { eq, desc, and } from "drizzle-orm";
 import { storagePut } from "./storage";
-import { checkMousaBalance, deductMousaCredits } from "./mousaCreditsService";
+import { checkMousaBalance, deductMousaCredits, getMousaUserIdFromUser } from "./mousaCreditsService";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 
@@ -140,10 +140,11 @@ export const designRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = (ctx.user as { id: number }).id;
+      const _mousaUserId_design = getMousaUserIdFromUser(ctx.user ?? null);
       const cost = calculateCost(input.type, !!input.referenceImageUrl);
 
       // 1. التحقق من الرصيد
-      const balanceData = await checkMousaBalance(Number(userId));
+      const balanceData = _mousaUserId_design ? await checkMousaBalance(_mousaUserId_design) : null;
       if (balanceData && balanceData.balance < cost) {
         throw new TRPCError({
           code: "PAYMENT_REQUIRED",
@@ -197,11 +198,13 @@ export const designRouter = router({
       }).$returningId();
 
       // 6. خصم الكريدت
-      await deductMousaCredits(
-        Number(userId),
-        `تصميم ${DESIGN_TYPES[input.type as keyof typeof DESIGN_TYPES].label}: ${DESIGN_STYLES[input.style as keyof typeof DESIGN_STYLES].label}`,
-        { amount: cost }
-      );
+      if (_mousaUserId_design) {
+        await deductMousaCredits(
+          _mousaUserId_design,
+          `تصميم ${DESIGN_TYPES[input.type as keyof typeof DESIGN_TYPES].label}: ${DESIGN_STYLES[input.style as keyof typeof DESIGN_STYLES].label}`,
+          { amount: cost }
+        );
+      }
 
       // 7. جلب التصميم المحفوظ
       const [saved] = await db.select().from(architecturalDesigns).where(eq(architecturalDesigns.id, design.id));
@@ -242,6 +245,7 @@ export const designRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const userId = (ctx.user as { id: number }).id;
+      const _mousaUserId_refine = getMousaUserIdFromUser(ctx.user ?? null);
       const db = await getDb();
       if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
@@ -261,7 +265,7 @@ export const designRouter = router({
       const cost = calculateCost(original.type, true);
 
       // التحقق من الرصيد
-      const refineBalance = await checkMousaBalance(Number(userId));
+      const refineBalance = _mousaUserId_refine ? await checkMousaBalance(_mousaUserId_refine) : null;
       if (refineBalance && refineBalance.balance < cost) {
         throw new TRPCError({
           code: "PAYMENT_REQUIRED",
@@ -309,11 +313,13 @@ export const designRouter = router({
       }).$returningId();
 
       // خصم الكريدت
-      await deductMousaCredits(
-        Number(userId),
-        `تعديل تصميم: ${DESIGN_STYLES[original.style as keyof typeof DESIGN_STYLES]?.label || original.style}`,
-        { amount: cost }
-      );
+      if (_mousaUserId_refine) {
+        await deductMousaCredits(
+          _mousaUserId_refine,
+          `تعديل تصميم: ${DESIGN_STYLES[original.style as keyof typeof DESIGN_STYLES]?.label || original.style}`,
+          { amount: cost }
+        );
+      }
 
       const [saved] = await db.select().from(architecturalDesigns).where(eq(architecturalDesigns.id, newDesign.id));
       return saved;

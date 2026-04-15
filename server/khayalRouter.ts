@@ -22,7 +22,7 @@ import { checkContent, SAFE_CONTENT_DIRECTIVE } from "./contentFilter";
 import { analyzeDomain, buildDomainPrompt, quickDetectDomain } from "./domainEngine";
 import type { DomainAnalysis } from "./domainEngine";
 import { generateScript } from "./scriptEngine";
-import { guardMousaBalance, deductMousaCredits, isMousaEnabled, SESSION_COSTS } from "./mousaCreditsService";
+import { guardMousaBalance, deductMousaCredits, isMousaEnabled, SESSION_COSTS, getMousaUserIdFromUser } from "./mousaCreditsService";
 
 // ═══════════════════════════════════════════════════════════════
 // CAMERA ANGLES — زوايا الكاميرا المحددة لكتلة واحدة
@@ -527,12 +527,12 @@ export const khayalRouter = router({
         confidence: z.number(),
       }).optional(),
     }))
-    .mutation(async ({ input, ctx }: any) => {
+     .mutation(async ({ input, ctx }: any) => {
       const db = await getDb();
-
       // ━━ فحص رصيد MOUSA.AI قبل التوليد ━━
-      if (isMousaEnabled() && ctx?.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id);
+      const _mousaUserId_gs = getMousaUserIdFromUser(ctx?.user ?? null);
+      if (isMousaEnabled() && _mousaUserId_gs) {
+        const guard = await guardMousaBalance(_mousaUserId_gs);
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",
@@ -541,11 +541,10 @@ export const khayalRouter = router({
           }));
         }
       }
-
       // ━━ كشف وجه الشخص إذا كانت الصورة تحتوي على شخص ━━
       let faceDescription: string | undefined;
       if (input.referenceImageUrl && isPersonImage(input.description, input.referenceImageUrl)) {
-        console.log("[generateScene] Detecting face features from reference image...");
+        console.log("[generateScene] Detecting face features from reference image...");;
         faceDescription = await analyzeFaceFeatures(input.referenceImageUrl) || undefined;
         if (faceDescription) {
           console.log("[generateScene] Face locked:", faceDescription.slice(0, 80));
@@ -633,17 +632,16 @@ export const khayalRouter = router({
         .filter((r): r is PromiseFulfilledResult<any> => r.status === "fulfilled")
         .map(r => r.value);
 
-      // ━━ خصم كريدتس MOUSA.AI بعد نجاح التوليد ━━
-      if (isMousaEnabled() && (ctx as any)?.user?.id && successfulScenes.length > 0) {
+       // ━━ خصم كريدتس MOUSA.AI بعد نجاح التوليد ━━
+      if (isMousaEnabled() && _mousaUserId_gs && successfulScenes.length > 0) {
         // 20 نقطة لكل مشهد (SESSION_COSTS.scene = 20)
         const totalCredits = successfulScenes.length * SESSION_COSTS.scene;
         await deductMousaCredits(
-          (ctx as any).user.id,
+          _mousaUserId_gs,
           `خيال — توليد ${successfulScenes.length} مشهد: ${input.description.slice(0, 60)}`,
           { amount: totalCredits }
         );
       }
-
       return {
         projectId,
         scenes: successfulScenes,
@@ -1039,9 +1037,11 @@ Respond ONLY with valid JSON:
       visualMode: z.enum(["free", "cinematic", "realistic", "precise"]).default("cinematic"),
     }))
     .mutation(async ({ input, ctx }: any) => {
+      const db = await getDb();
       // ━━ فحص رصيد MOUSA.AI قبل التوليد ━━
-      if (isMousaEnabled() && ctx?.user?.id) {
-        const guard = await guardMousaBalance(ctx.user.id);
+      const _mousaUserId1 = getMousaUserIdFromUser(ctx?.user ?? null);
+      if (isMousaEnabled() && _mousaUserId1) {
+        const guard = await guardMousaBalance(_mousaUserId1);
         if (!guard.allowed) {
           throw new Error(JSON.stringify({
             code: "INSUFFICIENT_CREDITS",
@@ -1050,10 +1050,10 @@ Respond ONLY with valid JSON:
           }));
         }
       }
-
       // ━━ كشف وجه الشخص إذا كانت الصورة تحتوي على شخص ━━
       let faceDescription: string | undefined;
       if (input.referenceImageUrl && isPersonImage(input.description, input.referenceImageUrl)) {
+        console.log("[generateScene] Detecting face features from reference image...");
         faceDescription = await analyzeFaceFeatures(input.referenceImageUrl) || undefined;
         if (faceDescription) console.log("[generateWithDomainEngine] Face locked:", faceDescription.slice(0, 80));
       }
@@ -1125,11 +1125,11 @@ Respond ONLY with valid JSON:
         .map(r => r.value);
 
       // ━━ خصم كريدتس MOUSA.AI بعد نجاح التوليد ━━
-      if (isMousaEnabled() && (ctx as any)?.user?.id && successfulScenes.length > 0) {
+      if (isMousaEnabled() && _mousaUserId1 && successfulScenes.length > 0) {
         // المحرك المتقدم: 20 نقطة لكل مشهد (SESSION_COSTS.scene = 20)
         const totalCreditsAdv = successfulScenes.length * SESSION_COSTS.scene;
         await deductMousaCredits(
-          (ctx as any).user.id,
+          _mousaUserId1,
           `خيال — توليد بالمحرك المتقدم (${successfulScenes.length} مشهد): ${input.description.slice(0, 60)}`,
           { amount: totalCreditsAdv }
         );

@@ -9,6 +9,7 @@ vi.mock("./mousaCreditsService", () => ({
   checkMousaBalance: vi.fn().mockResolvedValue({ balance: 1000, currency: "credit" }),
   deductMousaCredits: vi.fn().mockResolvedValue({ success: true }),
   guardMousaBalance: vi.fn().mockResolvedValue(undefined),
+  getMousaUserIdFromUser: vi.fn().mockReturnValue(12345),
 }));
 
 vi.mock("./db", () => ({
