@@ -1052,3 +1052,10 @@
 - [x] الفجوة 5: localStorage كـ cache — تم التحقق: isFallback يُعالَج بشكل ذكي ✅
 - [x] الفجوة 6: تنبيه PLATFORM_API_KEY الصامت — إضافة console.warn/log عند بدء الخادم في index.ts
 - [x] الفجوة 7: مؤشر بصري واضح في CreditsWidget — أيقونة برتقالية + "حساب غير مربوط" + زر ربط الحساب
+
+---
+
+## 🔴 إصلاح الفجوتين المتبقيتين — أبريل 2026
+
+- [x] الفجوة 2: بادئة mousa_ قرار تصميمي مقصود ومُوثّق — لا تغيير مطلوب، إزالتها تكسر الكود
+- [x] الفجوة 6: تم إزالة حفظ الرصيد في localStorage من refreshBalance وrefreshBalanceInBackground — المصدر الحقيقي هو /api/sso/status

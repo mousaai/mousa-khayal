@@ -243,9 +243,7 @@ export function useMousaAuth() {
           ...prev,
           user: prev.user ? { ...prev.user, creditBalance: balance } : null,
         }));
-        if (state.token) {
-          saveSession(state.token, { ...state.user, creditBalance: balance });
-        }
+        // لا نحفظ في localStorage — الرصيد يتغير باستمرار والمصدر الحقيقي هو /api/sso/status
         return balance;
       }
       return state.user?.creditBalance ?? 0;
@@ -254,7 +252,7 @@ export function useMousaAuth() {
     }
   }
 
-  async function refreshBalanceInBackground(token: string, currentUser: MousaUser) {
+  async function refreshBalanceInBackground(_token: string, currentUser: MousaUser) {
     if (currentUser.isFallback) return;
     try {
       const balance = await fetchBalanceFromServer();
@@ -263,7 +261,7 @@ export function useMousaAuth() {
           ...prev,
           user: prev.user ? { ...prev.user, creditBalance: balance } : null,
         }));
-        saveSession(token, { ...currentUser, creditBalance: balance });
+        // لا نحفظ في localStorage — نتجنب تخزين رصيد قديم يُضلل المستخدم
       }
     } catch {}
   }
