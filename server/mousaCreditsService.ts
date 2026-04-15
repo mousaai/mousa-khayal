@@ -172,6 +172,7 @@ export async function verifyMousaToken(token: string): Promise<{
       method: "POST",
       headers: getMousaHeaders(),
       body: JSON.stringify({ token }),
+      signal: AbortSignal.timeout(8000),
     });
 
     const data = await res.json();
@@ -208,7 +209,7 @@ export async function checkMousaBalance(
   try {
     const res = await fetch(
       `${MOUSA_BASE_URL}/api/platform/check-balance?userId=${userId}`,
-      { headers: getMousaHeaders() }
+      { headers: getMousaHeaders(), signal: AbortSignal.timeout(8000) }
     );
 
     if (!res.ok) {
@@ -271,6 +272,7 @@ export async function deductMousaCredits(
         "X-Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
     });
 
     const data = await res.json();
@@ -406,6 +408,7 @@ export async function notifyMousaPricing(): Promise<MousaPricingWebhookResult> {
       method: "POST",
       headers: getMousaHeaders(),
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(8000),
     });
 
     const data = await res.json();

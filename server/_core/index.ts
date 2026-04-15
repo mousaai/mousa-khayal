@@ -164,6 +164,21 @@ async function startServer() {
 
   server.listen(port, () => {
     console.log(`Server running on http://localhost:${port}/`);
+    // ── تحقق من تكامل mousa.ai عند بدء التشغيل ──────────────────────────────
+    const platformApiKey = process.env.PLATFORM_API_KEY ?? process.env.MOUSA_API_KEY ?? "";
+    const mousaBaseUrl = process.env.MOUSA_BASE_URL ?? process.env.MOUSA_API_BASE ?? "";
+    const platformId = process.env.PLATFORM_ID ?? process.env.MOUSA_PLATFORM_ID ?? "";
+    const webhookSecret = process.env.MOUSA_WEBHOOK_SECRET ?? process.env.WEBHOOK_SECRET ?? "";
+    if (!platformApiKey) {
+      console.warn("⚠️  [mousa.ai] PLATFORM_API_KEY غير مُضبوط — تكامل الكريدت معطّل (وضع مفتوح)");
+    } else {
+      console.log(`✅ [mousa.ai] PLATFORM_API_KEY مُضبوط (platform=${platformId || 'khayal'}, url=${mousaBaseUrl || 'https://www.mousa.ai'})`);
+    }
+    if (!webhookSecret) {
+      console.warn("⚠️  [mousa.ai] MOUSA_WEBHOOK_SECRET غير مُضبوط — أحداث الكريدت لن تُعالَج");
+    } else {
+      console.log("✅ [mousa.ai] MOUSA_WEBHOOK_SECRET مُضبوط — Webhook جاهز");
+    }
   });
 }
 

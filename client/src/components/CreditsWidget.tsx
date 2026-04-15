@@ -61,29 +61,35 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
   if (isFallback) {
     if (compact) {
       return (
-        <div className={`flex items-center gap-1.5 ${className}`}>
-          <Coins className="w-3.5 h-3.5 text-emerald-400" />
-          <span className="text-xs text-emerald-400 font-mono font-bold">{user.creditBalance}</span>
-          <span className="text-[10px] text-emerald-400/60">{lang === 'AR' ? 'مجاني' : 'free'}</span>
+        <div className={`flex items-center gap-1.5 ${className}`} title={lang === 'AR' ? 'حساب غير مربوط — كريدت مؤقتة' : 'Account not linked — temporary credits'}>
+          <AlertTriangle className="w-3.5 h-3.5 text-orange-400 animate-pulse" />
+          <span className="text-xs text-orange-400 font-mono font-bold">{user.creditBalance}</span>
+          <span className="text-[10px] text-orange-400/60">{lang === 'AR' ? 'مؤقت' : 'temp'}</span>
         </div>
       );
     }
     return (
-      <div className={`rounded-xl border border-emerald-500/20 bg-emerald-950/10 p-3 ${className}`}>
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-            <Coins className="w-4 h-4 text-emerald-400" />
+      <div className={`rounded-xl border border-orange-500/30 bg-orange-950/15 p-3 ${className}`}>
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-8 h-8 rounded-lg bg-orange-500/20 flex items-center justify-center">
+            <AlertTriangle className="w-4 h-4 text-orange-400" />
           </div>
           <div>
             <div className="flex items-baseline gap-1">
-              <span className="text-lg font-bold font-mono text-emerald-300">{user.creditBalance}</span>
-              <span className="text-xs text-emerald-400/60">{lang === 'AR' ? 'كريدت مجاني' : 'Free Credits'}</span>
+              <span className="text-lg font-bold font-mono text-orange-300">{user.creditBalance}</span>
+              <span className="text-xs text-orange-400/60">{lang === 'AR' ? 'كريدت مؤقتة' : 'Temp Credits'}</span>
             </div>
-            <div className="text-[10px] text-white/30">
-              {lang === 'AR' ? 'يُجدَّد عند استعادة الاتصال بحسابك' : 'Restored when account reconnects'}
+            <div className="text-[10px] text-orange-400/50 font-medium">
+              {lang === 'AR' ? '⚠️ حساب غير مربوط بـ MOUSA.AI' : '⚠️ Account not linked to MOUSA.AI'}
             </div>
           </div>
         </div>
+        <button
+          onClick={() => window.open('https://www.mousa.ai?ref=khayal', '_blank')}
+          className="w-full text-[10px] text-orange-400/70 hover:text-orange-400 underline text-center transition-colors"
+        >
+          {lang === 'AR' ? 'ربط حسابك الآن ←' : 'Link your account now →'}
+        </button>
       </div>
     );
   }

@@ -1040,3 +1040,15 @@
 - [x] CreditsWidget موجود بالفعل في الـ Header (موضع top-4 right-28)
 - [x] CreditConfirmDialog موجود في جميع أزرار التوليد
 - [x] اختبارات vitest: 12 اختبار لتغطية منطق تزامن الرصيد واستعادة الجلسة
+
+---
+
+## ✅ إصلاح فجوات ربط mousa.ai (مقارنة مع فضاء) — أبريل 2026
+
+- [x] الفجوة 1: بادئة mousa_ في openId — تم التحقق: هي قرار تصميمي مقصود وليست خطأ
+- [x] الفجوة 2: توقيع Webhook — تم التحقق: x-mousa-signature مع HMAC sha256 مُطبَّق بالفعل ✅
+- [x] الفجوة 3: AbortSignal.timeout(8000) لجميع fetch calls في mousaCreditsService.ts (4 استدعاءات)
+- [x] الفجوة 4: creditBalance في JWT — تم التحقق: قرار تصميمي صحيح (الرصيد يُقرأ من DB لتجنب بيانات قديمة)
+- [x] الفجوة 5: localStorage كـ cache — تم التحقق: isFallback يُعالَج بشكل ذكي ✅
+- [x] الفجوة 6: تنبيه PLATFORM_API_KEY الصامت — إضافة console.warn/log عند بدء الخادم في index.ts
+- [x] الفجوة 7: مؤشر بصري واضح في CreditsWidget — أيقونة برتقالية + "حساب غير مربوط" + زر ربط الحساب
