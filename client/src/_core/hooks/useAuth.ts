@@ -1,10 +1,10 @@
 import { trpc } from "@/lib/trpc";
 import { TRPCClientError } from "@trpc/client";
 import { useCallback, useEffect, useMemo } from "react";
+import { getLoginUrl } from "@/const";
 
 /** رابط تسجيل الدخول الموحّد — يوجّه إلى mousa.ai مع redirect للعودة */
-const getMousaLoginUrl = () =>
-  `https://www.mousa.ai/dashboard?redirect=${encodeURIComponent(window.location.origin)}`;
+const getMousaLoginUrl = () => getLoginUrl();
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;

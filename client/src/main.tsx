@@ -6,12 +6,13 @@ import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import App from "./App";
 import "./index.css";
+import { getLoginUrl } from "./const";
 
 const queryClient = new QueryClient();
 
 const redirectToMousaLogin = () => {
   if (typeof window === "undefined") return;
-  window.location.href = `https://www.mousa.ai/dashboard?redirect=${encodeURIComponent(window.location.origin)}`;
+  window.location.href = getLoginUrl();
 };
 
 queryClient.getQueryCache().subscribe(event => {

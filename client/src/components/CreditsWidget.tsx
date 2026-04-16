@@ -7,6 +7,7 @@
  */
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/components/AuthGate";
+import { getLoginUrl } from "@/const";
 import { Coins, AlertTriangle, ExternalLink, Zap, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -85,7 +86,7 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
           </div>
         </div>
         <button
-          onClick={() => window.open('https://www.mousa.ai?ref=khayal', '_blank')}
+          onClick={() => { window.location.href = getLoginUrl(); }}
           className="w-full text-[10px] text-orange-400/70 hover:text-orange-400 underline text-center transition-colors"
         >
           {lang === 'AR' ? 'ربط حسابك الآن ←' : 'Link your account now →'}
@@ -99,9 +100,7 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
     if (compact) {
       return (
         <a
-          href="https://www.mousa.ai?ref=khayal"
-          target="_blank"
-          rel="noopener noreferrer"
+          href={getLoginUrl()}
           className={`flex items-center gap-1.5 text-xs text-yellow-400/70 hover:text-yellow-400 transition-colors ${className}`}
         >
           <Coins className="w-3.5 h-3.5" />
@@ -125,7 +124,7 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
         <Button
           size="sm"
           className="w-full h-7 text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30"
-          onClick={() => window.open("https://www.mousa.ai?ref=khayal", "_blank")}
+          onClick={() => { window.location.href = getLoginUrl(); }}
         >
           <ExternalLink className="w-3 h-3 mr-1" />
           {lang === "AR" ? "سجّل دخول عبر MOUSA.AI" : "Login via MOUSA.AI"}

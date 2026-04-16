@@ -15,6 +15,7 @@ import { musicEngine, selectMusicMood } from "@/lib/musicEngine";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { ALL_LANGS, LANG_NAMES, LANG_FLAGS, isRTLLang } from "@/i18n/translations";
 import { useAuth } from "@/components/AuthGate";
+import { getLoginUrl } from "@/const";
 import { useMousaTokenHandoff } from "@/hooks/useMousaTokenHandoff";
 import CreditConfirmDialog from "@/components/CreditConfirmDialog";
 
@@ -1184,7 +1185,7 @@ export default function Home() {
 
           {/* زر تسجيل الدخول */}
           <button
-            onClick={() => { window.location.href = `https://www.mousa.ai/dashboard?redirect=${encodeURIComponent(window.location.origin)}`; }}
+            onClick={() => { window.location.href = getLoginUrl(); }}
             className="w-full py-4 rounded-2xl text-lg font-bold transition-all hover:scale-105 active:scale-95"
             style={{
               background: "linear-gradient(135deg, #7c3aed, #4f46e5)",

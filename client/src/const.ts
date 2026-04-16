@@ -1,17 +1,17 @@
 export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 
-// Generate login URL at runtime so redirect URI reflects the current origin.
-export const getLoginUrl = () => {
-  const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
-  const appId = import.meta.env.VITE_APP_ID;
-  const redirectUri = `${window.location.origin}/api/oauth/callback`;
-  const state = btoa(redirectUri);
-
-  const url = new URL(`${oauthPortalUrl}/app-auth`);
-  url.searchParams.set("appId", appId);
-  url.searchParams.set("redirectUri", redirectUri);
-  url.searchParams.set("state", state);
-  url.searchParams.set("type", "signIn");
-
+/**
+ * رابط تسجيل الدخول الوحيد — يوجّه المستخدم مباشرة إلى mousa.ai
+ * بعد تسجيل الدخول، يُعاد توجيهه إلى: https://khayal.mousa.ai?token=<JWT>
+ * الـ hook useMousaAuth يستقبل الـ token ويُنشئ جلسة محلية
+ *
+ * ملاحظة: Manus OAuth مُعطَّل — المصادقة تمر عبر mousa.ai SSO فقط
+ */
+export const getLoginUrl = (returnPath: string = "/") => {
+  const origin = window.location.origin;
+  const redirectUrl = `${origin}${returnPath}`;
+  const url = new URL("https://www.mousa.ai/dashboard");
+  url.searchParams.set("redirect", redirectUrl);
+  url.searchParams.set("ref", "khayal");
   return url.toString();
 };
