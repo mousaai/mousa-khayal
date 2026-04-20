@@ -7,7 +7,7 @@
  */
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/components/AuthGate";
-import { getLoginUrl } from "@/const";
+import { getLoginUrl, getAppleLoginUrl } from "@/const";
 import { Coins, AlertTriangle, ExternalLink, Zap, ChevronDown, ChevronUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLanguage } from "@/i18n/LanguageContext";
@@ -121,14 +121,24 @@ export default function CreditsWidget({ compact = false, className = "" }: Credi
             <div className="text-[10px] text-white/30 font-mono">MOUSA.AI</div>
           </div>
         </div>
-        <Button
-          size="sm"
-          className="w-full h-7 text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30"
-          onClick={() => { window.location.href = getLoginUrl(); }}
-        >
-          <ExternalLink className="w-3 h-3 mr-1" />
-          {lang === "AR" ? "سجّل دخول عبر MOUSA.AI" : "Login via MOUSA.AI"}
-        </Button>
+        <div className="flex flex-col gap-1.5">
+          <Button
+            size="sm"
+            className="w-full h-7 text-xs bg-yellow-500/20 hover:bg-yellow-500/30 text-yellow-300 border border-yellow-500/30"
+            onClick={() => { window.location.href = getLoginUrl(); }}
+          >
+            <ExternalLink className="w-3 h-3 mr-1" />
+            {lang === "AR" ? "دخول بـ Google" : "Login with Google"}
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            className="w-full h-7 text-xs text-white/60 border-white/10 hover:bg-white/5 bg-transparent"
+            onClick={() => { window.location.href = getAppleLoginUrl(); }}
+          >
+            {lang === "AR" ? "دخول بـ Apple" : "Login with Apple"}
+          </Button>
+        </div>
       </div>
     );
   }

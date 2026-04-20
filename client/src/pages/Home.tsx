@@ -15,7 +15,7 @@ import { musicEngine, selectMusicMood } from "@/lib/musicEngine";
 import { useLanguage } from "@/i18n/LanguageContext";
 import { ALL_LANGS, LANG_NAMES, LANG_FLAGS, isRTLLang } from "@/i18n/translations";
 import { useAuth } from "@/components/AuthGate";
-import { getLoginUrl } from "@/const";
+import { getLoginUrl, getAppleLoginUrl } from "@/const";
 import { useMousaTokenHandoff } from "@/hooks/useMousaTokenHandoff";
 import CreditConfirmDialog from "@/components/CreditConfirmDialog";
 
@@ -1183,19 +1183,33 @@ export default function Home() {
             ))}
           </div>
 
-          {/* زر تسجيل الدخول */}
-          <button
-            onClick={() => { window.location.href = getLoginUrl(); }}
-            className="w-full py-4 rounded-2xl text-lg font-bold transition-all hover:scale-105 active:scale-95"
-            style={{
-              background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
-              boxShadow: "0 0 40px rgba(124,58,237,0.4), 0 0 80px rgba(124,58,237,0.2)",
-              color: "white",
-              fontFamily: "'Tajawal', sans-serif",
-            }}
-          >
-            {lang.loginBtn ?? "سجل الدخول عبر Mousa.ai"}
-          </button>
+          {/* أزرار تسجيل الدخول */}
+          <div className="flex flex-col gap-3">
+            <button
+              onClick={() => { window.location.href = getLoginUrl(); }}
+              className="w-full py-4 rounded-2xl text-lg font-bold transition-all hover:scale-105 active:scale-95"
+              style={{
+                background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                boxShadow: "0 0 40px rgba(124,58,237,0.4), 0 0 80px rgba(124,58,237,0.2)",
+                color: "white",
+                fontFamily: "'Tajawal', sans-serif",
+              }}
+            >
+              {lang.loginBtn ?? "دخول بـ Google"}
+            </button>
+            <button
+              onClick={() => { window.location.href = getAppleLoginUrl(); }}
+              className="w-full py-3 rounded-2xl text-base font-medium transition-all hover:scale-105 active:scale-95"
+              style={{
+                background: "rgba(255,255,255,0.05)",
+                border: "1px solid rgba(255,255,255,0.15)",
+                color: "rgba(255,255,255,0.7)",
+                fontFamily: "'Tajawal', sans-serif",
+              }}
+            >
+              دخول بـ Apple
+            </button>
+          </div>
 
           <p className="mt-4 text-xs text-purple-300/40" style={{ fontFamily: "'Tajawal', sans-serif" }}>
             {lang.loginHint ?? "تسجيل الدخول مطلوب لاستخدام خيال"}
