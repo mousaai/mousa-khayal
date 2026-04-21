@@ -26,6 +26,7 @@ import http from "http";
 import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
 import { ElevenLabsEngine, selectVoiceForDomain, type ElevenLabsVoiceId } from "./elevenLabsEngine";
+import { openAiTtsEngine } from "./openAiTtsEngine";
 import { detectFilmGenre, getGenreDNA, type FilmGenre } from "./filmGenreEngine";
 import { RunwayEngine, selectMotionForDomain } from "./runwayEngine";
 
@@ -504,6 +505,7 @@ export class VideoProducer {
       ? "eleven_multilingual_v2"
       : "eleven_turbo_v2_5";
 
+    // ── المحاولة الأولى: ElevenLabs ──────────────────────────
     try {
       const audioBuffer = await this.elevenLabs.generateSpeech({
         voice: elevenVoice,
@@ -511,18 +513,38 @@ export class VideoProducer {
         model: ttsModel as any,
       });
 
-      if (!audioBuffer) {
-        console.warn("[VideoProducer] ElevenLabs TTS فشل — سيتم الإنتاج بدون صوت");
-        return null;
+      if (audioBuffer) {
+        await fs.writeFile(audioPath, audioBuffer);
+        console.log(`  ✓ صوت ElevenLabs جاهز: ${audioPath}`);
+        return audioPath;
       }
-
-      await fs.writeFile(audioPath, audioBuffer);
-      console.log(`  ✓ صوت ElevenLabs جاهز: ${audioPath}`);
-      return audioPath;
+      console.warn("[VideoProducer] ElevenLabs TTS فشل — تجربة OpenAI TTS...");
     } catch (e) {
-      console.warn(`[VideoProducer] ElevenLabs error: ${e} — سيتم الإنتاج بدون صوت`);
-      return null;
+      console.warn(`[VideoProducer] ElevenLabs error: ${e} — تجربة OpenAI TTS...`);
     }
+
+    // ── المحاولة الثانية: OpenAI TTS (fallback اقتصادي) ──────
+    if (openAiTtsEngine.isConfigured()) {
+      try {
+        const openAiModel = mode === "production" ? "tts-1-hd" : "tts-1";
+        const audioBuffer = await openAiTtsEngine.generateSpeech(
+          script.narration,
+          elevenVoice,
+          openAiModel
+        );
+
+        if (audioBuffer) {
+          await fs.writeFile(audioPath, audioBuffer);
+          console.log(`  ✓ صوت OpenAI TTS جاهز (fallback): ${audioPath}`);
+          return audioPath;
+        }
+      } catch (e) {
+        console.warn(`[VideoProducer] OpenAI TTS error: ${e}`);
+      }
+    }
+
+    console.warn("[VideoProducer] كلا ElevenLabs وOpenAI TTS فشلا — سيتم الإنتاج بدون صوت");
+    return null;
   }
 
   // ─────────────────────────────────────────────────────────
