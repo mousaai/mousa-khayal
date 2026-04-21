@@ -4,11 +4,12 @@
  * ═══════════════════════════════════════════════════════════════
  * ترتيب الأولوية (Waterfall Fallback):
  *
- *  1️⃣  Gemini 3.1 Flash Image Preview  — الأحدث، أعلى جودة، مجاني
- *  2️⃣  Gemini 2.5 Flash Image          — سريع جداً، جودة عالية، مجاني
- *  3️⃣  Stability AI Ultra              — احترافي، $0.08/صورة
- *  4️⃣  Stability AI Core               — بديل أرخص، $0.03/صورة
- *  5️⃣  Replicate Flux Schnell          — احتياطي أخير، يحتاج رصيد
+ *  1️⃣  OpenAI DALL-E 3               — جودة عالية، موثوق
+ *  2️⃣  Gemini 3.1 Flash Image Preview  — الأحدث، أعلى جودة
+ *  3️⃣  Gemini 2.5 Flash Image          — سريع جداً، جودة عالية
+ *  4️⃣  Stability AI Ultra              — احترافي، $0.08/صورة
+ *  5️⃣  Stability AI Core               — بديل أرخص، $0.03/صورة
+ *  6️⃣  Replicate Flux Schnell          — احتياطي أخير، يحتاج رصيد
  *
  * الانتقال التلقائي: إذا فشل مزود (403/402/429/500) ينتقل للتالي
  * ═══════════════════════════════════════════════════════════════
@@ -37,6 +38,7 @@ export type GenerateImageResponse = {
 };
 
 type ProviderName =
+  | "openai-dalle3"
   | "gemini-3.1-flash-image"
   | "gemini-2.5-flash-image"
   | "stability-ultra"
@@ -71,7 +73,58 @@ async function urlToBase64(url: string): Promise<{ data: string; mimeType: strin
 }
 
 // ═══════════════════════════════════════════════════════════════
-// المزود ١ و٢: Google Gemini Image
+// المزود ١: OpenAI DALL-E 3
+// ═══════════════════════════════════════════════════════════════
+
+async function generateWithOpenAI(
+  prompt: string
+): Promise<Buffer> {
+  const key = ENV.openAiApiKey;
+  if (!key) throw Object.assign(new Error("OPENAI_API_KEY not configured"), { status: 401 });
+
+  const res = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${key}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "dall-e-3",
+      prompt,
+      n: 1,
+      size: "1024x1024",
+      response_format: "b64_json",
+    }),
+    signal: AbortSignal.timeout(90_000),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw Object.assign(
+      new Error(`OpenAI DALL-E HTTP ${res.status}: ${body.substring(0, 200)}`),
+      { status: res.status }
+    );
+  }
+
+  const data = await res.json() as {
+    data?: Array<{ b64_json?: string; url?: string }>;
+    error?: { message: string };
+  };
+
+  if (data.error) {
+    throw Object.assign(new Error(`OpenAI error: ${data.error.message}`), { status: 400 });
+  }
+
+  const b64 = data.data?.[0]?.b64_json;
+  if (!b64) {
+    throw Object.assign(new Error("OpenAI DALL-E: no image in response"), { status: 500 });
+  }
+
+  return Buffer.from(b64, "base64");
+}
+
+// ═══════════════════════════════════════════════════════════════
+// المزود ٢ و٣: Google Gemini Image
 // ═══════════════════════════════════════════════════════════════
 
 async function generateWithGemini(
@@ -289,6 +342,11 @@ export async function generateImage(options: GenerateImageOptions): Promise<Gene
 
   // ─── قائمة المزودين بترتيب الأولوية ─────────────────────────
   const providers: Array<{ name: ProviderName; fn: () => Promise<Buffer>; ext: string }> = [
+    {
+      name: "openai-dalle3",
+      fn: () => generateWithOpenAI(prompt),
+      ext: "png",
+    },
     {
       name: "gemini-3.1-flash-image",
       fn: () => generateWithGemini("gemini-3.1-flash-image-preview", prompt, originalImages),

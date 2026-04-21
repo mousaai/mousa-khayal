@@ -75,7 +75,9 @@ async function processSSOToken(token: string): Promise<{
 
   // الخطوة 5: حفظ/تحديث المستخدم في DB المحلية
   // openId المحلي = `mousa_{openId}` لتمييزه عن مستخدمي Manus OAuth
-  const localOpenId = `mousa_${result.openId}`;
+  // تنظيف أي بادئات mousa_ متكررة قبل إضافة البادئة
+  const cleanOpenId = result.openId.replace(/^(mousa_)+/, '');
+  const localOpenId = `mousa_${cleanOpenId}`;
   await db.upsertUser({
     openId: localOpenId,
     name: result.name || null,
@@ -111,6 +113,7 @@ router.get("/api/sso/token", async (req, res) => {
     return res.status(400).json({ error: "token مطلوب", code: "MISSING_TOKEN" });
   }
 
+  console.log(`[SSO/token] token length=${token?.length}, first30=${token?.substring(0,30)}, last10=${token?.slice(-10)}`);
   const ssoResult = await processSSOToken(token);
 
   if (!ssoResult.success) {
@@ -122,7 +125,8 @@ router.get("/api/sso/token", async (req, res) => {
   }
 
   // الخطوة 6: إنشاء JWT cookie محلي صالح لسنة كاملة
-  const localOpenId = `mousa_${ssoResult.openId}`;
+  const cleanOpenId2 = ssoResult.openId!.replace(/^(mousa_)+/, '');
+  const localOpenId = `mousa_${cleanOpenId2}`;
   const sessionToken = await sdk.createSessionToken(localOpenId, {
     name: ssoResult.name || "",
     expiresInMs: SSO_SESSION_TTL_MS,
@@ -150,6 +154,7 @@ router.post("/api/sso/verify", async (req, res) => {
     return res.status(400).json({ error: "token مطلوب", code: "MISSING_TOKEN" });
   }
 
+  console.log(`[SSO/verify] token length=${token?.length}, first30=${token?.substring(0,30)}, last10=${token?.slice(-10)}`);
   const ssoResult = await processSSOToken(token);
 
   if (!ssoResult.success) {
@@ -161,7 +166,8 @@ router.post("/api/sso/verify", async (req, res) => {
   }
 
   // إنشاء JWT cookie محلي صالح لسنة كاملة
-  const localOpenId = `mousa_${ssoResult.openId}`;
+  const cleanOpenId3 = ssoResult.openId!.replace(/^(mousa_)+/, '');
+  const localOpenId = `mousa_${cleanOpenId3}`;
   const sessionToken = await sdk.createSessionToken(localOpenId, {
     name: ssoResult.name || "",
     expiresInMs: SSO_SESSION_TTL_MS,

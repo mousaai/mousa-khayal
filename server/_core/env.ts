@@ -7,6 +7,8 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
+  // OpenAI API Key — لتوليد الصور عبر DALL-E 3
+  openAiApiKey: process.env.OPENAI_API_KEY ?? "",
   // Google AI — مستقل عن مانوس
   googleAiKey: process.env.GOOGLE_AI_KEY ?? "",
   // Stability AI — توليد صور احترافية

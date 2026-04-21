@@ -1,11 +1,12 @@
 /**
- * llm.ts — Google Gemini SDK مباشرة (مستقل عن مانوس)
+ * llm.ts — Manus Forge API (OpenAI-compatible)
  *
- * يحافظ على نفس الواجهة الخارجية (invokeLLM) حتى لا يحتاج أي ملف آخر للتغيير.
- * النموذج الافتراضي: gemini-2.5-flash (أسرع + أرخص + جودة عالية)
- * Fallback: gemini-2.0-flash
+ * يستخدم Manus Forge API بدلاً من Google Gemini SDK مباشرة
+ * لأن GOOGLE_AI_KEY لا يعمل خارج بيئة Manus (API_KEY_SERVICE_BLOCKED)
+ *
+ * Forge API متوافق مع OpenAI API format — نفس الواجهة الخارجية (invokeLLM)
+ * النموذج الافتراضي: gemini-2.5-flash عبر Forge proxy
  */
-import { GoogleGenAI, Type } from "@google/genai";
 import { ENV } from "./env";
 import { trackLLM } from "../costTracker";
 
@@ -113,121 +114,16 @@ export type InvokeResult = {
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Helpers
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function getClient(): GoogleGenAI {
-  const key = ENV.googleAiKey;
-  if (!key) throw new Error("GOOGLE_AI_KEY is not configured");
-  return new GoogleGenAI({ apiKey: key });
-}
-
-/** تحويل رسائل OpenAI format إلى Gemini format */
-function convertMessages(messages: Message[]): {
-  systemInstruction?: string;
-  contents: Array<{ role: "user" | "model"; parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> }>;
-} {
-  let systemInstruction: string | undefined;
-  const contents: Array<{ role: "user" | "model"; parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> }> = [];
-
-  for (const msg of messages) {
-    const contentArray = Array.isArray(msg.content) ? msg.content : [msg.content];
-
-    // system → systemInstruction
-    if (msg.role === "system") {
-      systemInstruction = contentArray
-        .map(c => (typeof c === "string" ? c : (c as TextContent).text ?? ""))
-        .join("\n");
-      continue;
-    }
-
-    // tool/function responses → user
-    const geminiRole = msg.role === "assistant" ? "model" : "user";
-
-    const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [];
-
-    for (const part of contentArray) {
-      if (typeof part === "string") {
-        parts.push({ text: part });
-      } else if (part.type === "text") {
-        parts.push({ text: (part as TextContent).text });
-      } else if (part.type === "image_url") {
-        const url = (part as ImageContent).image_url.url;
-        // data URL → inlineData
-        if (url.startsWith("data:")) {
-          const [meta, data] = url.split(",");
-          const mimeType = meta.split(":")[1].split(";")[0];
-          parts.push({ inlineData: { mimeType, data } });
-        } else {
-          // URL مباشر → نمرره كنص مع تعليمات
-          parts.push({ text: `[Image: ${url}]` });
-        }
-      } else {
-        // file_url → نص
-        parts.push({ text: `[File: ${(part as FileContent).file_url.url}]` });
-      }
-    }
-
-    if (parts.length === 0) parts.push({ text: "" });
-    contents.push({ role: geminiRole, parts });
-  }
-
-  // Gemini يتطلب أن يبدأ بـ user وينتهي بـ user
-  // إذا كان آخر message هو model، نضيف user فارغ
-  if (contents.length > 0 && contents[contents.length - 1].role === "model") {
-    contents.push({ role: "user", parts: [{ text: "Continue." }] });
-  }
-
-  return { systemInstruction, contents };
-}
-
-/** تحويل JSON Schema إلى Gemini Schema format */
-function convertJsonSchemaToGemini(schema: Record<string, unknown>): Record<string, unknown> {
-  if (!schema || typeof schema !== "object") return schema;
-
-  const result: Record<string, unknown> = {};
-
-  for (const [key, value] of Object.entries(schema)) {
-    if (key === "type" && typeof value === "string") {
-      result[key] = value.toUpperCase();
-    } else if (key === "properties" && typeof value === "object" && value !== null) {
-      result[key] = Object.fromEntries(
-        Object.entries(value as Record<string, unknown>).map(([k, v]) => [
-          k,
-          convertJsonSchemaToGemini(v as Record<string, unknown>),
-        ])
-      );
-    } else if (key === "items" && typeof value === "object" && value !== null) {
-      result[key] = convertJsonSchemaToGemini(value as Record<string, unknown>);
-    } else if (key === "additionalProperties") {
-      // Gemini لا يدعم هذا الخاصية — نتجاهلها
-      continue;
-    } else {
-      result[key] = value;
-    }
-  }
-
-  return result;
-}
-
-/** تحويل Tools إلى Gemini function declarations */
-function convertTools(tools: Tool[]) {
-  return tools.map(t => ({
-    name: t.function.name,
-    description: t.function.description ?? "",
-    parameters: t.function.parameters
-      ? convertJsonSchemaToGemini(t.function.parameters)
-      : undefined,
-  }));
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Main invokeLLM — drop-in replacement
+// Main invokeLLM — Manus Forge API (OpenAI-compatible)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
-  const client = getClient();
-  const modelName = "gemini-2.5-flash"; // النموذج الأحدث والأسرع من Google
+  const forgeUrl = ENV.forgeApiUrl;
+  const forgeKey = ENV.forgeApiKey;
+
+  if (!forgeUrl || !forgeKey) {
+    throw new Error("BUILT_IN_FORGE_API_URL or BUILT_IN_FORGE_API_KEY is not configured");
+  }
 
   const {
     messages,
@@ -242,92 +138,79 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     max_tokens,
   } = params;
 
-  const { systemInstruction, contents } = convertMessages(messages);
+  const modelName = "gemini-2.5-flash";
 
-  // بناء config
-  const config: Record<string, unknown> = {
-    maxOutputTokens: maxTokens || max_tokens || 8192,
+  // تحويل المحتوى إلى OpenAI format
+  const openAiMessages = messages.map((msg) => {
+    const role = msg.role === "function" ? "tool" : msg.role;
+    if (Array.isArray(msg.content)) {
+      const parts = msg.content.map((part) => {
+        if (typeof part === "string") return { type: "text", text: part };
+        if (part.type === "file_url") return { type: "text", text: `[File: ${(part as FileContent).file_url.url}]` };
+        return part;
+      });
+      return { role, content: parts };
+    }
+    return { role, content: msg.content };
+  });
+
+  // بناء الـ request body
+  const body: Record<string, unknown> = {
+    model: modelName,
+    messages: openAiMessages,
+    max_tokens: maxTokens || max_tokens || 8192,
   };
-
-  if (systemInstruction) {
-    config.systemInstruction = systemInstruction;
-  }
 
   // Tools
   if (tools && tools.length > 0) {
-    config.tools = [{ functionDeclarations: convertTools(tools) }];
-
+    body.tools = tools;
     const tc = toolChoice || tool_choice;
-    if (tc === "none") {
-      config.toolConfig = { functionCallingConfig: { mode: "NONE" } };
-    } else if (tc === "required") {
-      config.toolConfig = { functionCallingConfig: { mode: "ANY" } };
-    } else if (tc && typeof tc === "object" && "name" in tc) {
-      config.toolConfig = {
-        functionCallingConfig: {
-          mode: "ANY",
-          allowedFunctionNames: [(tc as ToolChoiceByName).name],
-        },
-      };
-    } else if (tc && typeof tc === "object" && "function" in tc) {
-      config.toolConfig = {
-        functionCallingConfig: {
-          mode: "ANY",
-          allowedFunctionNames: [(tc as ToolChoiceExplicit).function.name],
-        },
-      };
+    if (tc) {
+      if (typeof tc === "string") {
+        body.tool_choice = tc;
+      } else if ("name" in tc) {
+        body.tool_choice = { type: "function", function: { name: (tc as ToolChoiceByName).name } };
+      } else {
+        body.tool_choice = tc;
+      }
     }
   }
 
-  // JSON Schema response format
+  // Response format
   const rf = responseFormat || response_format;
   const os = outputSchema || output_schema;
 
   if (rf?.type === "json_schema" || os) {
     const schema = rf?.type === "json_schema"
-      ? (rf as { type: "json_schema"; json_schema: JsonSchema }).json_schema.schema
-      : os!.schema;
-
-    config.responseMimeType = "application/json";
-    config.responseSchema = convertJsonSchemaToGemini(schema);
+      ? (rf as { type: "json_schema"; json_schema: JsonSchema }).json_schema
+      : os!;
+    body.response_format = { type: "json_schema", json_schema: schema };
   } else if (rf?.type === "json_object") {
-    config.responseMimeType = "application/json";
+    body.response_format = { type: "json_object" };
   }
 
-  // استدعاء Gemini
-  const response = await client.models.generateContent({
-    model: modelName,
-    contents,
-    config: config as Parameters<typeof client.models.generateContent>[0]["config"],
+  // استدعاء Forge API
+  const res = await fetch(`${forgeUrl}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${forgeKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+    signal: AbortSignal.timeout(120_000),
   });
 
-  const candidate = response.candidates?.[0];
-  const finishReason = candidate?.finishReason ?? null;
-  const usageMetadata = response.usageMetadata;
-
-  // استخراج المحتوى
-  let textContent = "";
-  const toolCalls: ToolCall[] = [];
-
-  for (const part of candidate?.content?.parts ?? []) {
-    if (part.text) {
-      textContent += part.text;
-    } else if (part.functionCall) {
-      toolCalls.push({
-        id: `call_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        type: "function",
-        function: {
-          name: part.functionCall.name ?? "",
-          arguments: JSON.stringify(part.functionCall.args ?? {}),
-        },
-      });
-    }
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => "");
+    throw new Error(`Forge API HTTP ${res.status}: ${errBody.substring(0, 200)}`);
   }
 
-  const inputTokens = usageMetadata?.promptTokenCount ?? 0;
-  const outputTokens = usageMetadata?.candidatesTokenCount ?? 0;
+  const data = await res.json() as InvokeResult;
 
   // تسجيل التكلفة
+  const inputTokens = data.usage?.prompt_tokens ?? 0;
+  const outputTokens = data.usage?.completion_tokens ?? 0;
+
   trackLLM({
     operation: "invokeLLM",
     inputTokens,
@@ -335,28 +218,5 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     model: modelName,
   }).catch(() => {});
 
-  // بناء InvokeResult بنفس شكل OpenAI
-  const result: InvokeResult = {
-    id: `gemini-${Date.now()}`,
-    created: Math.floor(Date.now() / 1000),
-    model: modelName,
-    choices: [
-      {
-        index: 0,
-        message: {
-          role: "assistant",
-          content: textContent,
-          ...(toolCalls.length > 0 ? { tool_calls: toolCalls } : {}),
-        },
-        finish_reason: finishReason?.toString().toLowerCase() ?? "stop",
-      },
-    ],
-    usage: {
-      prompt_tokens: inputTokens,
-      completion_tokens: outputTokens,
-      total_tokens: inputTokens + outputTokens,
-    },
-  };
-
-  return result;
+  return data;
 }
