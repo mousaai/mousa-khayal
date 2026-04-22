@@ -57,18 +57,45 @@ export function useMousaAuth() {
 
   async function initAuth() {
     try {
-      // 1. تحقق من جلسة محفوظة أولاً
+      // 1. تحقق من جلسة محفوظة أولاً — لكن تحقق من السيرفر دائماً لضمان صحة الجلسة
       const savedSession = loadSavedSession();
       if (savedSession) {
-        setState({
-          user: savedSession.user,
-          loading: false,
-          error: null,
-          token: savedSession.token,
-        });
-        // تحديث الرصيد في الخلفية بدون تغيير loading
-        refreshBalanceInBackground(savedSession.token, savedSession.user);
-        return;
+        // تحقق من السيرفر أولاً لضمان أن الجلسة لا تزال صالحة ومرتبطة بالمستخدم الصحيح
+        try {
+          const statusRes = await fetch("/api/sso/status", {
+            credentials: "include",
+          });
+          if (statusRes.ok) {
+            const statusData = await statusRes.json();
+            if (statusData.authenticated && statusData.userId) {
+              // الجلسة صالحة — استخدم البيانات الحديثة من السيرفر
+              const freshUser: MousaUser = {
+                userId: statusData.userId,
+                openId: statusData.openId ?? `mousa_${statusData.userId}`,
+                name: statusData.name ?? savedSession.user.name,
+                email: statusData.email ?? savedSession.user.email,
+                creditBalance: statusData.creditBalance ?? savedSession.user.creditBalance,
+                platform: THIS_PLATFORM,
+              };
+              // تحديث localStorage بالبيانات الحديثة
+              saveSession(savedSession.token, freshUser);
+              setState({ user: freshUser, loading: false, error: null, token: savedSession.token });
+              return;
+            } else {
+              // الجلسة منتهية أو غير صالحة — امسح localStorage
+              clearSession();
+            }
+          }
+        } catch {
+          // فشل الاتصال بالسيرفر — استخدم البيانات المحفوظة مؤقتاً
+          setState({
+            user: savedSession.user,
+            loading: false,
+            error: null,
+            token: savedSession.token,
+          });
+          return;
+        }
       }
 
       // 2. قراءة ?token= من URL
