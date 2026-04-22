@@ -162,23 +162,31 @@ export async function verifyMousaToken(token: string): Promise<{
   result: MousaVerifyResult | null;
   error: MousaVerifyError | null;
 }> {
+  const apiKey = getMousaApiKey();
+  const baseUrl = getMousaBaseUrl();
+  const platformId = getMousaPlatformId();
+  console.log(`[MousaCredits] verify-token START — platform=${platformId}, baseUrl=${baseUrl}, keyLen=${apiKey.length}, tokenLen=${token.length}`);
+
   if (!isEnabled()) {
     console.warn('[MousaCredits] verify-token skipped: PLATFORM_API_KEY not configured');
     return { result: null, error: null };
   }
 
   try {
-    const res = await fetch(`${MOUSA_BASE_URL}/api/platform/verify-token`, {
+    const headers = getMousaHeaders();
+    console.log(`[MousaCredits] verify-token calling: ${baseUrl}/api/platform/verify-token`);
+    const res = await fetch(`${baseUrl}/api/platform/verify-token`, {
       method: "POST",
-      headers: getMousaHeaders(),
+      headers,
       body: JSON.stringify({ token }),
       signal: AbortSignal.timeout(8000),
     });
 
     const data = await res.json();
+    console.log(`[MousaCredits] verify-token response: status=${res.status}, keys=${Object.keys(data).join(',')}`);
 
     if (!res.ok || data.error) {
-      console.error(`[MousaCredits] verify-token failed: ${res.status}`, data);
+      console.error(`[MousaCredits] verify-token failed: ${res.status}`, JSON.stringify(data));
       return {
         result: null,
         error: {
@@ -188,6 +196,7 @@ export async function verifyMousaToken(token: string): Promise<{
       };
     }
 
+    console.log(`[MousaCredits] verify-token SUCCESS — userId=${data.userId}, name=${data.name}, balance=${data.creditBalance}`);
     return { result: data as MousaVerifyResult, error: null };
   } catch (err) {
     console.error("[MousaCredits] verify-token error:", err);
