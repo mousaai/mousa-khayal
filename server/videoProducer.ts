@@ -27,6 +27,7 @@ import { invokeLLM } from "./_core/llm";
 import { storagePut } from "./storage";
 import { ElevenLabsEngine, selectVoiceForDomain, type ElevenLabsVoiceId } from "./elevenLabsEngine";
 import { openAiTtsEngine } from "./openAiTtsEngine";
+import { fishAudioEngine } from "./fishAudioEngine";
 import { detectFilmGenre, getGenreDNA, type FilmGenre } from "./filmGenreEngine";
 import { RunwayEngine, selectMotionForDomain } from "./runwayEngine";
 
@@ -505,7 +506,28 @@ export class VideoProducer {
       ? "eleven_multilingual_v2"
       : "eleven_turbo_v2_5";
 
-    // ── المحاولة الأولى: ElevenLabs ──────────────────────────
+    // ── المحاولة الأولى: Fish Audio (الرئيسي) ───────────────
+    if (fishAudioEngine.isConfigured()) {
+      try {
+        const fishQuality = mode === "production" ? "normal" : "balanced";
+        const audioBuffer = await fishAudioEngine.generateSpeech(
+          script.narration,
+          elevenVoice,
+          fishQuality
+        );
+
+        if (audioBuffer) {
+          await fs.writeFile(audioPath, audioBuffer);
+          console.log(`  ✓ صوت Fish Audio جاهز: ${audioPath}`);
+          return audioPath;
+        }
+        console.warn("[VideoProducer] Fish Audio TTS فشل — تجربة ElevenLabs...");
+      } catch (e) {
+        console.warn(`[VideoProducer] Fish Audio error: ${e} — تجربة ElevenLabs...`);
+      }
+    }
+
+    // ── المحاولة الثانية: ElevenLabs (fallback) ──────────────
     try {
       const audioBuffer = await this.elevenLabs.generateSpeech({
         voice: elevenVoice,
@@ -515,7 +537,7 @@ export class VideoProducer {
 
       if (audioBuffer) {
         await fs.writeFile(audioPath, audioBuffer);
-        console.log(`  ✓ صوت ElevenLabs جاهز: ${audioPath}`);
+        console.log(`  ✓ صوت ElevenLabs جاهز (fallback): ${audioPath}`);
         return audioPath;
       }
       console.warn("[VideoProducer] ElevenLabs TTS فشل — تجربة OpenAI TTS...");
@@ -523,7 +545,7 @@ export class VideoProducer {
       console.warn(`[VideoProducer] ElevenLabs error: ${e} — تجربة OpenAI TTS...`);
     }
 
-    // ── المحاولة الثانية: OpenAI TTS (fallback اقتصادي) ──────
+    // ── المحاولة الثالثة: OpenAI TTS (fallback أخير) ─────────
     if (openAiTtsEngine.isConfigured()) {
       try {
         const openAiModel = mode === "production" ? "tts-1-hd" : "tts-1";
@@ -535,7 +557,7 @@ export class VideoProducer {
 
         if (audioBuffer) {
           await fs.writeFile(audioPath, audioBuffer);
-          console.log(`  ✓ صوت OpenAI TTS جاهز (fallback): ${audioPath}`);
+          console.log(`  ✓ صوت OpenAI TTS جاهز (fallback أخير): ${audioPath}`);
           return audioPath;
         }
       } catch (e) {
@@ -543,7 +565,7 @@ export class VideoProducer {
       }
     }
 
-    console.warn("[VideoProducer] كلا ElevenLabs وOpenAI TTS فشلا — سيتم الإنتاج بدون صوت");
+    console.warn("[VideoProducer] جميع محركات TTS فشلت — سيتم الإنتاج بدون صوت");
     return null;
   }
 
