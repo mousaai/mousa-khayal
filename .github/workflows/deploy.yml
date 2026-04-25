@@ -34,6 +34,52 @@ jobs:
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             ./ root@${{ secrets.SERVER_HOST }}:/var/www/mousa-khayal/
 
+      - name: 🔐 Write environment variables to server
+        run: |
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            root@${{ secrets.SERVER_HOST }} \
+            'cat > /var/www/mousa-khayal/ecosystem.config.cjs << '"'"'EOFCONFIG'"'"'
+module.exports = {
+  apps: [
+    {
+      name: "khayal",
+      script: "./dist/index.js",
+      cwd: "/var/www/mousa-khayal",
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "1G",
+      env: {
+        NODE_ENV: "production",
+        PORT: 3007,
+        WEBHOOK_SECRET: "${{ secrets.WEBHOOK_SECRET }}",
+        EXTERNAL_URL: "https://khayal.mousa.ai",
+        PLATFORM_API_KEY: "${{ secrets.PLATFORM_API_KEY }}",
+        JWT_SECRET: "${{ secrets.JWT_SECRET }}",
+        DATABASE_URL: "${{ secrets.DATABASE_URL }}",
+        MOUSA_API_KEY: "${{ secrets.MOUSA_API_KEY }}",
+        OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}",
+        GOOGLE_AI_KEY: "${{ secrets.GOOGLE_AI_KEY }}",
+        REPLICATE_API_TOKEN: "${{ secrets.REPLICATE_API_TOKEN }}",
+        CLOUDFLARE_R2_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_R2_ACCOUNT_ID }}",
+        CLOUDFLARE_R2_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}",
+        CLOUDFLARE_R2_SECRET_ACCESS_KEY: "${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}",
+        CLOUDFLARE_R2_BUCKET_NAME: "${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}",
+        CLOUDFLARE_R2_PUBLIC_URL: "${{ secrets.CLOUDFLARE_R2_PUBLIC_URL }}",
+        VITE_APP_ID: "${{ secrets.VITE_APP_ID }}",
+        VITE_OAUTH_PORTAL_URL: "${{ secrets.VITE_OAUTH_PORTAL_URL }}",
+        VITE_FRONTEND_FORGE_API_KEY: "${{ secrets.VITE_FRONTEND_FORGE_API_KEY }}",
+        VITE_FRONTEND_FORGE_API_URL: "${{ secrets.VITE_FRONTEND_FORGE_API_URL }}",
+      },
+      error_file: "/var/log/pm2/khayal-error.log",
+      out_file: "/var/log/pm2/khayal-out.log",
+      log_date_format: "YYYY-MM-DD HH:mm:ss",
+    },
+  ],
+};
+EOFCONFIG
+echo "✅ ecosystem.config.cjs written"'
+
       - name: 🔧 Build & restart on server
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
@@ -47,7 +93,7 @@ jobs:
              pnpm install --no-frozen-lockfile && \
              pnpm build && \
              if pm2 describe khayal > /dev/null 2>&1; then \
-               pm2 reload khayal --update-env; \
+               pm2 restart ecosystem.config.cjs --update-env; \
              else \
                pm2 start ecosystem.config.cjs; \
              fi && \
