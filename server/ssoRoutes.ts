@@ -78,16 +78,21 @@ async function processSSOToken(token: string): Promise<{
   // تنظيف أي بادئات mousa_ متكررة قبل إضافة البادئة
   const cleanOpenId = result.openId.replace(/^(mousa_)+/, '');
   const localOpenId = `mousa_${cleanOpenId}`;
-  await db.upsertUser({
-    openId: localOpenId,
-    name: result.name || null,
-    email: result.email || null,
-    loginMethod: "mousa_sso",
-    lastSignedIn: new Date(),
-    mousaUserId: result.userId,
-    mousaBalance: realBalance,
-    mousaLastSync: new Date(),
-  });
+  try {
+    await db.upsertUser({
+      openId: localOpenId,
+      name: result.name || null,
+      email: result.email || null,
+      loginMethod: "mousa_sso",
+      lastSignedIn: new Date(),
+      mousaUserId: result.userId,
+      mousaBalance: realBalance,
+      mousaLastSync: new Date(),
+    });
+  } catch (dbErr) {
+    // لا نوقف العملية إذا فشل حفظ المستخدم — نكمل بدون DB
+    console.warn('[SSO] upsertUser failed (non-fatal):', dbErr);
+  }
 
   return {
     success: true,

@@ -182,4 +182,15 @@ async function startServer() {
   });
 }
 
+// حماية شاملة من الأخطاء غير المعالجة — تمنع crash السيرفر
+process.on('uncaughtException', (err) => {
+  console.error('[Process] uncaughtException (non-fatal):', err.message);
+  // لا نوقف السيرفر — فقط نُسجّل
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Process] unhandledRejection (non-fatal):', reason);
+  // لا نوقف السيرفر — فقط نُسجّل
+});
+
 startServer().catch(console.error);

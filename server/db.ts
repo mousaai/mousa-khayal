@@ -25,8 +25,8 @@ export async function getDb() {
         queueLimit: 0,
         enableKeepAlive: true,
         keepAliveInitialDelay: 10_000,
-        connectTimeout: 10_000,
-        idleTimeout: 60_000,
+        connectTimeout: 15_000,
+        idleTimeout: 300_000,  // 5 دقائق بدلاً من 60 ثانية
       });
       _db = drizzle(_pool);
       console.log("[Database] Connection pool initialized (limit=20)");

@@ -18,6 +18,7 @@ import { useAuth } from "@/components/AuthGate";
 import { getLoginUrl, getAppleLoginUrl } from "@/const";
 import { useMousaTokenHandoff } from "@/hooks/useMousaTokenHandoff";
 import CreditConfirmDialog from "@/components/CreditConfirmDialog";
+import { toast } from "sonner";
 
 // ── صور الخلفية ──────────────────────────────────────────────────────────────
 const PORTAL_SCENES = [
@@ -993,9 +994,17 @@ export default function Home() {
           );
           musicEngine.play(mood, 0.12);
         } catch (err) {
-          console.error(err);
+          console.error('[Generate] generateMutation failed:', err);
+          toast.error(
+            activeLang === 'AR' ? '❌ فشل التوليد — حاول مرة أخرى' :
+            activeLang === 'UR' ? '❌ ناکام — دوبارہ کوشش کریں' :
+            activeLang === 'FR' ? '❌ Échec — Réessayez' :
+            '❌ Generation failed — please try again',
+            { duration: 5000 }
+          );
         } finally {
           setIsGenerating(false);
+          setPortalGlow(false);
         }
         return;
       }
@@ -1078,9 +1087,17 @@ export default function Home() {
           );
           musicEngine.play(mood, 0.12);
         } catch (err) {
-          console.error(err);
+          console.error('[Generate] default image failed:', err);
+          toast.error(
+            activeLang === 'AR' ? '❌ فشل التوليد — حاول مرة أخرى' :
+            activeLang === 'UR' ? '❌ ناکام — دوبارہ کوشش کریں' :
+            activeLang === 'FR' ? '❌ Échec — Réessayez' :
+            '❌ Generation failed — please try again',
+            { duration: 5000 }
+          );
         } finally {
           setIsGenerating(false);
+          setPortalGlow(false);
         }
       }
     });
