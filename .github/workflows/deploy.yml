@@ -61,6 +61,8 @@ module.exports = {
         OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}",
         GOOGLE_AI_KEY: "${{ secrets.GOOGLE_AI_KEY }}",
         REPLICATE_API_TOKEN: "${{ secrets.REPLICATE_API_TOKEN }}",
+        ELEVENLABS_API_KEY: "${{ secrets.ELEVENLABS_API_KEY }}",
+        FISH_AUDIO_API_KEY: "${{ secrets.FISH_AUDIO_API_KEY }}",
         CLOUDFLARE_R2_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_R2_ACCOUNT_ID }}",
         CLOUDFLARE_R2_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}",
         CLOUDFLARE_R2_SECRET_ACCESS_KEY: "${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}",
@@ -92,11 +94,8 @@ echo "✅ ecosystem.config.cjs written"'
              export VITE_FRONTEND_FORGE_API_URL="${{ secrets.VITE_FRONTEND_FORGE_API_URL }}" && \
              pnpm install --no-frozen-lockfile && \
              pnpm build && \
-             if pm2 describe khayal > /dev/null 2>&1; then \
-               pm2 restart ecosystem.config.cjs --update-env; \
-             else \
-               pm2 start ecosystem.config.cjs; \
-             fi && \
+             pm2 delete khayal 2>/dev/null || true && \
+             pm2 start ecosystem.config.cjs --only khayal && \
              pm2 save && \
              echo "✅ KHAYAL deployment complete!"'
 
