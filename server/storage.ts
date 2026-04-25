@@ -2,7 +2,8 @@
  * storage.ts — Cloudflare R2 مباشرة (مستقل عن مانوس)
  *
  * يحافظ على نفس الواجهة (storagePut / storageGet) حتى لا يحتاج أي ملف آخر للتغيير.
- * Fallback: Manus Storage proxy إذا لم تتوفر R2 credentials
+ * Fallback 1: Manus Storage proxy إذا لم تتوفر R2 credentials
+ * Fallback 2: Local File Storage — يحفظ الملفات محلياً ويخدمها عبر Express
  *
  * بعد تفعيل Public Development URL على bucket khayal-media:
  * - storagePut تُعيد رابطاً عاماً دائماً (pub-XXX.r2.dev/key)
@@ -11,6 +12,8 @@
  */
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { ENV } from "./_core/env";
+import fs from "fs";
+import path from "path";
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Cloudflare R2 Client
@@ -54,6 +57,53 @@ function normalizeKey(relKey: string): string {
 function buildPublicUrl(key: string): string {
   const base = getR2Config().publicUrl.replace(/\/+$/, "");
   return `${base}/${key}`;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// Local File Storage Fallback
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/** مجلد التخزين المحلي — خارج dist لتجنب حذفه عند البناء */
+function getLocalStorageDir(): string {
+  // في الإنتاج: /var/www/mousa-khayal/uploads/
+  // في التطوير: <project_root>/uploads/
+  const baseDir = process.env.NODE_ENV === "production"
+    ? path.resolve(import.meta.dirname, "..", "uploads")
+    : path.resolve(import.meta.dirname, "../..", "uploads");
+  return baseDir;
+}
+
+/** URL عام للملف المحلي */
+function buildLocalUrl(key: string): string {
+  const externalUrl = process.env.EXTERNAL_URL || "https://khayal.mousa.ai";
+  return `${externalUrl.replace(/\/+$/, "")}/uploads/${key}`;
+}
+
+async function localPut(
+  relKey: string,
+  data: Buffer | Uint8Array | string,
+  _contentType: string
+): Promise<{ key: string; url: string }> {
+  const key = normalizeKey(relKey);
+  const storageDir = getLocalStorageDir();
+  const filePath = path.join(storageDir, key);
+
+  // إنشاء المجلدات الوسيطة إذا لم تكن موجودة
+  await fs.promises.mkdir(path.dirname(filePath), { recursive: true });
+
+  // كتابة الملف
+  const buffer = typeof data === "string" ? Buffer.from(data) : Buffer.from(data);
+  await fs.promises.writeFile(filePath, buffer);
+
+  const url = buildLocalUrl(key);
+  console.log(`[Storage] Local fallback: saved ${key} → ${url}`);
+  return { key, url };
+}
+
+async function localGet(relKey: string): Promise<{ key: string; url: string }> {
+  const key = normalizeKey(relKey);
+  const url = buildLocalUrl(key);
+  return { key, url };
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -127,29 +177,39 @@ export async function storagePut(
 
   if (isR2Configured()) {
     // ━━ Cloudflare R2 مباشرة ━━
-    const client = getR2Client();
-    const body = typeof data === "string" ? Buffer.from(data) : data;
+    try {
+      const client = getR2Client();
+      const body = typeof data === "string" ? Buffer.from(data) : data;
 
-    await client.send(
-      new PutObjectCommand({
-        Bucket: getR2Config().bucketName,
-        Key: key,
-        Body: body,
-        ContentType: contentType,
-      })
-    );
+      await client.send(
+        new PutObjectCommand({
+          Bucket: getR2Config().bucketName,
+          Key: key,
+          Body: body,
+          ContentType: contentType,
+        })
+      );
 
-    // الآن bucket عام — نُعيد رابطاً عاماً دائماً بدلاً من presigned URL
-    const url = buildPublicUrl(key);
-    return { key, url };
+      // الآن bucket عام — نُعيد رابطاً عاماً دائماً بدلاً من presigned URL
+      const url = buildPublicUrl(key);
+      return { key, url };
+    } catch (r2Error) {
+      console.warn(`[Storage] R2 failed (${(r2Error as Error).message}), falling back to local storage`);
+      // الـ fallback للتخزين المحلي
+    }
   }
 
   if (isManusFallbackConfigured()) {
     // ━━ Manus Storage كـ fallback ━━
-    return manusPut(relKey, data, contentType);
+    try {
+      return await manusPut(relKey, data, contentType);
+    } catch (manusError) {
+      console.warn(`[Storage] Manus fallback failed (${(manusError as Error).message}), using local storage`);
+    }
   }
 
-  throw new Error("لا توجد credentials للتخزين: يرجى ضبط CLOUDFLARE_R2_* أو BUILT_IN_FORGE_API_*");
+  // ━━ Local File Storage كـ fallback أخير ━━
+  return localPut(relKey, data, contentType);
 }
 
 export async function storageGet(
@@ -160,6 +220,11 @@ export async function storageGet(
 
   if (isR2Configured()) {
     // ━━ Cloudflare R2: رابط عام دائم (bucket عام الآن) ━━
+    // نتحقق أولاً إذا كان الملف موجوداً محلياً (من fallback سابق)
+    const localPath = path.join(getLocalStorageDir(), key);
+    if (fs.existsSync(localPath)) {
+      return localGet(relKey);
+    }
     const url = buildPublicUrl(key);
     return { key, url };
   }
@@ -168,5 +233,5 @@ export async function storageGet(
     return manusGet(relKey);
   }
 
-  throw new Error("لا توجد credentials للتخزين");
+  return localGet(relKey);
 }

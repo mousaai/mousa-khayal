@@ -2,6 +2,8 @@ import "dotenv/config";
 import express from "express";
 import { createServer } from "http";
 import net from "net";
+import path from "path";
+import fs from "fs";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 // OAuth محذوف — المنصة تستخدم mousa.ai SSO حصراً
 import { registerInternalRoutes } from "../internal.routes";
@@ -148,6 +150,21 @@ async function startServer() {
       createContext,
     })
   );
+  // ── Uploads: خدمة الملفات المحلية (fallback عند فشل R2) ─────────────────────────────
+  const uploadsDir = process.env.NODE_ENV === "production"
+    ? path.resolve(import.meta.dirname, "..", "uploads")
+    : path.resolve(import.meta.dirname, "../..", "uploads");
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  app.use("/uploads", express.static(uploadsDir, {
+    maxAge: "30d",
+    setHeaders: (res) => {
+      res.setHeader("Access-Control-Allow-Origin", "*");
+      res.setHeader("Cache-Control", "public, max-age=2592000, immutable");
+    },
+  }));
+
   // development mode uses Vite, production mode uses static files
   if (process.env.NODE_ENV === "development") {
     await setupVite(app, server);
