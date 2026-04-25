@@ -17,26 +17,6 @@ jobs:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: ⚙️ Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-
-      - name: 📦 Install pnpm
-        uses: pnpm/action-setup@v4
-
-      - name: 🔧 Install ALL dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: 🏗️ Build project
-        run: pnpm build
-        env:
-          NODE_ENV: production
-          VITE_APP_ID: ${{ secrets.VITE_APP_ID }}
-          VITE_OAUTH_PORTAL_URL: ${{ secrets.VITE_OAUTH_PORTAL_URL }}
-          VITE_FRONTEND_FORGE_API_KEY: ${{ secrets.VITE_FRONTEND_FORGE_API_KEY }}
-          VITE_FRONTEND_FORGE_API_URL: ${{ secrets.VITE_FRONTEND_FORGE_API_URL }}
-
       - name: 🔑 Setup SSH key
         run: |
           mkdir -p ~/.ssh
@@ -44,27 +24,30 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
-      - name: 📤 Deploy dist to server
+      - name: 📤 Sync source code to server
         run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            root@${{ secrets.SERVER_HOST }} \
-            "mkdir -p /var/www/mousa-khayal/dist /var/log/mousa-khayal"
           rsync -avz --delete \
+            --exclude='.git' \
+            --exclude='node_modules' \
+            --exclude='dist' \
+            --exclude='.env*' \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            dist/ root@${{ secrets.SERVER_HOST }}:/var/www/mousa-khayal/dist/
-          rsync -avz \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
-            package.json pnpm-lock.yaml ecosystem.config.cjs \
-            root@${{ secrets.SERVER_HOST }}:/var/www/mousa-khayal/
+            ./ root@${{ secrets.SERVER_HOST }}:/var/www/mousa-khayal/
 
-      - name: 🔄 Install deps & restart PM2
+      - name: 🔧 Build & restart on server
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             root@${{ secrets.SERVER_HOST }} \
             'cd /var/www/mousa-khayal && \
+             export NODE_ENV=production && \
+             export VITE_APP_ID="${{ secrets.VITE_APP_ID }}" && \
+             export VITE_OAUTH_PORTAL_URL="${{ secrets.VITE_OAUTH_PORTAL_URL }}" && \
+             export VITE_FRONTEND_FORGE_API_KEY="${{ secrets.VITE_FRONTEND_FORGE_API_KEY }}" && \
+             export VITE_FRONTEND_FORGE_API_URL="${{ secrets.VITE_FRONTEND_FORGE_API_URL }}" && \
              pnpm install --no-frozen-lockfile && \
-             if pm2 describe mousa-khayal > /dev/null 2>&1; then \
-               pm2 reload mousa-khayal --update-env; \
+             pnpm build && \
+             if pm2 describe khayal > /dev/null 2>&1; then \
+               pm2 reload khayal --update-env; \
              else \
                pm2 start ecosystem.config.cjs; \
              fi && \
@@ -73,7 +56,7 @@ jobs:
 
       - name: ✅ Verify khayal.mousa.ai is up
         run: |
-          sleep 15
+          sleep 20
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" https://khayal.mousa.ai/ || echo "000")
           if [ "$STATUS" = "200" ]; then
             echo "✅ khayal.mousa.ai → HTTP $STATUS — ONLINE"
