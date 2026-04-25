@@ -9,6 +9,7 @@ on:
         description: 'سبب النشر اليدوي'
         required: false
         default: 'نشر يدوي'
+
 jobs:
   deploy-khayal:
     name: 🏗️ نشر خيال (khayal.mousa.ai)
@@ -24,6 +25,30 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
 
+      - name: 🔐 Build ecosystem.config.cjs from template
+        run: |
+          cp .github/ecosystem.config.template.cjs ecosystem.config.cjs
+          sed -i "s|__WEBHOOK_SECRET__|${{ secrets.WEBHOOK_SECRET }}|g" ecosystem.config.cjs
+          sed -i "s|__PLATFORM_API_KEY__|${{ secrets.PLATFORM_API_KEY }}|g" ecosystem.config.cjs
+          sed -i "s|__JWT_SECRET__|${{ secrets.JWT_SECRET }}|g" ecosystem.config.cjs
+          sed -i "s|__DATABASE_URL__|${{ secrets.DATABASE_URL }}|g" ecosystem.config.cjs
+          sed -i "s|__MOUSA_API_KEY__|${{ secrets.MOUSA_API_KEY }}|g" ecosystem.config.cjs
+          sed -i "s|__OPENAI_API_KEY__|${{ secrets.OPENAI_API_KEY }}|g" ecosystem.config.cjs
+          sed -i "s|__GOOGLE_AI_KEY__|${{ secrets.GOOGLE_AI_KEY }}|g" ecosystem.config.cjs
+          sed -i "s|__REPLICATE_API_TOKEN__|${{ secrets.REPLICATE_API_TOKEN }}|g" ecosystem.config.cjs
+          sed -i "s|__ELEVENLABS_API_KEY__|${{ secrets.ELEVENLABS_API_KEY }}|g" ecosystem.config.cjs
+          sed -i "s|__FISH_AUDIO_API_KEY__|${{ secrets.FISH_AUDIO_API_KEY }}|g" ecosystem.config.cjs
+          sed -i "s|__CLOUDFLARE_R2_ACCOUNT_ID__|${{ secrets.CLOUDFLARE_R2_ACCOUNT_ID }}|g" ecosystem.config.cjs
+          sed -i "s|__CLOUDFLARE_R2_ACCESS_KEY_ID__|${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}|g" ecosystem.config.cjs
+          sed -i "s|__CLOUDFLARE_R2_SECRET_ACCESS_KEY__|${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}|g" ecosystem.config.cjs
+          sed -i "s|__CLOUDFLARE_R2_BUCKET_NAME__|${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}|g" ecosystem.config.cjs
+          sed -i "s|__CLOUDFLARE_R2_PUBLIC_URL__|${{ secrets.CLOUDFLARE_R2_PUBLIC_URL }}|g" ecosystem.config.cjs
+          sed -i "s|__VITE_APP_ID__|${{ secrets.VITE_APP_ID }}|g" ecosystem.config.cjs
+          sed -i "s|__VITE_OAUTH_PORTAL_URL__|${{ secrets.VITE_OAUTH_PORTAL_URL }}|g" ecosystem.config.cjs
+          sed -i "s|__VITE_FRONTEND_FORGE_API_KEY__|${{ secrets.VITE_FRONTEND_FORGE_API_KEY }}|g" ecosystem.config.cjs
+          sed -i "s|__VITE_FRONTEND_FORGE_API_URL__|${{ secrets.VITE_FRONTEND_FORGE_API_URL }}|g" ecosystem.config.cjs
+          echo "✅ ecosystem.config.cjs built from template"
+
       - name: 📤 Sync source code to server
         run: |
           rsync -avz --delete \
@@ -33,71 +58,24 @@ jobs:
             --exclude='.env*' \
             -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
             ./ root@${{ secrets.SERVER_HOST }}:/var/www/mousa-khayal/
-
-      - name: 🔐 Write environment variables to server
-        run: |
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
-            root@${{ secrets.SERVER_HOST }} \
-            'cat > /var/www/mousa-khayal/ecosystem.config.cjs << '"'"'EOFCONFIG'"'"'
-module.exports = {
-  apps: [
-    {
-      name: "khayal",
-      script: "./dist/index.js",
-      cwd: "/var/www/mousa-khayal",
-      instances: 1,
-      autorestart: true,
-      watch: false,
-      max_memory_restart: "1G",
-      env: {
-        NODE_ENV: "production",
-        PORT: 3007,
-        WEBHOOK_SECRET: "${{ secrets.WEBHOOK_SECRET }}",
-        EXTERNAL_URL: "https://khayal.mousa.ai",
-        PLATFORM_API_KEY: "${{ secrets.PLATFORM_API_KEY }}",
-        JWT_SECRET: "${{ secrets.JWT_SECRET }}",
-        DATABASE_URL: "${{ secrets.DATABASE_URL }}",
-        MOUSA_API_KEY: "${{ secrets.MOUSA_API_KEY }}",
-        OPENAI_API_KEY: "${{ secrets.OPENAI_API_KEY }}",
-        GOOGLE_AI_KEY: "${{ secrets.GOOGLE_AI_KEY }}",
-        REPLICATE_API_TOKEN: "${{ secrets.REPLICATE_API_TOKEN }}",
-        ELEVENLABS_API_KEY: "${{ secrets.ELEVENLABS_API_KEY }}",
-        FISH_AUDIO_API_KEY: "${{ secrets.FISH_AUDIO_API_KEY }}",
-        CLOUDFLARE_R2_ACCOUNT_ID: "${{ secrets.CLOUDFLARE_R2_ACCOUNT_ID }}",
-        CLOUDFLARE_R2_ACCESS_KEY_ID: "${{ secrets.CLOUDFLARE_R2_ACCESS_KEY_ID }}",
-        CLOUDFLARE_R2_SECRET_ACCESS_KEY: "${{ secrets.CLOUDFLARE_R2_SECRET_ACCESS_KEY }}",
-        CLOUDFLARE_R2_BUCKET_NAME: "${{ secrets.CLOUDFLARE_R2_BUCKET_NAME }}",
-        CLOUDFLARE_R2_PUBLIC_URL: "${{ secrets.CLOUDFLARE_R2_PUBLIC_URL }}",
-        VITE_APP_ID: "${{ secrets.VITE_APP_ID }}",
-        VITE_OAUTH_PORTAL_URL: "${{ secrets.VITE_OAUTH_PORTAL_URL }}",
-        VITE_FRONTEND_FORGE_API_KEY: "${{ secrets.VITE_FRONTEND_FORGE_API_KEY }}",
-        VITE_FRONTEND_FORGE_API_URL: "${{ secrets.VITE_FRONTEND_FORGE_API_URL }}",
-      },
-      error_file: "/var/log/pm2/khayal-error.log",
-      out_file: "/var/log/pm2/khayal-out.log",
-      log_date_format: "YYYY-MM-DD HH:mm:ss",
-    },
-  ],
-};
-EOFCONFIG
-echo "✅ ecosystem.config.cjs written"'
+          echo "✅ Source code synced (ecosystem.config.cjs included)"
 
       - name: 🔧 Build & restart on server
         run: |
           ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
             root@${{ secrets.SERVER_HOST }} \
-            'cd /var/www/mousa-khayal && \
-             export NODE_ENV=production && \
-             export VITE_APP_ID="${{ secrets.VITE_APP_ID }}" && \
-             export VITE_OAUTH_PORTAL_URL="${{ secrets.VITE_OAUTH_PORTAL_URL }}" && \
-             export VITE_FRONTEND_FORGE_API_KEY="${{ secrets.VITE_FRONTEND_FORGE_API_KEY }}" && \
-             export VITE_FRONTEND_FORGE_API_URL="${{ secrets.VITE_FRONTEND_FORGE_API_URL }}" && \
-             pnpm install --no-frozen-lockfile && \
-             pnpm build && \
-             pm2 delete khayal 2>/dev/null || true && \
-             pm2 start ecosystem.config.cjs --only khayal && \
-             pm2 save && \
-             echo "✅ KHAYAL deployment complete!"'
+            'cd /var/www/mousa-khayal \
+             && export NODE_ENV=production \
+             && export VITE_APP_ID="${{ secrets.VITE_APP_ID }}" \
+             && export VITE_OAUTH_PORTAL_URL="${{ secrets.VITE_OAUTH_PORTAL_URL }}" \
+             && export VITE_FRONTEND_FORGE_API_KEY="${{ secrets.VITE_FRONTEND_FORGE_API_KEY }}" \
+             && export VITE_FRONTEND_FORGE_API_URL="${{ secrets.VITE_FRONTEND_FORGE_API_URL }}" \
+             && pnpm install --no-frozen-lockfile \
+             && pnpm build \
+             && pm2 delete khayal 2>/dev/null || true \
+             && pm2 start ecosystem.config.cjs --only khayal \
+             && pm2 save \
+             && echo "✅ KHAYAL deployment complete!"'
 
       - name: ✅ Verify khayal.mousa.ai is up
         run: |
@@ -107,6 +85,7 @@ echo "✅ ecosystem.config.cjs written"'
             echo "✅ khayal.mousa.ai → HTTP $STATUS — ONLINE"
           else
             echo "⚠️ khayal.mousa.ai → HTTP $STATUS — CHECK REQUIRED"
+            exit 1
           fi
 
       - name: 📊 Notify on completion
